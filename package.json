@@ -1,0 +1,25 @@
+{
+  "name": "capsule",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "deploy": "rm -rf dist && npm run build && cd dist && touch .nojekyll && git init -q -b gh-pages && git add -A && git commit -q -m deploy && git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -f -q https://github.com/innademidova/capsule.git gh-pages && rm -rf .git"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-pwa": "^2.0.0"
+  }
+}

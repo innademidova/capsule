@@ -1,0 +1,91 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { signedUrls, colorOf, type Option } from './lib'
+
+const PATHS: Record<string, string> = {
+  hanger: 'M9.8 6.6a2.2 2.2 0 1 1 2.9 2.1c-.4.1-.7.5-.7.9v.6l-8.3 5.5A1.3 1.3 0 0 0 4.4 18h15.2a1.3 1.3 0 0 0 .7-2.3L12 10.2',
+  sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z',
+  image: 'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  plus: 'M12 5v14M5 12h14',
+  back: 'M15 5l-7 7 7 7',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
+  heart: 'M12 20s-7-4.4-9-9a4.5 4.5 0 0 1 9-3 4.5 4.5 0 0 1 9 3c-2 4.6-9 9-9 9z',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
+  filter: 'M4 6h16M7 12h10M10 18h4',
+  x: 'M6 6l12 12M18 6L6 18',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  'eye-off': 'M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.8M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6',
+  paste: 'M9 4h6v3H9zM8 5H6v15h12V5h-2',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  check: 'M5 12l5 5 9-10',
+}
+
+export function Icon({ name, filled }: { name: string; filled?: boolean }) {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" width="22" height="22" fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={PATHS[name]} />
+    </svg>
+  )
+}
+
+export function Swatch({ id, size = 18 }: { id: string; size?: number }) {
+  const c = colorOf(id)
+  if (!c) return null
+  return <span className="swatch" style={{ width: size, height: size, background: c.hex }} title={c.label} />
+}
+
+// Набір «таблеток» для вибору: один або кілька варіантів
+export function Chips({ options, value, onChange, multi = true, swatches }: {
+  options: Option[]; value: string[]; onChange: (v: string[]) => void; multi?: boolean; swatches?: boolean
+}) {
+  const toggle = (id: string) => {
+    if (!multi) return onChange(value[0] === id ? [] : [id])
+    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id])
+  }
+  return (
+    <div className="chips">
+      {options.map(o => (
+        <button type="button" key={o.id} className={'chip' + (value.includes(o.id) ? ' on' : '')} onClick={() => toggle(o.id)}>
+          {swatches && <Swatch id={o.id} size={14} />}{o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Фото з приватного сховища
+export function Photo({ path, alt, className }: { path: string | null; alt: string; className?: string }) {
+  const [url, setUrl] = useState<string>()
+  useEffect(() => {
+    let live = true
+    if (path) signedUrls([path]).then(m => { if (live) setUrl(m[path]) })
+    else setUrl(undefined)
+    return () => { live = false }
+  }, [path])
+  return (
+    <div className={'photo ' + (className ?? '')}>
+      {url ? <img src={url} alt={alt} loading="lazy" /> : <span className="photo-empty"><Icon name="hanger" /></span>}
+    </div>
+  )
+}
+
+export function Header({ title, left, right }: { title: ReactNode; left?: ReactNode; right?: ReactNode }) {
+  return (
+    <header className="top">
+      <div className="top-side">{left}</div>
+      <h1>{title}</h1>
+      <div className="top-side right">{right}</div>
+    </header>
+  )
+}
+
+export function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="field">
+      <h3>{title}</h3>
+      {children}
+    </section>
+  )
+}
