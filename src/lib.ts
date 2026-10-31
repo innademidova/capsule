@@ -225,3 +225,80 @@ export async function pasteImage(): Promise<Blob | null> {
   }
   return null
 }
+
+// ===== Етапи 2–5 =====
+
+export type Placement = { item_id: string; x: number; y: number; w: number; z: number }
+export type Outfit = {
+  id: string; name: string | null; layout: Placement[]; occasions: string[]; seasons: string[]
+  notes: string | null; favorite: boolean; source: string; created_at: string; updated_at: string
+}
+export type Wear = { id: string; worn_on: string; outfit_id: string | null; item_ids: string[] }
+export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
+export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
+export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
+export type StyleProfile = { summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
+export type AIRequest = {
+  id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
+  status: 'queued' | 'done' | 'error'; result: any; error: string | null; created_at: string; done_at: string | null
+}
+export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
+
+// Запит до ІІ: «now» — одразу через серверну функцію (платно), «queue» — у чергу (безкоштовно, обробляє Claude Code)
+export async function askAI(kind: string, input: Record<string, unknown>, mode: 'now' | 'queue', image_path?: string | null) {
+  const { data, error } = await supabase.from('ai_requests')
+    .insert({ kind, input, mode, image_path: image_path ?? null, status: 'queued' }).select().single()
+  if (error) throw error
+  const req = data as AIRequest
+  if (mode === 'queue') return req
+  const res = await supabase.functions.invoke('ai', { body: { id: req.id } })
+  if (res.error) {
+    let msg = res.error.message
+    try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
+    throw Object.assign(new Error(msg), { request: { ...req, status: 'error', error: msg } as AIRequest })
+  }
+  return { ...req, status: 'done', result: res.data.result, done_at: new Date().toISOString() } as AIRequest
+}
+
+export async function requeue(req: AIRequest) {
+  const { data } = await supabase.from('ai_requests').update({ status: 'queued', mode: 'queue', error: null }).eq('id', req.id).select().single()
+  return data as AIRequest
+}
+
+// Автоматична розкладка образу на полотні за категоріями
+const SLOTS: Record<string, { x: number; y: number; w: number }[]> = {
+  outerwear: [{ x: 2, y: 3, w: 46 }],
+  top: [{ x: 30, y: 3, w: 40 }, { x: 52, y: 3, w: 34 }],
+  dress: [{ x: 28, y: 2, w: 44 }],
+  bottom: [{ x: 30, y: 38, w: 38 }],
+  shoes: [{ x: 56, y: 74, w: 32 }, { x: 8, y: 76, w: 28 }],
+  bag: [{ x: 68, y: 42, w: 30 }],
+  accessory: [{ x: 4, y: 56, w: 22 }, { x: 74, y: 22, w: 22 }, { x: 72, y: 62, w: 20 }],
+}
+export function autoLayout(items: Item[]): Placement[] {
+  const used: Record<string, number> = {}
+  const hasOuter = items.some(i => i.category === 'outerwear')
+  return items.map((it, z) => {
+    const n = used[it.category] = (used[it.category] ?? -1) + 1
+    const slots = SLOTS[it.category] ?? SLOTS.accessory
+    let s = slots[Math.min(n, slots.length - 1)]
+    if (it.category === 'top' && !hasOuter && n === 0) s = { x: 14, y: 3, w: 44 }
+    if (it.category === 'bottom' && !hasOuter) s = { x: 18, y: 38, w: 40 }
+    return { item_id: it.id, ...s, z }
+  })
+}
+
+// Погода зараз (Open-Meteo, без ключа)
+export async function currentWeather(): Promise<string> {
+  const pos = await new Promise<GeolocationPosition>((res, rej) =>
+    navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000, maximumAge: 30 * 60 * 1000 }))
+  const { latitude: la, longitude: lo } = pos.coords
+  const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la.toFixed(2)}&longitude=${lo.toFixed(2)}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`)
+  const d = await r.json()
+  const code = d.current.weather_code as number
+  const sky = code === 0 ? 'clear' : code <= 3 ? 'cloudy' : code <= 48 ? 'fog' : code <= 67 ? 'rain' : code <= 77 ? 'snow' : code <= 82 ? 'showers' : 'storm'
+  return `${Math.round(d.current.temperature_2m)}°C (feels ${Math.round(d.current.apparent_temperature)}°C, today ${Math.round(d.daily.temperature_2m_min[0])}…${Math.round(d.daily.temperature_2m_max[0])}°C), ${sky}, wind ${Math.round(d.current.wind_speed_10m)} km/h`
+}
+
+export const today = () => new Date().toLocaleDateString('sv-SE')

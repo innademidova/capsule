@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase, CATEGORIES, COLORS, type Item } from './lib'
+import {
+  supabase, CATEGORIES, COLORS, askAI,
+  type Item, type Outfit, type Wear, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
+} from './lib'
 import { Icon, Header, Swatch } from './ui'
+import { StoreCtx, useStore, upsert, without, type Store } from './store'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
+import { OutfitList, OutfitDetail, OutfitEditor, Stylist } from './Outfits'
+import { InspoList, InspoDetail } from './Inspo'
+import { Shop, BeforeBuy, MiniItems } from './Shop'
 
 // Маршрути в адресі після #, щоб працювало на GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string }
-  | { view: 'outfits' } | { view: 'inspo' } | { view: 'me' }
+  | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
+  | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
@@ -15,7 +23,14 @@ function parse(hash: string): Route {
   if (a === 'i' && b && c === 'edit') return { view: 'item-edit', id: b }
   if (a === 'i' && b) return { view: 'item', id: b }
   if (a === 'outfits') return { view: 'outfits' }
+  if (a === 'o' && b === 'new') return { view: 'outfit-edit', with: c }
+  if (a === 'o' && b && c === 'edit') return { view: 'outfit-edit', id: b }
+  if (a === 'o' && b) return { view: 'outfit', id: b }
+  if (a === 'stylist') return { view: 'stylist' }
   if (a === 'inspo') return { view: 'inspo' }
+  if (a === 'n' && b) return { view: 'insp', id: b }
+  if (a === 'shop') return { view: 'shop' }
+  if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me' }
   return { view: 'wardrobe' }
 }
@@ -78,7 +93,13 @@ function Login() {
 
 function Main({ email }: { email: string }) {
   const [route, setRoute] = useState<Route>(() => parse(location.hash))
-  const [items, setItems] = useState<Item[] | null>(null)
+  const [items, setItemsS] = useState<Item[] | null>(null)
+  const [outfits, setOutfits] = useState<Outfit[]>([])
+  const [wear, setWear] = useState<Wear[]>([])
+  const [inspirations, setInspirations] = useState<Inspiration[]>([])
+  const [profile, setProfile] = useState<StyleProfile | null>(null)
+  const [shopping, setShopping] = useState<ShopItem[]>([])
+  const [requests, setRequests] = useState<AIRequest[]>([])
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [loadError, setLoadError] = useState('')
 
@@ -90,11 +111,23 @@ function Main({ email }: { email: string }) {
 
   const load = useCallback(async () => {
     setLoadError('')
-    const { data, error } = await supabase.from('items').select('*').order('created_at', { ascending: false })
-    if (error) { setLoadError(error.message); return }
-    setItems(data as Item[])
+    const by = (t: string) => supabase.from(t).select('*').order('created_at', { ascending: false })
+    const [it, ou, we, ins, pr, sh, rq] = await Promise.all([
+      by('items'), by('outfits'), supabase.from('wear_log').select('*').order('worn_on', { ascending: false }),
+      by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
+    ])
+    if (it.error) { setLoadError(it.error.message); return }
+    setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[]); setWear((we.data ?? []) as Wear[])
+    setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
+    setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
   }, [])
   useEffect(() => { load() }, [load])
+  // Коли застосунок знову відкривають — підтягуємо свіжі дані (напр. оброблену чергу)
+  useEffect(() => {
+    const on = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', on)
+    return () => document.removeEventListener('visibilitychange', on)
+  }, [load])
 
   if (loadError) return (
     <div className="splash">
@@ -105,54 +138,62 @@ function Main({ email }: { email: string }) {
   )
   if (!items) return <Splash />
 
-  const save = (i: Item) => setItems(list => [i, ...(list ?? []).filter(x => x.id !== i.id)])
-  const drop = (id: string) => setItems(list => (list ?? []).filter(x => x.id !== id))
+  const store: Store = {
+    items, outfits, wear, inspirations, profile, shopping, requests,
+    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setWear, setInspirations, setShopping, setRequests, reload: load,
+  }
+  const save = (i: Item) => store.setItems(upsert(i))
+  const drop = (id: string) => store.setItems(without(id))
   const find = (id?: string) => items.find(i => i.id === id)
+  const findO = (id?: string) => outfits.find(o => o.id === id)
+  const notFound = <NotFound />
 
   let screen
   switch (route.view) {
     case 'wardrobe': screen = <WardrobeList items={items} filters={filters} setFilters={setFilters} />; break
-    case 'item': {
-      const it = find(route.id)
-      screen = it ? <ItemDetail item={it} onChange={save} onDelete={drop} /> : <NotFound />
-      break
-    }
+    case 'item': { const it = find(route.id); screen = it ? <ItemDetail item={it} onChange={save} onDelete={drop} /> : notFound; break }
     case 'item-edit':
-      screen = route.id && !find(route.id) ? <NotFound /> : <ItemForm key={route.id ?? 'new'} item={find(route.id)} onSaved={save} />
+      screen = route.id && !find(route.id) ? notFound : <ItemForm key={route.id ?? 'new'} item={find(route.id)} onSaved={save} />
       break
-    case 'outfits':
-      screen = <Soon title="Outfits" icon="sparkle"
-        text="Build looks from your wardrobe on a canvas, save favorites, and ask the AI stylist for outfit ideas for any occasion and weather." />
+    case 'outfits': screen = <OutfitList />; break
+    case 'outfit': { const o = findO(route.id); screen = o ? <OutfitDetail outfit={o} /> : notFound; break }
+    case 'outfit-edit':
+      screen = route.id && !findO(route.id) ? notFound : <OutfitEditor key={route.id ?? route.with ?? 'new'} outfit={findO(route.id)} preset={route.with ? [route.with] : undefined} />
       break
-    case 'inspo':
-      screen = <Soon title="Inspiration" icon="image"
-        text="Save screenshots of looks you love. The AI will break them down, match them with what you already own, and find your personal style formulas." />
-      break
-    case 'me': screen = <Me items={items} email={email} />; break
+    case 'stylist': screen = <Stylist />; break
+    case 'inspo': screen = <InspoList />; break
+    case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
+    case 'shop': screen = <Shop />; break
+    case 'buy': screen = <BeforeBuy />; break
+    case 'me': screen = <Me email={email} />; break
   }
 
-  const tab = route.view.startsWith('item') ? 'wardrobe' : route.view
+  const tab = route.view.startsWith('item') ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
+    : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
   const tabs = [
     { id: 'wardrobe', label: 'Wardrobe', icon: 'hanger', path: '/' },
-    { id: 'outfits', label: 'Outfits', icon: 'sparkle', path: '/outfits' },
+    { id: 'outfits', label: 'Outfits', icon: 'layers', path: '/outfits' },
     { id: 'inspo', label: 'Inspo', icon: 'image', path: '/inspo' },
+    { id: 'shop', label: 'Shop', icon: 'bag', path: '/shop' },
     { id: 'me', label: 'Me', icon: 'user', path: '/me' },
   ]
-  const showTabs = route.view !== 'item-edit'
+  const showTabs = route.view !== 'item-edit' && route.view !== 'outfit-edit'
 
   return (
-    <div className={'app' + (showTabs ? ' with-tabs' : '')}>
-      {screen}
-      {showTabs && (
-        <nav className="tabbar">
-          {tabs.map(t => (
-            <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
-              <Icon name={t.icon} /><span>{t.label}</span>
-            </button>
-          ))}
-        </nav>
-      )}
-    </div>
+    <StoreCtx.Provider value={store}>
+      <div className={'app' + (showTabs ? ' with-tabs' : '')}>
+        {screen}
+        {showTabs && (
+          <nav className="tabbar">
+            {tabs.map(t => (
+              <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
+                <Icon name={t.icon} /><span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+    </StoreCtx.Provider>
   )
 }
 
@@ -165,29 +206,33 @@ function NotFound() {
   )
 }
 
-function Soon({ title, icon, text }: { title: string; icon: string; text: string }) {
-  return (
-    <div className="screen">
-      <Header title={title} />
-      <div className="empty">
-        <Icon name={icon} />
-        <h2>Coming soon</h2>
-        <p className="muted">{text}</p>
-      </div>
-    </div>
-  )
-}
-
-function Me({ items, email }: { items: Item[]; email: string }) {
+function Me({ email }: { email: string }) {
+  const { items, wear, requests, setRequests } = useStore()
+  const [busy, setBusy] = useState(false)
   const max = Math.max(1, ...CATEGORIES.map(c => items.filter(i => i.category === c.id).length))
   const colorCounts = COLORS.map(c => ({ ...c, n: items.filter(i => i.colors.includes(c.id)).length }))
     .filter(c => c.n > 0).sort((a, b) => b.n - a.n)
+  const worn = new Map<string, number>()
+  wear.forEach(w => w.item_ids.forEach(id => worn.set(id, (worn.get(id) ?? 0) + 1)))
+  const most = items.filter(i => worn.get(i.id)).sort((a, b) => worn.get(b.id)! - worn.get(a.id)!).slice(0, 6)
+  const monthAgo = Date.now() - 30 * 864e5
+  const never = items.filter(i => !worn.get(i.id) && new Date(i.created_at).getTime() < monthAgo)
+  const untagged = items.filter(i => !i.colors.length || !i.kind || !i.seasons.length || !i.styles.length || !i.occasions.length)
+  const queued = requests.filter(r => r.status === 'queued')
+  const tagQueued = queued.some(r => r.kind === 'tag' && !r.image_path)
+
+  const tagAll = async () => {
+    setBusy(true)
+    try { setRequests(upsert(await askAI('tag', {}, 'queue'))) } catch (e) { alert((e as Error).message) }
+    setBusy(false)
+  }
+
   return (
     <div className="screen">
       <Header title="Me" />
       <div className="card">
         <h3 className="card-title">Wardrobe at a glance</h3>
-        <p className="big-num">{items.length}<span className="muted"> items</span></p>
+        <p className="big-num">{items.length}<span className="muted"> items · {wear.length} days logged</span></p>
         <div className="bars">
           {CATEGORIES.map(c => {
             const n = items.filter(i => i.category === c.id).length
@@ -209,14 +254,25 @@ function Me({ items, email }: { items: Item[]; email: string }) {
           </div>
         </div>
       )}
+      {most.length > 0 && <div className="card"><h3 className="card-title">Most worn</h3><MiniItems items={most} /></div>}
+      {never.length > 0 && (
+        <div className="card">
+          <h3 className="card-title">Not worn for a month+</h3>
+          <p className="muted small">Try them in a new outfit, or think about letting them go.</p>
+          <MiniItems items={never} />
+        </div>
+      )}
+      {untagged.length > 0 && (
+        <div className="card">
+          <h3 className="card-title"><Icon name="wand" /> {untagged.length} items without full tags</h3>
+          <p className="muted small">Tags help the stylist. Claude can look at the photos and fill them in for free.</p>
+          <button className="btn sm" onClick={tagAll} disabled={busy || tagQueued}><Icon name="clock" /> {tagQueued ? 'In the queue' : 'Tag them via the queue'}</button>
+        </div>
+      )}
       <div className="card">
-        <h3 className="card-title">Coming next</h3>
-        <ol className="roadmap">
-          <li><b>AI tagging</b>: the app fills in type, colors and season from the photo.</li>
-          <li><b>Outfits</b>: build looks and get AI suggestions from your own clothes.</li>
-          <li><b>Inspiration</b>: break down saved looks and find your style formulas.</li>
-          <li><b>Smart shopping</b>: what's missing, what you have too much of, and a “before you buy” check.</li>
-        </ol>
+        <h3 className="card-title"><Icon name="clock" /> AI queue</h3>
+        {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “обработай очередь” and the answers will appear in the app.</p>
+          : <p className="muted small">Empty. Free requests you add to the queue appear here.</p>}
       </div>
       <div className="card row">
         <span className="muted small grow">{email}</span>

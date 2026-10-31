@@ -202,7 +202,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 }
 .tab {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 7px 14px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 68px;
+  padding: 7px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 60px;
 }
 .tab.on { background: var(--accent); color: var(--on-accent); }
 
@@ -215,3 +215,123 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .pw-wrap { position: relative; }
 .pw-wrap input { padding-right: 48px; }
 .pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; display: grid; place-items: center; color: var(--muted); }
+
+/* ===== Етапи 2–5 ===== */
+.row.wrap { flex-wrap: wrap; }
+h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.pre { white-space: pre-wrap; margin: 0 0 12px; }
+.cost { font-size: 11px; font-weight: 600; opacity: 0.6; margin-left: 2px; }
+.ai-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ai-actions .btn { flex: 1 1 160px; }
+.ai-fill { background: linear-gradient(135deg, var(--card), var(--soft)); }
+.queued { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted);
+  background: var(--soft); padding: 10px 12px; border-radius: 12px; margin: 8px 0; }
+.queued .icon { width: 16px; height: 16px; }
+.queued.err { color: var(--danger); }
+
+.stylist-cta { display: flex; align-items: center; gap: 14px; text-align: left; width: 100%; }
+.stylist-cta > span:last-child { display: grid; gap: 2px; }
+.cta-icon { width: 44px; height: 44px; border-radius: 14px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
+
+/* Колаж */
+.collage { position: relative; aspect-ratio: 3 / 4; background: var(--photo); border-radius: 12px; overflow: hidden; }
+.collage img { position: absolute; height: auto; display: block; pointer-events: none; }
+.collage.big { border-radius: 22px; box-shadow: var(--shadow); }
+.grid.outfits .tile .collage { aspect-ratio: 3 / 4; }
+.board { touch-action: none; user-select: none; -webkit-user-select: none; }
+.board-item { position: absolute; cursor: grab; touch-action: none; border-radius: 8px; }
+.board-item.on { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.photo.bare { background: transparent; }
+.photo.bare img { padding: 0; height: auto; }
+.board-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #9b9a97; font-size: 14px; }
+.board-tools { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.board-tools .btn.danger { color: var(--danger); }
+.editor { display: grid; gap: 20px; }
+.editor-board { max-width: 440px; width: 100%; margin: 0 auto; display: grid; gap: 4px; }
+.editor-board .hint { margin-top: 10px; }
+@media (min-width: 860px) { .editor { grid-template-columns: 440px 1fr; align-items: start; } .editor .form { margin: 0; } }
+
+/* Нижня шторка */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--bg); width: 100%; max-width: 720px; max-height: 88dvh; overflow-y: auto; border-radius: 24px 24px 0 0;
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); display: grid; gap: 12px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-head h2 { font-size: 20px; }
+.sheet .cat-row { margin-bottom: 0; }
+.picker-grid { grid-template-columns: repeat(3, 1fr); }
+@media (min-width: 600px) { .picker-grid { grid-template-columns: repeat(4, 1fr); } }
+.tile.chosen { outline: 2px solid var(--ink); }
+.tick { position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+.tick .icon { width: 14px; height: 14px; }
+
+/* Міні-списки */
+.mini-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: none; }
+.mini { flex: none; width: 76px; display: grid; gap: 4px; text-align: center; font-size: 11px; font-weight: 600; }
+.mini .photo { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); }
+.mini span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+.mini-outfits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mini-outfits .collage { border: 1px solid var(--line); }
+
+/* Ідеї стиліста */
+.idea-block { margin-top: 24px; }
+.ideas { display: grid; gap: 12px; margin-top: 8px; }
+@media (min-width: 700px) { .ideas { grid-template-columns: repeat(3, 1fr); } }
+.idea { display: grid; gap: 8px; margin: 0; }
+.idea h3 { font-size: 16px; }
+.idea p { margin: 0; font-size: 14px; }
+.idea .btn { justify-self: start; }
+
+/* Натхнення */
+.formulas .card-title, .card-title { display: flex; align-items: center; gap: 8px; }
+.card-title .icon { width: 18px; height: 18px; }
+.formula-list { display: grid; gap: 8px; margin-bottom: 10px; }
+.formula { display: grid; gap: 2px; padding: 10px 12px; background: var(--soft); border-radius: 12px; font-size: 14px; }
+.inspo-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+@media (min-width: 700px) { .inspo-grid { grid-template-columns: repeat(5, 1fr); gap: 10px; } }
+.inspo-tile { position: relative; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; }
+.photo.cover { width: 100%; height: 100%; }
+.photo.cover img { object-fit: cover; padding: 0; }
+.photo.cover-big { aspect-ratio: auto; }
+.photo.cover-big img { padding: 0; max-height: 70dvh; object-fit: contain; }
+.badge { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+.badge .icon { width: 13px; height: 13px; }
+.formula-big { display: grid; gap: 4px; margin: 0; }
+.formula-big b { font-size: 17px; }
+.pieces { display: grid; gap: 14px; }
+.piece { display: grid; gap: 4px; }
+.piece-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.piece-head b { text-transform: capitalize; }
+.pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--soft); }
+.pill.have { background: #dcefe0; color: #24683a; }
+.pill.similar { background: #f6ecd4; color: #85621a; }
+.pill.missing, .pill.p1 { background: #f6dede; color: #9b2c2c; }
+.pill.p2 { background: #f6ecd4; color: #85621a; }
+.pill.p3 { background: var(--soft); color: var(--muted); }
+.buy-row { padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+
+/* Покупки */
+.gaps p { margin: 0 0 8px; }
+.gap { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.gap .grow { display: grid; gap: 3px; }
+.gap .pill { justify-self: start; }
+.gaps ul, .buy-result ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.shop-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.shop-row .grow { display: grid; gap: 2px; }
+.shop-row.done b { text-decoration: line-through; color: var(--muted); }
+.check { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; color: transparent; flex: none; margin-top: 2px; }
+.check.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.check .icon { width: 14px; height: 14px; }
+.add-shop { display: grid; gap: 10px; margin-bottom: 8px; }
+.add-shop .btn { justify-self: start; }
+.done-list summary { cursor: pointer; padding: 8px 0; }
+.buy-result { display: grid; gap: 8px; }
+.buy-result p { margin: 0; }
+.buy-thumb { width: 64px; height: 64px; border-radius: 12px; flex: none; border: 1px solid var(--line); }
+.verdict { font-weight: 800; font-size: 17px; }
+.verdict.buy { color: #24683a; } .verdict.maybe { color: #85621a; } .verdict.skip { color: #9b2c2c; }
+@media (prefers-color-scheme: dark) {
+  .pill.have { background: #1f3a27; color: #8fd3a2; }
+  .pill.similar, .pill.p2 { background: #3a311d; color: #e3c27a; }
+  .pill.missing, .pill.p1 { background: #3d2222; color: #f0a0a0; }
+  .verdict.buy { color: #8fd3a2; } .verdict.maybe { color: #e3c27a; } .verdict.skip { color: #f0a0a0; }
+}

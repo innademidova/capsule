@@ -41,3 +41,126 @@ drop policy if exists "own photos" on storage.objects;
 create policy "own photos" on storage.objects for all to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ===== Етапи 2–5 =====
+
+-- Образи: розкладка речей на полотні (координати у відсотках)
+create table if not exists public.outfits (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text,
+  layout      jsonb not null default '[]',      -- [{item_id, x, y, w, z}]
+  occasions   text[] not null default '{}',
+  seasons     text[] not null default '{}',
+  notes       text,                             -- напр. пояснення стиліста
+  favorite    boolean not null default false,
+  source      text not null default 'manual',   -- manual | ai
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- Що і коли вдягала
+create table if not exists public.wear_log (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  worn_on     date not null default current_date,
+  outfit_id   uuid references public.outfits(id) on delete set null,
+  item_ids    uuid[] not null default '{}',
+  created_at  timestamptz not null default now()
+);
+
+-- Натхнення: скріншоти образів і їх розбір
+create table if not exists public.inspirations (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  image_path  text not null,
+  thumb_path  text,
+  note        text,
+  analysis    jsonb,                            -- результат ІІ
+  created_at  timestamptz not null default now()
+);
+
+-- Мої стильові формули (один рядок)
+create table if not exists public.style_profile (
+  user_id     uuid primary key default auth.uid() references auth.users(id) on delete cascade,
+  summary     text,
+  formulas    jsonb not null default '[]',      -- [{title, recipe}]
+  palette     text[] not null default '{}',
+  key_pieces  text[] not null default '{}',
+  based_on    int not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
+-- Список покупок
+create table if not exists public.shopping (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  category    text,
+  why         text,
+  priority    smallint not null default 2,      -- 1 must-have, 2 nice, 3 someday
+  done        boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+-- Запити до ІІ: «зараз» (Edge Function) або «в чергу» (обробляє Claude Code безкоштовно)
+create table if not exists public.ai_requests (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind        text not null,                    -- tag | outfits | inspo | formulas | gaps | buy
+  input       jsonb not null default '{}',
+  image_path  text,
+  mode        text not null default 'queue',    -- now | queue
+  status      text not null default 'queued',   -- queued | done | error
+  result      jsonb,
+  error       text,
+  created_at  timestamptz not null default now(),
+  done_at     timestamptz
+);
+
+drop trigger if exists outfits_touch on public.outfits;
+create trigger outfits_touch before update on public.outfits
+  for each row execute function public.touch_updated_at();
+
+do $$ declare t text; begin
+  foreach t in array array['outfits','wear_log','inspirations','style_profile','shopping','ai_requests'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own rows" on public.%I', t);
+    execute format('create policy "own rows" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+  end loop;
+end $$;
+
+-- Коли запит виконано, результат сам розкладається по таблицях
+create or replace function public.apply_ai_result() returns trigger
+language plpgsql security invoker as $$
+begin
+  if new.status <> 'done' or old.status = 'done' or new.result is null then return new; end if;
+  new.done_at = now();
+  if new.kind = 'inspo' and new.input ? 'inspiration_id' then
+    update public.inspirations set analysis = new.result where id = (new.input->>'inspiration_id')::uuid;
+  elsif new.kind = 'formulas' then
+    insert into public.style_profile (user_id, summary, formulas, palette, key_pieces, based_on, updated_at)
+    values (new.user_id, new.result->>'summary', coalesce(new.result->'formulas', '[]'),
+      array(select jsonb_array_elements_text(coalesce(new.result->'palette', '[]'))),
+      array(select jsonb_array_elements_text(coalesce(new.result->'key_pieces', '[]'))),
+      coalesce((new.result->>'based_on')::int, 0), now())
+    on conflict (user_id) do update set summary = excluded.summary, formulas = excluded.formulas,
+      palette = excluded.palette, key_pieces = excluded.key_pieces, based_on = excluded.based_on, updated_at = now();
+  elsif new.kind = 'tag' and jsonb_typeof(new.result->'items') = 'array' then
+    -- масова розмітка з черги: [{id, name, kind, colors, seasons, styles, occasions}]
+    update public.items i set
+      name = coalesce(i.name, r->>'name'),
+      kind = coalesce(i.kind, r->>'kind'),
+      colors = case when cardinality(i.colors) = 0 then array(select jsonb_array_elements_text(r->'colors')) else i.colors end,
+      seasons = case when cardinality(i.seasons) = 0 then array(select jsonb_array_elements_text(r->'seasons')) else i.seasons end,
+      styles = case when cardinality(i.styles) = 0 then array(select jsonb_array_elements_text(r->'styles')) else i.styles end,
+      occasions = case when cardinality(i.occasions) = 0 then array(select jsonb_array_elements_text(r->'occasions')) else i.occasions end
+    from jsonb_array_elements(new.result->'items') r
+    where i.id = (r->>'id')::uuid and i.user_id = new.user_id;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists ai_apply on public.ai_requests;
+create trigger ai_apply before update on public.ai_requests
+  for each row execute function public.apply_ai_result();

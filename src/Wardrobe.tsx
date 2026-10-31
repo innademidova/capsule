@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, type Item, type Processed,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, today, type Item, type Processed, type AIRequest,
 } from './lib'
-import { Chips, Icon, Photo, Header, Section, Swatch } from './ui'
+import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
+import { useStore, upsert } from './store'
+import { logWear } from './Outfits'
 
 // --- Список ---
 
@@ -103,6 +105,13 @@ export function WardrobeList({ items, filters, setFilters }: {
 
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
+  const { wear, outfits, items, setWear } = useStore()
+  const worn = wear.filter(w => w.item_ids.includes(item.id))
+  const wornToday = worn.some(w => w.worn_on === today())
+  const inOutfits = outfits.filter(o => o.layout.some(p => p.item_id === item.id))
+  const wore = async () => {
+    try { const w = await logWear([item.id], null); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
+  }
 
   const toggleFav = async () => {
     const { data, error } = await supabase.from('items').update({ favorite: !item.favorite }).eq('id', item.id).select().single()
@@ -148,6 +157,19 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             {!item.seasons.length && !item.styles.length && !item.occasions.length && <p className="muted small">No tags yet</p>}
           </div>
           {item.notes && <div className="card notes">{item.notes}</div>}
+          <div className="row wrap">
+            <button className="btn primary" onClick={wore} disabled={wornToday}><Icon name="check" /> {wornToday ? 'Worn today' : 'Wore it today'}</button>
+            <button className="btn" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> Build outfit</button>
+          </div>
+          <p className="muted small">{worn.length ? `Worn ${worn.length}× · last ${worn[0].worn_on}` : 'Not worn yet'}</p>
+          {inOutfits.length > 0 && (
+            <div className="card">
+              <h3 className="card-title">In {inOutfits.length} outfit{inOutfits.length > 1 ? 's' : ''}</h3>
+              <div className="mini-outfits">
+                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}><Collage layout={o.layout} items={items} /></button>)}
+              </div>
+            </div>
+          )}
           <button className="btn ghost danger" onClick={del} disabled={busy}><Icon name="trash" /> Delete item</button>
         </div>
       </div>
@@ -167,7 +189,10 @@ const toDraft = (i?: Item): Draft => ({
 export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(item))
   const [photo, setPhoto] = useState<Processed | null>(null)
+  const [uploaded, setUploaded] = useState<{ photo_path: string; thumb_path: string } | null>(null)
+  const [tagging, setTagging] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const { setRequests } = useStore()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -176,7 +201,7 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
   const take = async (blob: Blob | null | undefined) => {
     if (!blob) return
     setProcessing(true); setError('')
-    try { setPhoto(await processPhoto(blob)) }
+    try { setPhoto(await processPhoto(blob)); setUploaded(null) }
     catch { setError('Could not read this image. Try another one.') }
     setProcessing(false)
   }
@@ -197,6 +222,30 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
     return () => window.removeEventListener('paste', on)
   }, [])
 
+  // ІІ дивиться на фото і заповнює поля (порожні — завжди, решту не чіпає)
+  const autoFill = async () => {
+    setTagging(true); setError('')
+    try {
+      let path = item?.photo_path ?? null
+      if (photo) {
+        const up = uploaded ?? await uploadPhoto(photo)
+        setUploaded(up); path = up.photo_path
+      }
+      const r = await askAI('tag', { category: d.category || null }, 'now', path)
+      setRequests(upsert(r))
+      const t = r.result as Draft
+      setD(x => ({
+        ...x, category: x.category || t.category, kind: x.kind || t.kind, name: x.name || t.name,
+        colors: x.colors.length ? x.colors : t.colors, seasons: x.seasons.length ? x.seasons : t.seasons,
+        styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
+      }))
+    } catch (err) {
+      const r = (err as { request?: AIRequest }).request; if (r) setRequests(upsert(r))
+      setError((err as Error).message)
+    }
+    setTagging(false)
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!d.category) { setError('Choose a category'); return }
@@ -204,7 +253,7 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
     setBusy(true); setError('')
     try {
       let paths = {}
-      if (photo) paths = await uploadPhoto(photo)
+      if (photo) paths = uploaded ?? await uploadPhoto(photo)
       const row = {
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
@@ -245,6 +294,12 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
             <p className="hint">Tip: in the Photos app, touch and hold the item until it lifts, tap <b>Copy</b>, then tap <b>Paste</b> here. iPhone removes the background for you.</p>
           )}
         </div>
+
+        {(photo || item) && (
+          <button type="button" className="btn wide ai-fill" onClick={autoFill} disabled={tagging || processing}>
+            <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">≈1¢</span>
+          </button>
+        )}
 
         <Section title="Category">
           <Chips options={CATEGORIES} value={d.category ? [d.category] : []} multi={false} onChange={v => set({ category: v[0] ?? '' })} />

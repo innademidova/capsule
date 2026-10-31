@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { signedUrls, colorOf, type Option } from './lib'
+import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
 
 const PATHS: Record<string, string> = {
   hanger: 'M9.8 6.6a2.2 2.2 0 1 1 2.9 2.1c-.4.1-.7.5-.7.9v.6l-8.3 5.5A1.3 1.3 0 0 0 4.4 18h15.2a1.3 1.3 0 0 0 .7-2.3L12 10.2',
@@ -19,6 +19,13 @@ const PATHS: Record<string, string> = {
   paste: 'M9 4h6v3H9zM8 5H6v15h12V5h-2',
   camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   check: 'M5 12l5 5 9-10',
+  bag: 'M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
+  minus: 'M5 12h14',
+  wand: 'M4 20L16 8M14 4v2M18 8h2M19 3l-1 1M10 4l1 1M20 13l-1-1',
+  shirt: 'M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9l-2 1-3-3z',
 }
 
 export function Icon({ name, filled }: { name: string; filled?: boolean }) {
@@ -87,5 +94,66 @@ export function Section({ title, children }: { title: string; children: ReactNod
       <h3>{title}</h3>
       {children}
     </section>
+  )
+}
+
+// Колаж образу: речі на білому полотні за координатами у відсотках
+export function Collage({ layout, items, className, children }: {
+  layout: Placement[]; items: Item[]; className?: string; children?: ReactNode
+}) {
+  const byId = new Map(items.map(i => [i.id, i]))
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const paths = layout.map(p => byId.get(p.item_id)).map(i => i?.thumb_path ?? i?.photo_path).filter((p): p is string => !!p)
+  const key = paths.join(',')
+  useEffect(() => { let live = true; if (paths.length) signedUrls(paths).then(u => live && setUrls(u)); return () => { live = false } }, [key])
+  return (
+    <div className={'collage ' + (className ?? '')}>
+      {[...layout].sort((a, b) => a.z - b.z).map(p => {
+        const it = byId.get(p.item_id); const path = it?.thumb_path ?? it?.photo_path
+        return it && path && urls[path]
+          ? <img key={p.item_id} src={urls[path]} alt="" style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.w}%`, zIndex: p.z }} />
+          : null
+      })}
+      {children}
+    </div>
+  )
+}
+
+// Дві кнопки для будь-якої дії ІІ: «зараз» (платно) і «в чергу» (безкоштовно)
+export function AIActions({ onRun, busy, label, cost = '≈3¢', disabled }: {
+  onRun: (mode: 'now' | 'queue') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
+}) {
+  return (
+    <div className="ai-actions">
+      <button type="button" className="btn primary" disabled={busy || disabled} onClick={() => onRun('now')}>
+        <Icon name="sparkle" /> {busy ? 'Thinking…' : `${label} now`}<span className="cost">{cost}</span>
+      </button>
+      <button type="button" className="btn ghost" disabled={busy || disabled} onClick={() => onRun('queue')}>
+        <Icon name="clock" /> Add to queue<span className="cost">free</span>
+      </button>
+    </div>
+  )
+}
+
+export function RequestState({ req, onRequeue }: { req?: AIRequest; onRequeue?: (r: AIRequest) => void }) {
+  if (!req) return null
+  if (req.status === 'queued') return <p className="queued"><Icon name="clock" /> In the queue. Ask Claude to “process the queue” and the answer will appear here.</p>
+  if (req.status === 'error') return (
+    <div className="queued err">
+      <span>{req.error}</span>
+      {onRequeue && <button className="btn ghost sm" onClick={() => onRequeue(req)}>Add to queue instead</button>}
+    </div>
+  )
+  return null
+}
+
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="sheet-bg" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
+        {children}
+      </div>
+    </div>
   )
 }
