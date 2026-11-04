@@ -15,7 +15,11 @@ for (let y = 0; y < H; y += 4) border.push(y * W, y * W + W - 1)
 const med = c => { const v = border.map(p => data[p * 4 + c]).sort((a, b) => a - b); return v[v.length >> 1] }
 const ref = [med(0), med(1), med(2)]
 const local = p => { const i = p * 4; return Math.hypot(data[i] - ref[0], data[i + 1] - ref[1], data[i + 2] - ref[2]) }
-const like = new Uint8Array(W * H); for (let p = 0; p < W * H; p++) like[p] = local(p) < 26 ? 1 : 0
+const TOL = +(process.env.TOL || 26)
+const like = new Uint8Array(W * H); for (let p = 0; p < W * H; p++) like[p] = process.env.WARM
+  // WARM=1: світла тепла річ на сірому фоні — фон відрізняємо за «теплотою» (r−b), а не яскравістю
+  ? (data[p * 4] - data[p * 4 + 2] < 11 && data[p * 4 + 1] > 190 ? 1 : 0)
+  : (local(p) < TOL ? 1 : 0)
 // компоненти схожих пікселів: фон, якщо торкається краю або це великий «отвір» (виріз у речі)
 const bg = new Uint8Array(W * H), seen = new Uint8Array(W * H)
 for (let s0 = 0; s0 < W * H; s0++) { if (!like[s0] || seen[s0]) continue
