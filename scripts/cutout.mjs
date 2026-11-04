@@ -18,7 +18,7 @@ const local = p => { const i = p * 4; return Math.hypot(data[i] - ref[0], data[i
 const TOL = +(process.env.TOL || 26)
 const like = new Uint8Array(W * H); for (let p = 0; p < W * H; p++) like[p] = process.env.WARM
   // WARM=1: світла тепла річ на сірому фоні — фон відрізняємо за «теплотою» (r−b), а не яскравістю
-  ? (data[p * 4] - data[p * 4 + 2] < 11 && data[p * 4 + 1] > 190 ? 1 : 0)
+  ? (data[p * 4] - data[p * 4 + 2] < 11 && data[p * 4 + 1] > (+process.env.MINL || 190) ? 1 : 0)
   : (local(p) < TOL ? 1 : 0)
 // компоненти схожих пікселів: фон, якщо торкається краю або це великий «отвір» (виріз у речі)
 const bg = new Uint8Array(W * H), seen = new Uint8Array(W * H)
