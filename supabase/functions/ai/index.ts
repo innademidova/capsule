@@ -23,7 +23,7 @@ const anthropic = new Anthropic({
 
 // ---------- Довідники (мають збігатися з src/lib.ts) ----------
 
-const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory"];
+const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory", "swim"];
 const COLORS = ["black", "white", "cream", "beige", "camel", "brown", "grey", "navy", "blue", "light-blue", "denim",
   "green", "olive", "red", "burgundy", "pink", "purple", "yellow", "orange", "silver", "gold", "print"];
 const SEASONS = ["spring", "summer", "autumn", "winter"];

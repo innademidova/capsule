@@ -4,7 +4,7 @@ create table if not exists public.items (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name        text,                              -- коротка назва, напр. "Cream cable-knit sweater"
-  category    text not null,                     -- top, bottom, dress, outerwear, shoes, bag, accessory
+  category    text not null,                     -- top, bottom, dress, outerwear, shoes, bag, accessory, swim
   kind        text,                              -- уточнення: sweater, jeans, loafers…
   colors      text[] not null default '{}',
   seasons     text[] not null default '{}',      -- winter, spring, summer, autumn

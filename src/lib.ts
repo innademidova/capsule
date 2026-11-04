@@ -34,6 +34,7 @@ export const CATEGORIES: Option[] = [
   { id: 'shoes', label: 'Shoes' },
   { id: 'bag', label: 'Bags' },
   { id: 'accessory', label: 'Accessories' },
+  { id: 'swim', label: 'Swimwear' },
 ]
 export const categoryLabel = (id: string) => CATEGORIES.find(c => c.id === id)?.label ?? id
 
@@ -46,6 +47,7 @@ export const KINDS: Record<string, string[]> = {
   shoes: ['sneakers', 'boots', 'ankle boots', 'loafers', 'heels', 'flats', 'sandals', 'mules', 'ballet flats'],
   bag: ['tote', 'shoulder bag', 'crossbody', 'clutch', 'backpack', 'mini bag'],
   accessory: ['belt', 'scarf', 'hat', 'cap', 'jewelry', 'sunglasses', 'gloves', 'watch', 'hair accessory'],
+  swim: ['swimsuit', 'bikini', 'cover-up', 'beach dress'],
 }
 
 export const COLORS: (Option & { hex: string })[] = [
@@ -274,6 +276,7 @@ const SLOTS: Record<string, { x: number; y: number; w: number }[]> = {
   bottom: [{ x: 30, y: 38, w: 38 }],
   shoes: [{ x: 56, y: 74, w: 32 }, { x: 8, y: 76, w: 28 }],
   bag: [{ x: 68, y: 42, w: 30 }],
+  swim: [{ x: 24, y: 4, w: 52 }],
   accessory: [{ x: 4, y: 56, w: 22 }, { x: 74, y: 22, w: 22 }, { x: 72, y: 62, w: 20 }],
 }
 export function autoLayout(items: Item[]): Placement[] {
