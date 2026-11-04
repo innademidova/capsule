@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 const { createClient } = createRequire(process.cwd() + '/')('@supabase/supabase-js')
 const sharp = createRequire(process.env.HOME + '/projects/perfume-diary/')('sharp')
 const [src, id, preview] = process.argv.slice(2)
+const meta = await sharp(src).metadata()
 const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
 const { width: W, height: H } = info
 const lum = i => (data[i] + data[i + 1] + data[i + 2]) / 3
@@ -32,7 +33,8 @@ for (let s0 = 0; s0 < W * H; s0++) { if (!like[s0] || seen[s0]) continue
 for (let p = 0; p < W * H; p++) { const x = p % W, y = (p / W) | 0; let c = 0, t = 0
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; t++; if (!bg[yy * W + xx]) c++ }
   data[p * 4 + 3] = Math.round(255 * c / t) }
-const cut = await sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer()
+// KEEP=1: фото вже з прозорим фоном — нічого не вирізаємо
+const cut = process.env.KEEP ? await sharp(src).ensureAlpha().png().toBuffer() : await sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer()
 const trimmed = await sharp(cut).trim().toBuffer()
 const render = max => sharp(trimmed).extend({ top: 16, bottom: 16, left: 16, right: 16, background: { r: 0, g: 0, b: 0, alpha: 0 } })
   .toBuffer().then(b => sharp(b).resize(max, max, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 90, alphaQuality: 100 }).toBuffer())
