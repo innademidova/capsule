@@ -80,6 +80,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 - `src/App.tsx` auth, routing (`#/`, `#/i/…`, `#/outfits`, `#/o/…`, `#/o/new/<itemId>`, `#/stylist`, `#/inspo`,
   `#/n/<id>`, `#/shop`, `#/buy`, `#/me`), 5-tab bar, Me screen. Data reloads when the app becomes visible again.
 - `supabase/schema.sql` full schema; apply changes via the Management API (append new statements to this file too).
+- `scripts/cutout.mjs <photo> <item id>` removes a plain light background (edge colour + enclosed holes) and replaces the item photo/thumb; `<photo> x <out.png>` = preview only. Use it when she sends item photos to add.
 - `scripts/ai-queue.mjs` export/apply for the free AI queue. `scripts/seed-basics.mjs` test items.
 - `scripts/icons.mjs` regenerates PNG icons from `public/favicon.svg` (borrows `sharp` from perfume-diary).
 
