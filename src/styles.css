@@ -243,7 +243,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .board-item { position: absolute; cursor: grab; touch-action: none; border-radius: 8px; }
 .board-item.on { outline: 2px dashed var(--ink); outline-offset: 2px; }
 .photo.bare { background: transparent; }
-.photo.bare img { padding: 0; height: auto; }
+.photo.bare img { position: static; padding: 0; height: auto; }
 .board-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #9b9a97; font-size: 14px; }
 .board-tools { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 .board-tools .btn.danger { color: var(--danger); }
