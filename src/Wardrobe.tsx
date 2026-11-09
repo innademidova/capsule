@@ -276,7 +276,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
         brand: d.brand?.trim() || null, notes: d.notes?.trim() || null,
-        ...(item ? {} : { wishlist: !!wish }),
+        ...(!item && wish ? { wishlist: true } : {}),
       }
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
       const { data, error } = await q.select().single()
