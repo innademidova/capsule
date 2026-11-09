@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { supabase, CATEGORIES, processPhoto, uploadPhoto, removePhotos, whiteToAlpha, generateGarment, type Item } from './lib'
+import { supabase, CATEGORIES, processPhoto, uploadPhoto, removePhotos, whiteToAlpha, generateGarment, askAI, type Item } from './lib'
 import { Chips, Icon, Photo, Header, Section } from './ui'
 import { back } from './App'
 
@@ -60,8 +60,16 @@ export function GarmentCreator({ wish, onSaved }: { wish?: boolean; onSaved: (i:
       const { data, error } = await supabase.from('items').insert(row).select().single()
       if (error) { await removePhotos(paths.photo_path, paths.thumb_path); throw error }
       await removePhotos(source.path, draft)
-      onSaved(data as Item)
-      location.replace(`#/i/${(data as Item).id}`)
+      let saved = data as Item
+      // Tags are a bonus: if this fails, the item is already saved and can be edited by hand
+      try {
+        setBusy('Filling in the details…')
+        const t = (await askAI('tag', { category }, 'now', paths.photo_path)).result as Pick<Item, 'kind' | 'colors' | 'seasons' | 'styles' | 'occasions'>
+        const tagged = await supabase.from('items').update({ kind: t.kind, colors: t.colors, seasons: t.seasons, styles: t.styles, occasions: t.occasions }).eq('id', saved.id).select().single()
+        if (!tagged.error) saved = tagged.data as Item
+      } catch { /* keep the untagged item */ }
+      onSaved(saved)
+      location.replace(`#/i/${saved.id}`)
     } catch (e) { setError((e as Error).message); setBusy('') }
   }
 

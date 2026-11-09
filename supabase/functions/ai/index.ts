@@ -116,7 +116,7 @@ async function buildPrompt(sb: SupabaseClient, r: Req): Promise<{ content: Anthr
       return { effort: "low", content: [await imageBlock(sb, r.image_path), { type: "text", text:
         `Describe this clothing item for her digital wardrobe. kind: a short lowercase type like "sweater", "straight jeans",
 "ankle boots". name: a short English product-style name, e.g. "Cream cable-knit sweater". Pick only fitting colors
-(main colors first), seasons, styles and occasions.${i.category ? ` She says the category is "${i.category}".` : ""}` }] };
+(main colors first), seasons, styles and occasions. A body-hugging one-piece is a bodysuit (category "top"), not a swimsuit, unless she says the category is "swim".${i.category ? ` She says the category is "${i.category}".` : ""}` }] };
     }
     case "outfits": {
       const w = await wardrobe(sb);
@@ -177,8 +177,34 @@ summary: 2–3 sentences with the main reason.` }] };
   throw new Error("Unknown request kind");
 }
 
+// Photo tagging runs on the owner's OpenAI key; the other tasks use Claude.
+const TAG_MODEL = "gpt-6.1-terra";
+
+async function tagWithOpenAI(content: unknown) {
+  const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
+  const input = blocks.map(b => b.type === "text"
+    ? { type: "input_text", text: b.text }
+    : { type: "input_image", image_url: `data:${(b.source as Anthropic.Base64ImageSource).media_type};base64,${(b.source as Anthropic.Base64ImageSource).data}` });
+  const r = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: TAG_MODEL,
+      input: [{ role: "system", content: VOICE }, { role: "user", content: input }],
+      text: { format: { type: "json_schema", name: "item_tags", schema: SCHEMAS.tag, strict: true } },
+    }),
+  });
+  const body = await r.json();
+  if (!r.ok) throw new Error(`OpenAI error ${r.status}: ${body.error?.message ?? "unknown"}`);
+  if (body.status === "incomplete") throw new Error("The answer was too long, try again");
+  const parts = (body.output ?? []).flatMap((o: { content?: { type: string; text?: string }[] }) => o.content ?? []);
+  if (parts.some((p: { type: string }) => p.type === "refusal")) throw new Error("The AI declined this request");
+  return JSON.parse(parts.filter((p: { type: string }) => p.type === "output_text").map((p: { text: string }) => p.text).join(""));
+}
+
 async function run(sb: SupabaseClient, r: Req) {
   const { content, effort } = await buildPrompt(sb, r);
+  if (r.kind === "tag") return await tagWithOpenAI(content);
   const res = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -204,7 +230,7 @@ Deno.serve(async req => {
     ({ id } = await req.json());
     const { data: r, error } = await sb.from("ai_requests").select("id,kind,input,image_path").eq("id", id).single();
     if (error || !r) return json({ error: "Request not found" }, 404);
-    if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
+    if (!Deno.env.get(r.kind === "tag" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
     const result = await run(sb, r as Req);
     await sb.from("ai_requests").update({ status: "done", mode: "now", result }).eq("id", id);
     return json({ result });

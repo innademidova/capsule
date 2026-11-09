@@ -37,14 +37,14 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 
 **Wishlist** (`#/wish`, switch on the Wardrobe screen): same cards, stored in `items` with `wishlist = true`; `store.items` is wardrobe only, so the stylist, outfits, stats and AI never see wishlist pieces. "I bought it" moves a piece to the wardrobe. To add one by script, put `"wishlist":true` in the JSON for `scripts/add-item.mjs`.
 
-**Create from a photo with AI** (`#/i/gen`, `#/i/gen/wish`, `src/Generate.tsx`): photo of a person + which piece + category → Edge Function `garment` (`gpt-image-2.6-sunburst`, medium quality, needs Supabase secret `OPENAI_API_KEY`) writes a draft to `photos/<uid>/drafts/`. She approves it ("Add" saves the item) or regenerates: corrections accumulate and the previous attempt is sent with the original. Tags stay empty, to be filled later. Deploy like `ai`.
+**Create from a photo with AI** (`#/i/gen`, `#/i/gen/wish`, `src/Generate.tsx`): photo of a person + which piece + category → Edge Function `garment` (`gpt-image-2.6-sunburst`, medium quality, needs Supabase secret `OPENAI_API_KEY`) writes a draft to `photos/<uid>/drafts/`. She approves it ("Add" saves the item) or regenerates: corrections accumulate and the previous attempt is sent with the original. After Add, tags are filled automatically. Deploy like `ai`.
 
 Test data: the 15 illustrated basics from `scripts/seed-basics.mjs` were deleted on 2026-11-04 at her request; her real
 items start with the beige cropped trench (2026-11-04). Do not seed test items again.
 
 ## AI: two modes, her choice per action (same pattern as perfume-diary)
 
-Every AI action creates a row in `ai_requests` (kind `tag|outfits|inspo|formulas|gaps|buy`).
+Photo tagging (`tag`, "Fill in with AI") runs on OpenAI (`gpt-6.1-terra`, secret `OPENAI_API_KEY`); every other "now" action uses Claude. Every AI action creates a row in `ai_requests` (kind `tag|outfits|inspo|formulas|gaps|buy`).
 - **"… now"**: the app calls Edge Function `ai` (`supabase/functions/ai/index.ts`, **Claude Opus 5.5** with JSON-schema
   structured outputs, server-side refusal fallback), ≈1–4¢ per request. Needs Supabase secret `ANTHROPIC_API_KEY`
   (and `ANTHROPIC_WORKSPACE_ID` if her key requires it — it does for the perfume diary key). **Not set yet** (as of
