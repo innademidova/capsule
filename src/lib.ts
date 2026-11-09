@@ -217,6 +217,43 @@ export async function removePhotos(...paths: (string | null)[]) {
   if (list.length) await supabase.storage.from('photos').remove(list)
 }
 
+// Створює чернетку речі зі знімка людини (функція garment); повертає шлях у сховищі
+export async function generateGarment(body: { source_path: string; previous_path?: string; piece: string; corrections: string[] }) {
+  const res = await supabase.functions.invoke('garment', { body })
+  if (res.error) {
+    let msg = res.error.message
+    try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return res.data.path as string
+}
+
+// Якщо модель повернула білий фон замість прозорого — прибираємо його заливкою від країв
+export async function whiteToAlpha(file: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  const { width: W, height: H } = bitmap
+  const c = canvasOf(W, H), ctx = c.getContext('2d')!
+  ctx.drawImage(bitmap, 0, 0)
+  bitmap.close?.()
+  const img = ctx.getImageData(0, 0, W, H), d = img.data
+  if (d[3] < 250 || d[W * 4 - 1] < 250 || d[(H - 1) * W * 4 + 3] < 250) return file
+  const isWhite = (p: number) => Math.min(d[p * 4], d[p * 4 + 1], d[p * 4 + 2]) >= 244
+  const seen = new Uint8Array(W * H), stack: number[] = []
+  const push = (p: number) => { if (!seen[p] && isWhite(p)) { seen[p] = 1; stack.push(p) } }
+  for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x) }
+  for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1) }
+  while (stack.length) {
+    const p = stack.pop()!, x = p % W
+    d[p * 4 + 3] = 0
+    if (x > 0) push(p - 1)
+    if (x < W - 1) push(p + 1)
+    if (p >= W) push(p - W)
+    if (p < (H - 1) * W) push(p + W)
+  }
+  ctx.putImageData(img, 0, 0)
+  return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Could not process the image')), 'image/png'))
+}
+
 // Картинка з буфера обміну (iPhone: «Скопіювати» вирізаний об'єкт у Фото)
 export const canPaste = () => typeof navigator !== 'undefined' && !!navigator.clipboard?.read
 

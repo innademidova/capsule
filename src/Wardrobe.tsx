@@ -297,6 +297,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         left={<button type="button" className="icon-btn" onClick={() => back(item ? `/i/${item.id}` : wish ? '/wish' : '/')} aria-label="Back"><Icon name="back" /></button>} />
 
       <div className="form">
+        {!item && <button type="button" className="btn wide ai-fill" onClick={() => go(wish ? '/i/gen/wish' : '/i/gen')}><Icon name="sparkle" /> Create from a photo with AI</button>}
         <div className="picker">
           {photo ? <div className="photo big"><img src={photo.preview} alt="" /></div>
             : item ? <Photo path={item.photo_path} alt="" className="big" />
