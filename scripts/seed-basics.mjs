@@ -1,12 +1,12 @@
-// Тестові базові речі: малює ілюстрації (SVG → WebP з прозорим фоном) і додає їх у гардероб.
-//   node scripts/seed-basics.mjs            → додати
-//   node scripts/seed-basics.mjs preview <папка> → лише зберегти картинки для перегляду
+// Test basics: draws illustrations (SVG → WebP with a transparent background) and adds them to the wardrobe.
+//   node scripts/seed-basics.mjs            → add
+//   node scripts/seed-basics.mjs preview <dir> → only save the images for review
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createClient } from '@supabase/supabase-js'
 const sharp = createRequire(process.env.HOME + '/projects/perfume-diary/')('sharp')
 
-// Відтінок кольору: amt > 0 світліше, < 0 темніше
+// Colour shade: amt > 0 is lighter, < 0 is darker
 const shade = (hex, amt) => {
   const n = parseInt(hex.slice(1), 16)
   const f = c => Math.max(0, Math.min(255, Math.round(amt > 0 ? c + (255 - c) * amt : c * (1 + amt))))

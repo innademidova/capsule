@@ -8,7 +8,7 @@ import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { logWear } from './Outfits'
 
-// --- Список ---
+// --- List ---
 
 export type Filters = {
   category: string; q: string; colors: string[]; seasons: string[]; styles: string[]; occasions: string[]; fav: boolean
@@ -107,7 +107,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
   )
 }
 
-// --- Картка речі ---
+// --- Item card ---
 
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
@@ -124,7 +124,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
     const { data, error } = await supabase.from('items').update({ favorite: !item.favorite }).eq('id', item.id).select().single()
     if (!error) onChange(data as Item)
   }
-  // Купила річ із вішліста — вона переходить у гардероб
+  // Bought a wishlist item: it moves to the wardrobe
   const bought = async () => {
     setBusy(true)
     const { data, error } = await supabase.from('items').update({ wishlist: false }).eq('id', item.id).select().single()
@@ -195,7 +195,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
   )
 }
 
-// --- Додавання / редагування ---
+// --- Add / edit ---
 
 type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path'>
 
@@ -230,7 +230,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       else take(img)
     } catch { setError('Paste was not allowed. Try again and tap “Paste”.') }
   }
-  // Вставка з клавіатури (Cmd+V на комп'ютері)
+  // Paste from the keyboard (Cmd+V on a computer)
   useEffect(() => {
     const on = (e: ClipboardEvent) => {
       const f = [...(e.clipboardData?.files ?? [])].find(x => x.type.startsWith('image/'))
@@ -240,7 +240,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     return () => window.removeEventListener('paste', on)
   }, [])
 
-  // ІІ дивиться на фото і заповнює поля (порожні — завжди, решту не чіпає)
+  // AI looks at the photo and fills in the fields (only empty ones, the rest stay untouched)
   const autoFill = async () => {
     setTagging(true); setError('')
     try {

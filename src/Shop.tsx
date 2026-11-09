@@ -113,7 +113,7 @@ function Gaps({ r, onAdd, inList }: { r: AIRequest; onAdd: (g: Gap) => void; inL
   )
 }
 
-// --- «Перед покупкою» ---
+// --- Before you buy ---
 
 const VERDICT = { buy: 'Worth buying', maybe: 'Think it over', skip: 'Better skip' }
 

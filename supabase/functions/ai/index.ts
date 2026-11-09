@@ -1,8 +1,8 @@
-// Серверна функція ІІ-стиліста (Claude Opus 5.5 через API).
-// Обробляє один запит з таблиці ai_requests: розмітка речі, підбір образів, розбір натхнення,
-// стильові формули, аналіз гардероба, «перед покупкою». Результат пише в ai_requests.result,
-// а тригер у базі сам розкладає його по таблицях.
-// Ключ — у секретах Supabase (ANTHROPIC_API_KEY, за потреби ANTHROPIC_WORKSPACE_ID).
+// AI stylist Edge Function (Claude Opus 5.5 through the API).
+// Handles one row from ai_requests: item tagging, outfit ideas, inspiration breakdown,
+// style formulas, wardrobe check, before-you-buy. Writes the result to ai_requests.result,
+// and a database trigger distributes it to the right tables.
+// The key is a Supabase secret (ANTHROPIC_API_KEY, plus ANTHROPIC_WORKSPACE_ID if needed).
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
@@ -21,7 +21,7 @@ const anthropic = new Anthropic({
   defaultHeaders: workspace ? { "anthropic-workspace-id": workspace } : undefined,
 });
 
-// ---------- Довідники (мають збігатися з src/lib.ts) ----------
+// ---------- Option lists (must match src/lib.ts) ----------
 
 const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory", "swim"];
 const COLORS = ["black", "white", "cream", "beige", "camel", "brown", "grey", "navy", "blue", "light-blue", "denim",
@@ -73,10 +73,10 @@ const SCHEMAS: Record<string, unknown> = {
 
 const VOICE = `You are a warm, honest personal stylist for one woman. Her goal: dress stylishly with a small, well-combined
 capsule wardrobe instead of buying more. All prose fields (summary, why, tip, note, recipe, formula, outfit_ideas, to_buy,
-strengths, what) must be in Ukrainian, addressing her as "ти", short and concrete. Never write Russian.
+strengths, what) must be in Ukrainian, addressing her informally (second person singular), short and concrete. Never write Russian.
 Short labels (title, name, piece, kind, tags, palette, key_pieces) are in English. When you refer to her items, use their ids exactly as given.`;
 
-// ---------- Дані користувачки ----------
+// ---------- The owner's data ----------
 
 type Item = Record<string, unknown> & { id: string };
 
@@ -104,7 +104,7 @@ async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.I
   };
 }
 
-// ---------- Завдання ----------
+// ---------- Tasks ----------
 
 type Req = { id: string; kind: string; input: Record<string, unknown>; image_path: string | null };
 
@@ -136,8 +136,8 @@ missing for this request, say so briefly in note (else empty string).` }] };
       return { effort: "medium", content: [await imageBlock(sb, ins.image_path), { type: "text", text: `${w.text}
 
 This is a look she saved because she likes it${ins.note ? ` (her note: "${ins.note}")` : ""}. Break it down:
-summary: what makes this look work (2–3 sentences). formula: the reusable recipe in one line (e.g. "світлий трикотаж +
-пряма темна деніма + лофери + структурна сумка"). pieces: every visible piece; status "have" if she owns essentially the same
+summary: what makes this look work (2–3 sentences). formula: the reusable recipe in one line (e.g. "light knit +
+straight dark denim + loafers + structured bag", written in Ukrainian). pieces: every visible piece; status "have" if she owns essentially the same
 item, "similar" if she owns something that can replace it (say how in note), "missing" if not; item_ids = her matching items.
 to_buy: only the missing pieces that would unlock the most outfits for her. tags: 2–5 English style tags.` }] };
     }

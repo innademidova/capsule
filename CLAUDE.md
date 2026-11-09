@@ -12,8 +12,7 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 
 ## Hard rules from the owner
 
-- **App UI is English.** All other non-English text (code comments, README, commit messages) must be **Ukrainian.
-  Never Russian anywhere in the project.** Chat replies to the owner: in her language, plain and non-technical.
+- **Everything in the repo is English: app UI, code comments, README, docs and commit messages. No Cyrillic in code at all** (owner's request, 2026-11-09). AI prose results shown in the app stay Ukrainian. Chat replies to the owner: in her language, plain and non-technical.
 - Hosting must stay free (GitHub Pages + Supabase free tier). Ask before anything that costs money.
 - She is often on limited mobile internet (2 GB): avoid unnecessary downloads, install packages with
   `npm install --prefer-offline`, warn before anything large.
@@ -50,16 +49,16 @@ Every AI action creates a row in `ai_requests` (kind `tag|outfits|inspo|formulas
   structured outputs, server-side refusal fallback), ≈1–4¢ per request. Needs Supabase secret `ANTHROPIC_API_KEY`
   (and `ANTHROPIC_WORKSPACE_ID` if her key requires it — it does for the perfume diary key). **Not set yet** (as of
   2026-10-31): "now" returns "AI key is not set up yet" and the UI offers "Add to queue instead".
-- **"Add to queue"**: free; processed by Claude Code when she says «обработай очередь».
+- **"Add to queue"**: free; processed by Claude Code when she asks to process the queue (in Russian: "obrabotai ochered").
 - A DB trigger (`apply_ai_result`) copies finished results where they belong: `inspo` → `inspirations.analysis`,
   `formulas` → `style_profile`, bulk `tag` → fills empty item fields. `outfits`, `gaps`, `buy`, single-photo `tag`
   results are read straight from `ai_requests.result`.
-- Result shapes = `SCHEMAS` in the Edge Function. Prose fields in **Ukrainian addressing her as "ти"**, labels in English.
+- Result shapes = `SCHEMAS` in the Edge Function. Prose fields in **Ukrainian addressing her informally (second person singular)**, labels in English.
 
 Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoyzzzlrlttk --use-api`
 (the CLI is in the npx cache; `npx` may download it otherwise). Set the key: `npx supabase secrets set ANTHROPIC_API_KEY=… --project-ref ajbdkvpyhoyzzzlrlttk`.
 
-## Workflow: «обработай очередь» (process the AI queue)
+## Workflow: process the AI queue
 
 1. `node scripts/ai-queue.mjs export <scratch dir>` → `ctx.json` (queued requests, wardrobe with wear counts,
    inspirations with analyses, style profile) + downloaded photos (`local_image` paths).

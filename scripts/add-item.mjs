@@ -1,5 +1,5 @@
-// Додає річ у гардероб і готує фото через cutout.mjs.
-//   node scripts/add-item.mjs <фото> '<json полів items>'   (змінні WARM/MINL/TOL/KEEP передаються у cutout)
+// Adds an item to the wardrobe and prepares its photo with cutout.mjs.
+//   node scripts/add-item.mjs <photo> '<JSON with items fields>'   (WARM/MINL/TOL/KEEP env vars are passed on to cutout)
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'

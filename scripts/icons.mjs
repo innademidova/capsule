@@ -1,4 +1,4 @@
-// Генерує PNG-іконки з public/favicon.svg (sharp береться з perfume-diary, щоб не качати)
+// Generates PNG icons from public/favicon.svg (sharp is borrowed from perfume-diary to avoid a download)
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
 const sharp = createRequire(process.env.HOME + '/projects/perfume-diary/')('sharp')

@@ -16,7 +16,7 @@ export async function logWear(item_ids: string[], outfit_id: string | null) {
   return data as Wear
 }
 
-// --- Список образів ---
+// --- Outfit list ---
 
 export function OutfitList() {
   const { outfits, items } = useStore()
@@ -54,7 +54,7 @@ export function OutfitList() {
   )
 }
 
-// --- Картка образу ---
+// --- Outfit card ---
 
 export function OutfitDetail({ outfit }: { outfit: Outfit }) {
   const { items, wear, setOutfits, setWear } = useStore()
@@ -113,7 +113,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
   )
 }
 
-// --- Конструктор образу ---
+// --- Outfit builder ---
 
 export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: string[] }) {
   const { items, setOutfits } = useStore()
@@ -229,7 +229,7 @@ function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle:
   )
 }
 
-// --- ІІ-стиліст: ідеї образів ---
+// --- AI stylist: outfit ideas ---
 
 export function Stylist() {
   const { items, requests, setRequests, setOutfits } = useStore()

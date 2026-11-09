@@ -1,19 +1,19 @@
--- Capsule: схема бази даних
+-- Capsule: database schema
 
 create table if not exists public.items (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  name        text,                              -- коротка назва, напр. "Cream cable-knit sweater"
+  name        text,                              -- short name, e.g. "Cream cable-knit sweater"
   category    text not null,                     -- top, bottom, dress, outerwear, shoes, bag, accessory, swim
-  kind        text,                              -- уточнення: sweater, jeans, loafers…
+  kind        text,                              -- detail: sweater, jeans, loafers…
   colors      text[] not null default '{}',
   seasons     text[] not null default '{}',      -- winter, spring, summer, autumn
   styles      text[] not null default '{}',      -- casual, classic, minimal…
   occasions   text[] not null default '{}',      -- everyday, work, evening…
   brand       text,
   notes       text,
-  photo_path  text,                              -- повне фото (Storage, до 1600px)
-  thumb_path  text,                              -- прев'ю для галереї (до 600px)
+  photo_path  text,                              -- full photo (Storage, up to 1600px)
+  thumb_path  text,                              -- gallery preview (up to 600px)
   favorite    boolean not null default false,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -26,13 +26,13 @@ drop trigger if exists items_touch on public.items;
 create trigger items_touch before update on public.items
   for each row execute function public.touch_updated_at();
 
--- Доступ: кожен запис бачить і змінює лише власниця
+-- Access: the owner alone sees and changes each row
 alter table public.items enable row level security;
 drop policy if exists "own items" on public.items;
 create policy "own items" on public.items for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- Фото: приватний бакет, шлях <user_id>/<файл>
+-- Photos: private bucket, path <user_id>/<file>
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('photos', 'photos', false, 20971520)
 on conflict (id) do nothing;
@@ -42,9 +42,9 @@ create policy "own photos" on storage.objects for all to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
--- ===== Етапи 2–5 =====
+-- ===== Stages 2-5 =====
 
--- Образи: розкладка речей на полотні (координати у відсотках)
+-- Outfits: placement of items on the canvas (coordinates in percent)
 create table if not exists public.outfits (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -52,14 +52,14 @@ create table if not exists public.outfits (
   layout      jsonb not null default '[]',      -- [{item_id, x, y, w, z}]
   occasions   text[] not null default '{}',
   seasons     text[] not null default '{}',
-  notes       text,                             -- напр. пояснення стиліста
+  notes       text,                             -- e.g. the stylist's explanation
   favorite    boolean not null default false,
   source      text not null default 'manual',   -- manual | ai
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 
--- Що і коли вдягала
+-- What was worn and when
 create table if not exists public.wear_log (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -69,18 +69,18 @@ create table if not exists public.wear_log (
   created_at  timestamptz not null default now()
 );
 
--- Натхнення: скріншоти образів і їх розбір
+-- Inspiration: look screenshots and their breakdown
 create table if not exists public.inspirations (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   image_path  text not null,
   thumb_path  text,
   note        text,
-  analysis    jsonb,                            -- результат ІІ
+  analysis    jsonb,                            -- AI result
   created_at  timestamptz not null default now()
 );
 
--- Мої стильові формули (один рядок)
+-- My style formulas (one row)
 create table if not exists public.style_profile (
   user_id     uuid primary key default auth.uid() references auth.users(id) on delete cascade,
   summary     text,
@@ -91,7 +91,7 @@ create table if not exists public.style_profile (
   updated_at  timestamptz not null default now()
 );
 
--- Список покупок
+-- Shopping list
 create table if not exists public.shopping (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -103,7 +103,7 @@ create table if not exists public.shopping (
   created_at  timestamptz not null default now()
 );
 
--- Запити до ІІ: «зараз» (Edge Function) або «в чергу» (обробляє Claude Code безкоштовно)
+-- AI requests: "now" (Edge Function) or "queue" (processed by Claude Code for free)
 create table if not exists public.ai_requests (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -130,7 +130,7 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
--- Коли запит виконано, результат сам розкладається по таблицях
+-- When a request is done, its result is distributed to the tables automatically
 create or replace function public.apply_ai_result() returns trigger
 language plpgsql security invoker as $$
 begin
@@ -147,7 +147,7 @@ begin
     on conflict (user_id) do update set summary = excluded.summary, formulas = excluded.formulas,
       palette = excluded.palette, key_pieces = excluded.key_pieces, based_on = excluded.based_on, updated_at = now();
   elsif new.kind = 'tag' and jsonb_typeof(new.result->'items') = 'array' then
-    -- масова розмітка з черги: [{id, name, kind, colors, seasons, styles, occasions}]
+    -- bulk tagging from the queue: [{id, name, kind, colors, seasons, styles, occasions}]
     update public.items i set
       name = coalesce(i.name, r->>'name'),
       kind = coalesce(i.kind, r->>'kind'),
@@ -165,5 +165,5 @@ drop trigger if exists ai_apply on public.ai_requests;
 create trigger ai_apply before update on public.ai_requests
   for each row execute function public.apply_ai_result();
 
--- Вішліст: речі, яких ще немає; стиліст і образи їх не бачать
+-- Wishlist: pieces not owned yet; the stylist and outfits do not see them
 alter table items add column if not exists wishlist boolean not null default false;

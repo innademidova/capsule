@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Публічний ключ: дані захищені правилами доступу в базі (RLS) і входом за паролем
+// Publishable key: data is protected by database access rules (RLS) and password login
 export const supabase = createClient(
   'https://ajbdkvpyhoyzzzlrlttk.supabase.co',
   'sb_publishable_zyycYXIPLQCCxPsccMttlQ_SglhZaMg',
@@ -39,7 +39,7 @@ export const CATEGORIES: Option[] = [
 ]
 export const categoryLabel = (id: string) => CATEGORIES.find(c => c.id === id)?.label ?? id
 
-// Підказки для поля «тип» залежно від категорії
+// Suggestions for the "type" field, by category
 export const KINDS: Record<string, string[]> = {
   top: ['t-shirt', 'shirt', 'blouse', 'sweater', 'cardigan', 'turtleneck', 'hoodie', 'sweatshirt', 'top', 'tank top', 'bodysuit', 'polo'],
   bottom: ['jeans', 'trousers', 'skirt', 'shorts', 'leggings', 'joggers'],
@@ -95,10 +95,10 @@ export const labelOf = (list: Option[], id: string) => list.find(o => o.id === i
 
 export const itemTitle = (i: Item) => i.name || i.kind || categoryLabel(i.category)
 
-// --- Фото: підписані посилання (бакет приватний) ---
+// --- Photos: signed URLs (the bucket is private) ---
 
-// Посилання живуть добу, тож браузер бере картинки з кешу і не качає їх повторно.
-// Запити з багатьох плиток збираються в один пакет.
+// URLs live for a day, so the browser serves images from cache instead of downloading them again.
+// Requests from many tiles are collected into one batch.
 const urlCache = new Map<string, { url: string; exp: number }>()
 let pending = new Set<string>()
 let flush: Promise<void> | null = null
@@ -121,10 +121,10 @@ export async function signedUrls(paths: string[]): Promise<Record<string, string
   return out
 }
 
-// --- Обробка фото перед завантаженням ---
-// Якісне зменшення (поступово, по половині), обрізання прозорих країв у вирізаних речей.
-// Повне фото до 1600px, прев'ю для галереї до 600px. WebP (зберігає прозорість),
-// якщо браузер не вміє WebP — PNG для прозорих, JPEG для звичайних.
+// --- Photo processing before upload ---
+// High-quality stepped downscale (halving each step), trims transparent edges of cut-out items.
+// Full photo up to 1600px, gallery preview up to 600px. WebP (keeps transparency);
+// if the browser cannot encode WebP: PNG for transparent images, JPEG for regular ones.
 
 const FULL = 1600
 const THUMB = 600
@@ -152,7 +152,7 @@ function downscale(src: CanvasImageSource & { width: number; height: number }, m
   return c
 }
 
-// Межі непрозорої частини; null — якщо прозорих пікселів немає
+// Bounds of the opaque part; null if there are no transparent pixels
 function opaqueBounds(c: HTMLCanvasElement) {
   const { data, width, height } = c.getContext('2d')!.getImageData(0, 0, c.width, c.height)
   let minX = width, minY = height, maxX = -1, maxY = -1, transparent = false
@@ -217,7 +217,7 @@ export async function removePhotos(...paths: (string | null)[]) {
   if (list.length) await supabase.storage.from('photos').remove(list)
 }
 
-// Створює чернетку речі зі знімка людини (функція garment); повертає шлях у сховищі
+// Creates an item draft from a photo of a person (garment function); returns its storage path
 export async function generateGarment(body: { source_path: string; previous_path?: string; piece: string; corrections: string[] }) {
   const res = await supabase.functions.invoke('garment', { body })
   if (res.error) {
@@ -228,7 +228,7 @@ export async function generateGarment(body: { source_path: string; previous_path
   return res.data.path as string
 }
 
-// Якщо модель повернула білий фон замість прозорого — прибираємо його заливкою від країв
+// If the model returned a white background instead of a transparent one, remove it with a flood fill from the edges
 export async function whiteToAlpha(file: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
   const { width: W, height: H } = bitmap
@@ -254,7 +254,7 @@ export async function whiteToAlpha(file: Blob): Promise<Blob> {
   return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Could not process the image')), 'image/png'))
 }
 
-// Картинка з буфера обміну (iPhone: «Скопіювати» вирізаний об'єкт у Фото)
+// Image from the clipboard (iPhone: "Copy" on a lifted subject in Photos)
 export const canPaste = () => typeof navigator !== 'undefined' && !!navigator.clipboard?.read
 
 export async function pasteImage(): Promise<Blob | null> {
@@ -266,7 +266,7 @@ export async function pasteImage(): Promise<Blob | null> {
   return null
 }
 
-// ===== Етапи 2–5 =====
+// ===== Stages 2-5 =====
 
 export type Placement = { item_id: string; x: number; y: number; w: number; z: number }
 export type Outfit = {
@@ -285,7 +285,7 @@ export type AIRequest = {
 }
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 
-// Запит до ІІ: «now» — одразу через серверну функцію (платно), «queue» — у чергу (безкоштовно, обробляє Claude Code)
+// AI request: "now" goes straight to the Edge Function (paid), "queue" waits for Claude Code (free)
 export async function askAI(kind: string, input: Record<string, unknown>, mode: 'now' | 'queue', image_path?: string | null) {
   const { data, error } = await supabase.from('ai_requests')
     .insert({ kind, input, mode, image_path: image_path ?? null, status: 'queued' }).select().single()
@@ -306,7 +306,7 @@ export async function requeue(req: AIRequest) {
   return data as AIRequest
 }
 
-// Автоматична розкладка образу на полотні за категоріями
+// Automatic outfit layout on the canvas, by category
 const SLOTS: Record<string, { x: number; y: number; w: number }[]> = {
   outerwear: [{ x: 2, y: 3, w: 46 }],
   top: [{ x: 30, y: 3, w: 40 }, { x: 52, y: 3, w: 34 }],
@@ -330,7 +330,7 @@ export function autoLayout(items: Item[]): Placement[] {
   })
 }
 
-// Погода зараз (Open-Meteo, без ключа)
+// Current weather (Open-Meteo, no key needed)
 export async function currentWeather(): Promise<string> {
   const pos = await new Promise<GeolocationPosition>((res, rej) =>
     navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000, maximumAge: 30 * 60 * 1000 }))

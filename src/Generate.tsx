@@ -3,7 +3,7 @@ import { supabase, CATEGORIES, processPhoto, uploadPhoto, removePhotos, whiteToA
 import { Chips, Icon, Photo, Header, Section } from './ui'
 import { back } from './App'
 
-// Річ зі знімка людини: ІІ малює її окремо, власниця підтверджує або просить виправити
+// Item from a photo of a person: AI draws it on its own, the owner approves it or asks for fixes
 export function GarmentCreator({ wish, onSaved }: { wish?: boolean; onSaved: (i: Item) => void }) {
   const [source, setSource] = useState<{ path: string; preview: string } | null>(null)
   const [piece, setPiece] = useState('')
@@ -32,7 +32,7 @@ export function GarmentCreator({ wish, onSaved }: { wish?: boolean; onSaved: (i:
     setBusy('')
   }
 
-  // Правки накопичуються, а попередній варіант іде в модель разом з оригіналом
+  // Corrections accumulate, and the previous attempt goes to the model along with the original
   const generate = async (again: boolean) => {
     if (!source) return
     const note = fix.trim()

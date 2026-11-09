@@ -1,7 +1,7 @@
-// Безкоштовна черга ІІ: запити з застосунку обробляє Claude Code.
-//   node scripts/ai-queue.mjs export <папка>   → <папка>/ctx.json + фото для перегляду
+// Free AI queue: requests from the app are processed by Claude Code.
+//   node scripts/ai-queue.mjs export <dir>   → <dir>/ctx.json + photos to look at
 //   node scripts/ai-queue.mjs apply <res.json>  → res.json: {"results":[{"id":"…","result":{…}}]}
-// Логін — з .env.local (CAPSULE_EMAIL, CAPSULE_PASSWORD).
+// Login comes from .env.local (CAPSULE_EMAIL, CAPSULE_PASSWORD).
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
@@ -44,7 +44,7 @@ if (cmd === 'export') {
       x.inspiration = i ? { note: i.note, local_image: await save(dir, i.image_path) } : null
     }
     if (r.kind === 'tag' && !r.image_path) {
-      // масова розмітка: речі без тегів
+      // bulk tagging: items without tags
       x.untagged = []
       for (const it of (items.data ?? []).filter(i => !i.colors.length || !i.kind || !i.seasons.length || !i.styles.length || !i.occasions.length))
         x.untagged.push({ id: it.id, category: it.category, kind: it.kind, name: it.name, local_image: await save(dir, it.photo_path) })

@@ -1,4 +1,4 @@
-/* Capsule: нейтральний «модний» стиль — одяг у центрі уваги */
+/* Capsule: neutral "fashion" look that keeps the clothes in focus */
 :root {
   --bg: #f5f4f2;
   --card: #ffffff;
@@ -58,7 +58,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .error { color: var(--danger); font-size: 14px; margin: 0; }
 .hint { font-size: 13px; color: var(--muted); margin: 0; text-align: center; }
 
-/* Каркас */
+/* Layout */
 .app { min-height: 100dvh; }
 .screen {
   max-width: 1100px; margin: 0 auto;
@@ -101,12 +101,12 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
 .card-title { font-size: 15px; margin-bottom: 10px; }
 
-/* Гардероб / вішліст */
+/* Wardrobe / wishlist */
 .switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 12px; background: var(--card); border-radius: 14px; box-shadow: var(--shadow); }
 .switch button { border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: 14px; padding: 9px; border-radius: 10px; cursor: pointer; }
 .switch button.on { background: var(--ink); color: var(--bg); }
 
-/* Пошук і категорії */
+/* Search and categories */
 .search {
   display: flex; align-items: center; gap: 8px; padding: 0 12px; margin-bottom: 12px;
   background: var(--card); border-radius: 14px; box-shadow: var(--shadow); color: var(--muted);
@@ -134,7 +134,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .filters { display: grid; gap: 14px; }
 .field h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
 
-/* Сітка речей */
+/* Item grid */
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 @media (min-width: 600px) { .grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
 @media (min-width: 900px) { .grid { grid-template-columns: repeat(5, 1fr); } }
@@ -149,7 +149,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .tile-fav .icon { width: 18px; height: 18px; }
 
 .photo { position: relative; background: var(--photo); overflow: hidden; display: grid; place-items: center; }
-/* абсолютне позиціювання: висота картинки не розтягує рамку, річ завжди вміщується повністю */
+/* Absolute positioning: the image height cannot stretch the frame, so the item always fits */
 .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 8%; display: block; }
 .photo-empty { color: #b9b7b3; font-size: 14px; }
 .photo-empty .icon { width: 36px; height: 36px; }
@@ -168,7 +168,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 }
 .fab .icon { width: 26px; height: 26px; }
 
-/* Картка речі */
+/* Item card */
 .detail { display: grid; gap: 18px; }
 @media (min-width: 760px) { .detail { grid-template-columns: 1fr 1fr; align-items: start; gap: 28px; } }
 .detail-info { display: grid; gap: 10px; }
@@ -182,13 +182,13 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .kv span:last-child { text-align: right; font-weight: 600; }
 .notes { white-space: pre-wrap; margin: 0; }
 
-/* Форма */
+/* Form */
 .form { display: grid; gap: 20px; max-width: 640px; margin: 0 auto; }
 .picker { display: grid; gap: 12px; }
 .picker .photo.big { max-width: 360px; width: 100%; margin: 0 auto; }
 .picker-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
-/* Профіль */
+/* Profile */
 .big-num { font-size: 34px; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.03em; }
 .big-num span { font-size: 15px; font-weight: 500; letter-spacing: 0; }
 .bars { display: grid; gap: 8px; }
@@ -199,7 +199,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .roadmap { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); }
 .roadmap b { color: var(--ink); }
 
-/* Нижнє меню */
+/* Bottom menu */
 .tabbar {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 14px);
   display: flex; gap: 2px; padding: 6px; border-radius: 999px; z-index: 10;
@@ -212,7 +212,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 }
 .tab.on { background: var(--accent); color: var(--on-accent); }
 
-/* Вхід */
+/* Login */
 .login { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
 .login-card { width: 100%; max-width: 360px; display: grid; gap: 12px; text-align: center; }
 .login-logo { width: 72px; height: 72px; border-radius: 18px; margin: 0 auto; box-shadow: var(--shadow); }
@@ -222,7 +222,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .pw-wrap input { padding-right: 48px; }
 .pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; display: grid; place-items: center; color: var(--muted); }
 
-/* ===== Етапи 2–5 ===== */
+/* ===== Stages 2-5 ===== */
 .row.wrap { flex-wrap: wrap; }
 h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .pre { white-space: pre-wrap; margin: 0 0 12px; }
@@ -239,7 +239,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .stylist-cta > span:last-child { display: grid; gap: 2px; }
 .cta-icon { width: 44px; height: 44px; border-radius: 14px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
 
-/* Колаж */
+/* Collage */
 .collage { position: relative; aspect-ratio: 3 / 4; background: var(--photo); border-radius: 12px; overflow: hidden; }
 .collage img { position: absolute; height: auto; display: block; pointer-events: none; }
 .collage.big { border-radius: 22px; box-shadow: var(--shadow); }
@@ -257,7 +257,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .editor-board .hint { margin-top: 10px; }
 @media (min-width: 860px) { .editor { grid-template-columns: 440px 1fr; align-items: start; } .editor .form { margin: 0; } }
 
-/* Нижня шторка */
+/* Bottom sheet */
 .sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
 .sheet { background: var(--bg); width: 100%; max-width: 720px; max-height: 88dvh; overflow-y: auto; border-radius: 24px 24px 0 0;
   padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); display: grid; gap: 12px; }
@@ -270,7 +270,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .tick { position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
 .tick .icon { width: 14px; height: 14px; }
 
-/* Міні-списки */
+/* Mini lists */
 .mini-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 4px; scrollbar-width: none; }
 .mini { flex: none; width: 76px; display: grid; gap: 4px; text-align: center; font-size: 11px; font-weight: 600; }
 .mini .photo { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); }
@@ -278,7 +278,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .mini-outfits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .mini-outfits .collage { border: 1px solid var(--line); }
 
-/* Ідеї стиліста */
+/* Stylist ideas */
 .idea-block { margin-top: 24px; }
 .ideas { display: grid; gap: 12px; margin-top: 8px; }
 @media (min-width: 700px) { .ideas { grid-template-columns: repeat(3, 1fr); } }
@@ -287,7 +287,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .idea p { margin: 0; font-size: 14px; }
 .idea .btn { justify-self: start; }
 
-/* Натхнення */
+/* Inspiration */
 .formulas .card-title, .card-title { display: flex; align-items: center; gap: 8px; }
 .card-title .icon { width: 18px; height: 18px; }
 .formula-list { display: grid; gap: 8px; margin-bottom: 10px; }
@@ -315,7 +315,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .pill.p3 { background: var(--soft); color: var(--muted); }
 .buy-row { padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
 
-/* Покупки */
+/* Shopping */
 .gaps p { margin: 0 0 8px; }
 .gap { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .gap .grow { display: grid; gap: 3px; }

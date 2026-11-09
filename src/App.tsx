@@ -12,7 +12,7 @@ import { OutfitList, OutfitDetail, OutfitEditor, Stylist } from './Outfits'
 import { InspoList, InspoDetail } from './Inspo'
 import { Shop, BeforeBuy, MiniItems } from './Shop'
 
-// Маршрути в адресі після #, щоб працювало на GitHub Pages
+// Routes live after # so they work on GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' } | { view: 'item-gen'; wish?: boolean }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
@@ -38,7 +38,7 @@ function parse(hash: string): Route {
   return { view: 'wardrobe' }
 }
 
-// Скільки кроків ми пройшли всередині застосунку — щоб «назад» не виводив із нього
+// How many steps we took inside the app, so that "back" never leaves it
 let depth = 0
 export const go = (path: string) => { depth++; location.hash = path }
 export const back = (fallback: string) => {
@@ -126,7 +126,7 @@ function Main({ email }: { email: string }) {
     setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
   }, [])
   useEffect(() => { load() }, [load])
-  // Коли застосунок знову відкривають — підтягуємо свіжі дані (напр. оброблену чергу)
+  // When the app is opened again, pull fresh data (e.g. a processed queue)
   useEffect(() => {
     const on = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', on)
@@ -141,7 +141,7 @@ function Main({ email }: { email: string }) {
     </div>
   )
   if (!allItems) return <Splash />
-  // Вішліст живе в тій самій таблиці, але стиліст, образи й статистика бачать лише гардероб
+  // The wishlist shares the table, but the stylist, outfits and stats only see the wardrobe
   const items = allItems.filter(i => !i.wishlist)
   const wishlist = allItems.filter(i => i.wishlist)
 
@@ -280,7 +280,7 @@ function Me({ email }: { email: string }) {
       )}
       <div className="card">
         <h3 className="card-title"><Icon name="clock" /> AI queue</h3>
-        {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “обработай очередь” and the answers will appear in the app.</p>
+        {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “process the queue” and the answers will appear in the app.</p>
           : <p className="muted small">Empty. Free requests you add to the queue appear here.</p>}
       </div>
       <div className="card row">

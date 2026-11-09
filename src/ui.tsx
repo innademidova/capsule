@@ -43,7 +43,7 @@ export function Swatch({ id, size = 18 }: { id: string; size?: number }) {
   return <span className="swatch" style={{ width: size, height: size, background: c.hex }} title={c.label} />
 }
 
-// Набір «таблеток» для вибору: один або кілька варіантів
+// Set of pills for choosing one or several options
 export function Chips({ options, value, onChange, multi = true, swatches }: {
   options: Option[]; value: string[]; onChange: (v: string[]) => void; multi?: boolean; swatches?: boolean
 }) {
@@ -62,7 +62,7 @@ export function Chips({ options, value, onChange, multi = true, swatches }: {
   )
 }
 
-// Фото з приватного сховища
+// Photo from private storage
 export function Photo({ path, alt, className }: { path: string | null; alt: string; className?: string }) {
   const [url, setUrl] = useState<string>()
   useEffect(() => {
@@ -97,7 +97,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
   )
 }
 
-// Колаж образу: речі на білому полотні за координатами у відсотках
+// Outfit collage: items on a white canvas, positioned in percent
 export function Collage({ layout, items, className, children }: {
   layout: Placement[]; items: Item[]; className?: string; children?: ReactNode
 }) {
@@ -119,7 +119,7 @@ export function Collage({ layout, items, className, children }: {
   )
 }
 
-// Дві кнопки для будь-якої дії ІІ: «зараз» (платно) і «в чергу» (безкоштовно)
+// Two buttons for any AI action: "now" (paid) and "queue" (free)
 export function AIActions({ onRun, busy, label, cost = '≈3¢', disabled }: {
   onRun: (mode: 'now' | 'queue') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
 }) {

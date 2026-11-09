@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { Item, Outfit, Wear, Inspiration, StyleProfile, ShopItem, AIRequest } from './lib'
 
-// Усі дані застосунку в одному місці
+// All app data in one place
 export type Store = {
   items: Item[]; wishlist: Item[]; outfits: Outfit[]; wear: Wear[]; inspirations: Inspiration[]
   profile: StyleProfile | null; shopping: ShopItem[]; requests: AIRequest[]
