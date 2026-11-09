@@ -6,7 +6,6 @@ import {
 } from './lib'
 import { Icon, Header, Swatch } from './ui'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
-import { GarmentCreator } from './Generate'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
 import { OutfitList, OutfitDetail, OutfitEditor, Stylist } from './Outfits'
 import { InspoList, InspoDetail } from './Inspo'
@@ -14,13 +13,12 @@ import { Shop, BeforeBuy, MiniItems } from './Shop'
 
 // Routes live after # so they work on GitHub Pages
 type Route =
-  | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' } | { view: 'item-gen'; wish?: boolean }
+  | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
   | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
-  if (a === 'i' && b === 'gen') return { view: 'item-gen', wish: c === 'wish' }
   if (a === 'i' && b === 'new') return { view: 'item-edit', wish: c === 'wish' }
   if (a === 'wish') return { view: 'wishlist' }
   if (a === 'i' && b && c === 'edit') return { view: 'item-edit', id: b }
@@ -163,7 +161,6 @@ function Main({ email }: { email: string }) {
     case 'item-edit':
       screen = route.id && !find(route.id) ? notFound : <ItemForm key={route.id ?? 'new'} item={find(route.id)} wish={route.wish} onSaved={save} />
       break
-    case 'item-gen': screen = <GarmentCreator key={String(route.wish)} wish={route.wish} onSaved={save} />; break
     case 'outfits': screen = <OutfitList />; break
     case 'outfit': { const o = findO(route.id); screen = o ? <OutfitDetail outfit={o} /> : notFound; break }
     case 'outfit-edit':
@@ -186,7 +183,7 @@ function Main({ email }: { email: string }) {
     { id: 'shop', label: 'Shop', icon: 'bag', path: '/shop' },
     { id: 'me', label: 'Me', icon: 'user', path: '/me' },
   ]
-  const showTabs = route.view !== 'item-edit' && route.view !== 'item-gen' && route.view !== 'outfit-edit'
+  const showTabs = route.view !== 'item-edit' && route.view !== 'outfit-edit'
 
   return (
     <StoreCtx.Provider value={store}>

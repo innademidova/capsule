@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, today, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, today, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
@@ -214,14 +214,21 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  // AI draft made from the chosen photo; it replaces the photo only when the form is saved
+  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[] } | null>(null)
+  const [genBusy, setGenBusy] = useState('')
+  const [fix, setFix] = useState('')
+  const genAfterPick = useRef(false)
   const set = (patch: Partial<Draft>) => setD(x => ({ ...x, ...patch }))
 
   const take = async (blob: Blob | null | undefined) => {
     if (!blob) return
     setProcessing(true); setError('')
-    try { setPhoto(await processPhoto(blob)); setUploaded(null) }
+    let processed: Processed | null = null
+    try { processed = await processPhoto(blob); setPhoto(processed); setUploaded(null) }
     catch { setError('Could not read this image. Try another one.') }
     setProcessing(false)
+    if (processed && genAfterPick.current) { genAfterPick.current = false; startGen(processed) }
   }
   const paste = async () => {
     try {
@@ -240,23 +247,74 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     return () => window.removeEventListener('paste', on)
   }, [])
 
+  const fillEmpty = (t: Draft) => setD(x => ({
+    ...x, category: x.category || t.category, kind: x.kind || t.kind, name: x.name || t.name,
+    colors: x.colors.length ? x.colors : t.colors, seasons: x.seasons.length ? x.seasons : t.seasons,
+    styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
+  }))
+
+  const startGen = async (p: Processed) => {
+    setGenBusy('Creating the image, this can take a minute or two…'); setError('')
+    let source = ''
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Please sign in again')
+      source = `${user.id}/drafts/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
+      const up = await supabase.storage.from('photos').upload(source, p.full, { contentType: p.full.type })
+      if (up.error) { source = ''; throw up.error }
+      const piece = d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
+      const draft = await generateGarment({ source_path: source, piece, corrections: [] })
+      setGen({ source, draft, piece, corrections: [] })
+      setGenBusy('Filling in the details…')
+      // Tags are a bonus: if this fails, the fields can be filled by hand
+      try {
+        const r = await askAI('tag', { category: d.category || null }, 'now', draft)
+        setRequests(upsert(r)); fillEmpty(r.result as Draft)
+      } catch { /* fill by hand */ }
+    } catch (err) {
+      if (source) await removePhotos(source)
+      setError((err as Error).message)
+    }
+    setGenBusy('')
+  }
+
+  const createFromPhoto = () => {
+    if (photo) startGen(photo)
+    else { genAfterPick.current = true; fileRef.current?.click() }
+  }
+
+  // Corrections accumulate, and the previous attempt goes to the model along with the original
+  const regenerate = async () => {
+    if (!gen) return
+    const note = fix.trim()
+    const corrections = note ? [...gen.corrections, note] : gen.corrections
+    setGenBusy('Creating the image, this can take a minute or two…'); setError('')
+    try {
+      const draft = await generateGarment({ source_path: gen.source, piece: gen.piece, corrections, previous_path: note ? gen.draft : undefined })
+      await removePhotos(gen.draft)
+      setGen({ ...gen, draft, corrections }); setFix('')
+    } catch (err) { setError((err as Error).message) }
+    setGenBusy('')
+  }
+
+  const discardGen = async () => {
+    if (gen) await removePhotos(gen.source, gen.draft)
+    setGen(null); setFix('')
+  }
+
   // AI looks at the photo and fills in the fields (only empty ones, the rest stay untouched)
   const autoFill = async () => {
     setTagging(true); setError('')
     try {
       let path = item?.photo_path ?? null
-      if (photo) {
+      if (gen) path = gen.draft
+      else if (photo) {
         const up = uploaded ?? await uploadPhoto(photo)
         setUploaded(up); path = up.photo_path
       }
       const r = await askAI('tag', { category: d.category || null }, 'now', path)
       setRequests(upsert(r))
-      const t = r.result as Draft
-      setD(x => ({
-        ...x, category: x.category || t.category, kind: x.kind || t.kind, name: x.name || t.name,
-        colors: x.colors.length ? x.colors : t.colors, seasons: x.seasons.length ? x.seasons : t.seasons,
-        styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
-      }))
+      fillEmpty(r.result as Draft)
     } catch (err) {
       const r = (err as { request?: AIRequest }).request; if (r) setRequests(upsert(r))
       setError((err as Error).message)
@@ -267,11 +325,15 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!d.category) { setError('Choose a category'); return }
-    if (!item && !photo) { setError('Add a photo'); return }
+    if (!item && !photo && !gen) { setError('Add a photo'); return }
     setBusy(true); setError('')
     try {
       let paths = {}
-      if (photo) paths = uploaded ?? await uploadPhoto(photo)
+      if (gen) {
+        const { data: blob, error: dl } = await supabase.storage.from('photos').download(gen.draft)
+        if (dl || !blob) throw dl ?? new Error('Could not read the image')
+        paths = await uploadPhoto(await processPhoto(await whiteToAlpha(blob)))
+      } else if (photo) paths = uploaded ?? await uploadPhoto(photo)
       const row = {
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
@@ -282,6 +344,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const { data, error } = await q.select().single()
       if (error) throw error
       if (item && photo) await removePhotos(item.photo_path, item.thumb_path)
+      if (gen) await removePhotos(gen.source, gen.draft, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
       onSaved(data as Item)
       if (item) back(`/i/${item.id}`)
       else location.replace(`#/i/${(data as Item).id}`)
@@ -294,16 +357,26 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   return (
     <form className="screen" onSubmit={submit}>
       <Header title={item ? 'Edit item' : 'New item'}
-        left={<button type="button" className="icon-btn" onClick={() => back(item ? `/i/${item.id}` : wish ? '/wish' : '/')} aria-label="Back"><Icon name="back" /></button>} />
+        left={<button type="button" className="icon-btn" onClick={async () => { await discardGen(); back(item ? `/i/${item.id}` : wish ? '/wish' : '/') }} aria-label="Back"><Icon name="back" /></button>} />
 
       <div className="form">
-        {!item && <button type="button" className="btn wide ai-fill" onClick={() => go(wish ? '/i/gen/wish' : '/i/gen')}><Icon name="sparkle" /> Create from a photo with AI</button>}
         <div className="picker">
-          {photo ? <div className="photo big"><img src={photo.preview} alt="" /></div>
+          {gen ? <Photo path={gen.draft} alt="" className="big" />
+            : photo ? <div className="photo big"><img src={photo.preview} alt="" /></div>
             : item ? <Photo path={item.photo_path} alt="" className="big" />
             : <div className="photo big"><span className="photo-empty">{processing ? 'Processing…' : <Icon name="camera" />}</span></div>}
+          {gen ? <>
+            <Section title="What to fix (optional)">
+              <textarea rows={2} placeholder="e.g. remove the belt, make the sleeves longer" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
+            </Section>
+            {gen.corrections.length > 0 && <p className="hint">Already asked: {gen.corrections.join(' · ')}</p>}
+            <div className="picker-btns">
+              <button type="button" className="btn" onClick={regenerate} disabled={!!genBusy}><Icon name="sparkle" /> Regenerate<span className="cost">≈6¢</span></button>
+              <button type="button" className="btn ghost" onClick={discardGen} disabled={!!genBusy}>Use original photo</button>
+            </div>
+          </> : <>
           <div className="picker-btns">
-            <button type="button" className="btn" onClick={() => fileRef.current?.click()} disabled={processing}>
+            <button type="button" className="btn" onClick={() => { genAfterPick.current = false; fileRef.current?.click() }} disabled={processing || !!genBusy}>
               <Icon name="image" /> {photo || item ? 'Change photo' : 'Choose photo'}
             </button>
             {canPaste() && <button type="button" className="btn" onClick={paste} disabled={processing}><Icon name="paste" /> Paste</button>}
@@ -313,9 +386,16 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           {!photo && !item && (
             <p className="hint">Tip: in the Photos app, touch and hold the item until it lifts, tap <b>Copy</b>, then tap <b>Paste</b> here. iPhone removes the background for you.</p>
           )}
+          {!item && (
+            <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
+              <Icon name="sparkle" /> Create from a photo with AI<span className="cost">≈6¢</span>
+            </button>
+          )}
+          </>}
+          {genBusy && <p className="hint">{genBusy}</p>}
         </div>
 
-        {(photo || item) && (
+        {(photo || item || gen) && (
           <button type="button" className="btn wide ai-fill" onClick={autoFill} disabled={tagging || processing}>
             <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">≈1¢</span>
           </button>
@@ -345,7 +425,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         </Section>
 
         {error && <p className="error">{error}</p>}
-        <button className="btn primary wide" disabled={busy || processing}>{busy ? 'Saving…' : item ? 'Save changes' : wish ? 'Add to wishlist' : 'Add to wardrobe'}</button>
+        <button className="btn primary wide" disabled={busy || processing || !!genBusy}>{busy ? 'Saving…' : item ? 'Save changes' : wish ? 'Add to wishlist' : 'Add to wardrobe'}</button>
       </div>
     </form>
   )
