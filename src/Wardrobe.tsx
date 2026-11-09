@@ -17,8 +17,8 @@ export const emptyFilters: Filters = { category: '', q: '', colors: [], seasons:
 
 const anyOf = (want: string[], have: string[]) => !want.length || want.some(w => have.includes(w))
 
-export function WardrobeList({ items, filters, setFilters }: {
-  items: Item[]; filters: Filters; setFilters: (f: Filters) => void
+export function WardrobeList({ items, filters, setFilters, wish }: {
+  items: Item[]; filters: Filters; setFilters: (f: Filters) => void; wish?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const f = filters
@@ -34,14 +34,20 @@ export function WardrobeList({ items, filters, setFilters }: {
   }, [items, f])
 
   const count = (cat: string) => items.filter(i => i.category === cat).length
+  const newPath = wish ? '/i/new/wish' : '/i/new'
 
   return (
     <div className="screen">
-      <Header title="Wardrobe" right={
+      <Header title={wish ? 'Wishlist' : 'Wardrobe'} right={
         <button className="icon-btn" onClick={() => setOpen(o => !o)} aria-label="Filters">
           <Icon name="filter" />{extra > 0 && <span className="dot">{extra}</span>}
         </button>
       } />
+
+      <div className="switch">
+        <button className={wish ? '' : 'on'} onClick={() => wish && location.replace('#/')}>Wardrobe</button>
+        <button className={wish ? 'on' : ''} onClick={() => !wish && location.replace('#/wish')}>Wishlist</button>
+      </div>
 
       <div className="search">
         <Icon name="search" />
@@ -77,9 +83,9 @@ export function WardrobeList({ items, filters, setFilters }: {
       {items.length === 0 ? (
         <div className="empty">
           <Icon name="hanger" />
-          <h2>Your wardrobe is empty</h2>
-          <p className="muted">Add your first piece: a photo of the item, ideally cut out from the background.</p>
-          <button className="btn primary" onClick={() => go('/i/new')}><Icon name="plus" /> Add item</button>
+          <h2>{wish ? 'Your wishlist is empty' : 'Your wardrobe is empty'}</h2>
+          <p className="muted">{wish ? 'Add pieces you dream of. They stay separate from your wardrobe until you buy them.' : 'Add your first piece: a photo of the item, ideally cut out from the background.'}</p>
+          <button className="btn primary" onClick={() => go(newPath)}><Icon name="plus" /> Add item</button>
         </div>
       ) : shown.length === 0 ? (
         <p className="muted center pad">Nothing matches these filters.</p>
@@ -96,7 +102,7 @@ export function WardrobeList({ items, filters, setFilters }: {
         </div>
       )}
 
-      <button className="fab" onClick={() => go('/i/new')} aria-label="Add item"><Icon name="plus" /></button>
+      <button className="fab" onClick={() => go(newPath)} aria-label="Add item"><Icon name="plus" /></button>
     </div>
   )
 }
@@ -108,6 +114,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
   const { wear, outfits, items, setWear } = useStore()
   const worn = wear.filter(w => w.item_ids.includes(item.id))
   const wornToday = worn.some(w => w.worn_on === today())
+  const home = item.wishlist ? '/wish' : '/'
   const inOutfits = outfits.filter(o => o.layout.some(p => p.item_id === item.id))
   const wore = async () => {
     try { const w = await logWear([item.id], null); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
@@ -117,6 +124,13 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
     const { data, error } = await supabase.from('items').update({ favorite: !item.favorite }).eq('id', item.id).select().single()
     if (!error) onChange(data as Item)
   }
+  // Купила річ із вішліста — вона переходить у гардероб
+  const bought = async () => {
+    setBusy(true)
+    const { data, error } = await supabase.from('items').update({ wishlist: false }).eq('id', item.id).select().single()
+    if (error) alert(error.message); else onChange(data as Item)
+    setBusy(false)
+  }
   const del = async () => {
     if (!confirm(`Delete “${itemTitle(item)}”?`)) return
     setBusy(true)
@@ -124,7 +138,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
     if (error) { alert(error.message); setBusy(false); return }
     await removePhotos(item.photo_path, item.thumb_path)
     onDelete(item.id)
-    back('/')
+    back(home)
   }
 
   const tags = (title: string, ids: string[], list: { id: string; label: string }[]) =>
@@ -134,7 +148,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
 
   return (
     <div className="screen">
-      <Header title="" left={<button className="icon-btn" onClick={() => back('/')} aria-label="Back"><Icon name="back" /></button>}
+      <Header title="" left={<button className="icon-btn" onClick={() => back(home)} aria-label="Back"><Icon name="back" /></button>}
         right={<>
           <button className={'icon-btn' + (item.favorite ? ' fav' : '')} onClick={toggleFav} aria-label="Favorite"><Icon name="heart" filled={item.favorite} /></button>
           <button className="icon-btn" onClick={() => go(`/i/${item.id}/edit`)} aria-label="Edit"><Icon name="edit" /></button>
@@ -157,11 +171,15 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             {!item.seasons.length && !item.styles.length && !item.occasions.length && <p className="muted small">No tags yet</p>}
           </div>
           {item.notes && <div className="card notes">{item.notes}</div>}
-          <div className="row wrap">
-            <button className="btn primary" onClick={wore} disabled={wornToday}><Icon name="check" /> {wornToday ? 'Worn today' : 'Wore it today'}</button>
-            <button className="btn" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> Build outfit</button>
-          </div>
-          <p className="muted small">{worn.length ? `Worn ${worn.length}× · last ${worn[0].worn_on}` : 'Not worn yet'}</p>
+          {item.wishlist ? (
+            <button className="btn primary" onClick={bought} disabled={busy}><Icon name="check" /> I bought it</button>
+          ) : <>
+            <div className="row wrap">
+              <button className="btn primary" onClick={wore} disabled={wornToday}><Icon name="check" /> {wornToday ? 'Worn today' : 'Wore it today'}</button>
+              <button className="btn" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> Build outfit</button>
+            </div>
+            <p className="muted small">{worn.length ? `Worn ${worn.length}× · last ${worn[0].worn_on}` : 'Not worn yet'}</p>
+          </>}
           {inOutfits.length > 0 && (
             <div className="card">
               <h3 className="card-title">In {inOutfits.length} outfit{inOutfits.length > 1 ? 's' : ''}</h3>
@@ -179,14 +197,14 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
 
 // --- Додавання / редагування ---
 
-type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'photo_path' | 'thumb_path'>
+type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path'>
 
 const toDraft = (i?: Item): Draft => ({
   name: i?.name ?? '', category: i?.category ?? '', kind: i?.kind ?? '', colors: i?.colors ?? [], seasons: i?.seasons ?? [],
   styles: i?.styles ?? [], occasions: i?.occasions ?? [], brand: i?.brand ?? '', notes: i?.notes ?? '',
 })
 
-export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) => void }) {
+export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean; onSaved: (i: Item) => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(item))
   const [photo, setPhoto] = useState<Processed | null>(null)
   const [uploaded, setUploaded] = useState<{ photo_path: string; thumb_path: string } | null>(null)
@@ -258,6 +276,7 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
         brand: d.brand?.trim() || null, notes: d.notes?.trim() || null,
+        ...(item ? {} : { wishlist: !!wish }),
       }
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
       const { data, error } = await q.select().single()
@@ -275,7 +294,7 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
   return (
     <form className="screen" onSubmit={submit}>
       <Header title={item ? 'Edit item' : 'New item'}
-        left={<button type="button" className="icon-btn" onClick={() => back(item ? `/i/${item.id}` : '/')} aria-label="Back"><Icon name="back" /></button>} />
+        left={<button type="button" className="icon-btn" onClick={() => back(item ? `/i/${item.id}` : wish ? '/wish' : '/')} aria-label="Back"><Icon name="back" /></button>} />
 
       <div className="form">
         <div className="picker">
@@ -325,7 +344,7 @@ export function ItemForm({ item, onSaved }: { item?: Item; onSaved: (i: Item) =>
         </Section>
 
         {error && <p className="error">{error}</p>}
-        <button className="btn primary wide" disabled={busy || processing}>{busy ? 'Saving…' : item ? 'Save changes' : 'Add to wardrobe'}</button>
+        <button className="btn primary wide" disabled={busy || processing}>{busy ? 'Saving…' : item ? 'Save changes' : wish ? 'Add to wishlist' : 'Add to wardrobe'}</button>
       </div>
     </form>
   )

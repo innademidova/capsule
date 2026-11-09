@@ -3,7 +3,7 @@ import type { Item, Outfit, Wear, Inspiration, StyleProfile, ShopItem, AIRequest
 
 // Усі дані застосунку в одному місці
 export type Store = {
-  items: Item[]; outfits: Outfit[]; wear: Wear[]; inspirations: Inspiration[]
+  items: Item[]; wishlist: Item[]; outfits: Outfit[]; wear: Wear[]; inspirations: Inspiration[]
   profile: StyleProfile | null; shopping: ShopItem[]; requests: AIRequest[]
   setItems: (f: (x: Item[]) => Item[]) => void
   setOutfits: (f: (x: Outfit[]) => Outfit[]) => void

@@ -13,13 +13,14 @@ import { Shop, BeforeBuy, MiniItems } from './Shop'
 
 // Маршрути в адресі після #, щоб працювало на GitHub Pages
 type Route =
-  | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string }
+  | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
   | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
-  if (a === 'i' && b === 'new') return { view: 'item-edit' }
+  if (a === 'i' && b === 'new') return { view: 'item-edit', wish: c === 'wish' }
+  if (a === 'wish') return { view: 'wishlist' }
   if (a === 'i' && b && c === 'edit') return { view: 'item-edit', id: b }
   if (a === 'i' && b) return { view: 'item', id: b }
   if (a === 'outfits') return { view: 'outfits' }
@@ -93,7 +94,7 @@ function Login() {
 
 function Main({ email }: { email: string }) {
   const [route, setRoute] = useState<Route>(() => parse(location.hash))
-  const [items, setItemsS] = useState<Item[] | null>(null)
+  const [allItems, setItemsS] = useState<Item[] | null>(null)
   const [outfits, setOutfits] = useState<Outfit[]>([])
   const [wear, setWear] = useState<Wear[]>([])
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
@@ -101,6 +102,7 @@ function Main({ email }: { email: string }) {
   const [shopping, setShopping] = useState<ShopItem[]>([])
   const [requests, setRequests] = useState<AIRequest[]>([])
   const [filters, setFilters] = useState<Filters>(emptyFilters)
+  const [wishFilters, setWishFilters] = useState<Filters>(emptyFilters)
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
@@ -136,24 +138,28 @@ function Main({ email }: { email: string }) {
       <button className="btn" onClick={load}>Try again</button>
     </div>
   )
-  if (!items) return <Splash />
+  if (!allItems) return <Splash />
+  // Вішліст живе в тій самій таблиці, але стиліст, образи й статистика бачать лише гардероб
+  const items = allItems.filter(i => !i.wishlist)
+  const wishlist = allItems.filter(i => i.wishlist)
 
   const store: Store = {
-    items, outfits, wear, inspirations, profile, shopping, requests,
+    items, wishlist, outfits, wear, inspirations, profile, shopping, requests,
     setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setWear, setInspirations, setShopping, setRequests, reload: load,
   }
   const save = (i: Item) => store.setItems(upsert(i))
   const drop = (id: string) => store.setItems(without(id))
-  const find = (id?: string) => items.find(i => i.id === id)
+  const find = (id?: string) => allItems.find(i => i.id === id)
   const findO = (id?: string) => outfits.find(o => o.id === id)
   const notFound = <NotFound />
 
   let screen
   switch (route.view) {
     case 'wardrobe': screen = <WardrobeList items={items} filters={filters} setFilters={setFilters} />; break
+    case 'wishlist': screen = <WardrobeList wish items={wishlist} filters={wishFilters} setFilters={setWishFilters} />; break
     case 'item': { const it = find(route.id); screen = it ? <ItemDetail item={it} onChange={save} onDelete={drop} /> : notFound; break }
     case 'item-edit':
-      screen = route.id && !find(route.id) ? notFound : <ItemForm key={route.id ?? 'new'} item={find(route.id)} onSaved={save} />
+      screen = route.id && !find(route.id) ? notFound : <ItemForm key={route.id ?? 'new'} item={find(route.id)} wish={route.wish} onSaved={save} />
       break
     case 'outfits': screen = <OutfitList />; break
     case 'outfit': { const o = findO(route.id); screen = o ? <OutfitDetail outfit={o} /> : notFound; break }
@@ -168,7 +174,7 @@ function Main({ email }: { email: string }) {
     case 'me': screen = <Me email={email} />; break
   }
 
-  const tab = route.view.startsWith('item') ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
+  const tab = route.view.startsWith('item') || route.view === 'wishlist' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
     : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
   const tabs = [
     { id: 'wardrobe', label: 'Wardrobe', icon: 'hanger', path: '/' },

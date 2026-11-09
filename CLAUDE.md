@@ -36,6 +36,8 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 5. **Shop**: wardrobe check (gaps / too many / strengths → add to shopping list), shopping list, "Before you buy"
    (photo from a shop → verdict, pairs_with, similar, outfit ideas). Me tab: stats, most worn, not worn for a month+.
 
+**Wishlist** (`#/wish`, switch on the Wardrobe screen): same cards, stored in `items` with `wishlist = true`; `store.items` is wardrobe only, so the stylist, outfits, stats and AI never see wishlist pieces. "I bought it" moves a piece to the wardrobe. To add one by script, put `"wishlist":true` in the JSON for `scripts/add-item.mjs`.
+
 Test data: the 15 illustrated basics from `scripts/seed-basics.mjs` were deleted on 2026-11-04 at her request; her real
 items start with the beige cropped trench (2026-11-04). Do not seed test items again.
 

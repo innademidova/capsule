@@ -164,3 +164,6 @@ end $$;
 drop trigger if exists ai_apply on public.ai_requests;
 create trigger ai_apply before update on public.ai_requests
   for each row execute function public.apply_ai_result();
+
+-- Вішліст: речі, яких ще немає; стиліст і образи їх не бачать
+alter table items add column if not exists wishlist boolean not null default false;

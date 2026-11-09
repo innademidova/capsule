@@ -20,6 +20,7 @@ export type Item = {
   photo_path: string | null
   thumb_path: string | null
   favorite: boolean
+  wishlist: boolean
   created_at: string
   updated_at: string
 }

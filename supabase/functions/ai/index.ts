@@ -82,7 +82,7 @@ type Item = Record<string, unknown> & { id: string };
 
 async function wardrobe(sb: SupabaseClient) {
   const [{ data: items }, { data: wear }] = await Promise.all([
-    sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,notes").order("created_at"),
+    sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,notes").eq("wishlist", false).order("created_at"),
     sb.from("wear_log").select("item_ids"),
   ]);
   const worn = new Map<string, number>();

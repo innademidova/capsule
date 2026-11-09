@@ -30,7 +30,7 @@ if (cmd === 'export') {
   const dir = arg ?? 'queue-export'; mkdirSync(dir, { recursive: true })
   const [q, items, ins, prof, wear] = await Promise.all([
     sb.from('ai_requests').select('*').eq('status', 'queued').order('created_at'),
-    sb.from('items').select('*').order('created_at'),
+    sb.from('items').select('*').eq('wishlist', false).order('created_at'),
     sb.from('inspirations').select('*').order('created_at'),
     sb.from('style_profile').select('*').maybeSingle(),
     sb.from('wear_log').select('item_ids'),
