@@ -1,10 +1,10 @@
-// Створює фото окремої речі зі знімка людини (OpenAI gpt-image-2).
+// Створює фото окремої речі зі знімка людини (OpenAI gpt-image-2.6-sunburst).
 // Результат — чернетка у сховищі: у застосунку річ потрапляє лише після підтвердження.
 // Ключ — у секретах Supabase (OPENAI_API_KEY).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
 
-const MODEL = "gpt-image-2";
+const MODEL = "gpt-image-2.6-sunburst";
 const QUALITY = "medium"; // high — детальніше, але приблизно вчетверо дорожче і довше
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +78,7 @@ Deno.serve(async req => {
     const prompt = buildPrompt(piece, corrections, !!previous_path);
 
     let r = await callOpenAI(images, prompt, "transparent");
-    // Прозорий фон у gpt-image-2 ще в прев'ю: якщо відмовить — білий, його прибере застосунок
+    // Якщо прозорий фон відмовить — білий, його прибере застосунок
     if (r.status === 400 && (await r.clone().text()).includes("background")) r = await callOpenAI(images, prompt, "opaque");
     const body = await r.json();
     if (!r.ok) throw new Error(`OpenAI error ${r.status}: ${body.error?.message ?? "unknown"}`);
