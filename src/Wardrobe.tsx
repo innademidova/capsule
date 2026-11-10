@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, cents, today, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, cents, compositionText, type Material, today, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
@@ -159,6 +159,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
           <p className="eyebrow">{categoryLabel(item.category)}{item.kind && item.name ? ` · ${item.kind}` : ''}</p>
           <h2 className="title">{itemTitle(item)}</h2>
           {item.brand && <p className="muted">{item.brand}</p>}
+          {item.materials?.length > 0 && <p className="muted small">{compositionText(item.materials)}</p>}
           {item.colors.length > 0 && (
             <div className="color-list">
               {item.colors.map(c => <span key={c} className="color-tag"><Swatch id={c} size={14} />{labelOf(COLORS, c)}</span>)}
@@ -204,12 +205,40 @@ type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishl
 
 const toDraft = (i?: Item): Draft => ({
   name: i?.name ?? '', category: i?.category ?? '', kind: i?.kind ?? '', colors: i?.colors ?? [], seasons: i?.seasons ?? [],
-  styles: i?.styles ?? [], occasions: i?.occasions ?? [], brand: i?.brand ?? '', notes: i?.notes ?? '', link: i?.link ?? '',
+  styles: i?.styles ?? [], occasions: i?.occasions ?? [], brand: i?.brand ?? '', notes: i?.notes ?? '', link: i?.link ?? '', materials: i?.materials ?? [],
 })
 
 // "zara.com/..." -> "https://zara.com/..."; empty -> null
 const normLink = (v?: string | null) => { const t = v?.trim(); return !t ? null : /^https?:\/\//i.test(t) ? t : `https://${t}` }
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
+
+// Composition editor: rows of material + optional percent, like a care label
+function MaterialsInput({ value, names, onChange }: { value: Material[]; names: string[]; onChange: (m: Material[]) => void }) {
+  const rows = value.length ? value : [{ name: '', pct: null }]
+  const put = (i: number, patch: Partial<Material>) => onChange(rows.map((r, j) => j === i ? { ...r, ...patch } : r))
+  const total = rows.reduce((s, r) => s + (r.pct ?? 0), 0)
+  const withPct = rows.filter(r => r.name.trim() && r.pct != null).length
+  return (
+    <div className="materials">
+      {rows.map((r, i) => (
+        <div key={i} className="material-row">
+          <input list="materials" placeholder="e.g. Cotton" value={r.name} onChange={e => put(i, { name: e.target.value })} />
+          <label className="pct">
+            <input type="number" inputMode="numeric" min={0} max={100} placeholder="%" value={r.pct ?? ''}
+              onChange={e => put(i, { pct: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(+e.target.value))) })} />
+            <span>%</span>
+          </label>
+          <button type="button" className="icon-btn" aria-label="Remove material" onClick={() => onChange(rows.filter((_, j) => j !== i))}><Icon name="x" /></button>
+        </div>
+      ))}
+      <datalist id="materials">{names.map(n => <option key={n} value={n} />)}</datalist>
+      <div className="material-foot">
+        <button type="button" className="btn ghost" onClick={() => onChange([...rows, { name: '', pct: rows.length && total < 100 && withPct ? 100 - total : null }])}><Icon name="plus" /> Add material</button>
+        {withPct > 0 && <span className={'hint' + (total === 100 ? '' : ' warn')}>Total {total}%{total !== 100 ? ' (a label adds up to 100)' : ''}</span>}
+      </div>
+    </div>
+  )
+}
 
 export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean; onSaved: (i: Item) => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(item))
@@ -231,8 +260,10 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const genAfterPick = useRef(false)
   const set = (patch: Partial<Draft>) => setD(x => ({ ...x, ...patch }))
   const [brands, setBrands] = useState<string[]>([])
+  const [materialNames, setMaterialNames] = useState<string[]>([])
   useEffect(() => {
     supabase.from('brands').select('name').order('name').then(({ data }) => setBrands((data ?? []).map(b => b.name)))
+    supabase.from('materials').select('name').order('name').then(({ data }) => setMaterialNames((data ?? []).map(m => m.name)))
   }, [])
 
   const take = async (blob: Blob | null | undefined) => {
@@ -384,6 +415,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
         brand: d.brand?.trim() || null, notes: d.notes?.trim() || null, link: normLink(d.link),
+        materials: d.materials.map(m => ({ name: m.name.trim(), pct: m.pct })).filter(m => m.name),
         ...(!item && wish ? { wishlist: true } : {}),
       }
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
@@ -392,6 +424,9 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       // Remember a new brand for the suggestions; the same name in another case counts as known
       if (row.brand && !brands.some(b => b.toLowerCase() === row.brand!.toLowerCase()))
         await supabase.from('brands').insert({ name: row.brand })
+      // Same for materials typed by hand
+      const newMaterials = row.materials.filter(m => !materialNames.some(n => n.toLowerCase() === m.name.toLowerCase()))
+      if (newMaterials.length) await supabase.from('materials').insert(newMaterials.map(m => ({ name: m.name })))
       if (item && photo) await removePhotos(item.photo_path, item.thumb_path)
       if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
       onSaved(data as Item)
@@ -486,6 +521,10 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
 
         <Section title="Name (optional)">
           <input placeholder="e.g. Cream cable-knit sweater" value={d.name ?? ''} onChange={e => set({ name: e.target.value })} />
+        </Section>
+
+        <Section title="Composition (optional)">
+          <MaterialsInput value={d.materials} names={materialNames} onChange={materials => set({ materials })} />
         </Section>
 
         <Section title="Brand (optional)">

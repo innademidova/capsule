@@ -199,3 +199,18 @@ alter table public.ai_usage enable row level security;
 drop policy if exists "own usage" on public.ai_usage;
 create policy "own usage" on public.ai_usage for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Composition, like the care label: [{"name": "Cotton", "pct": 95}, {"name": "Elastane", "pct": 5}]; pct may be null
+alter table items add column if not exists materials jsonb not null default '[]';
+
+-- Materials: suggestions for the Composition field
+create table if not exists public.materials (
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, name)
+);
+alter table public.materials enable row level security;
+drop policy if exists "own materials" on public.materials;
+create policy "own materials" on public.materials for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());

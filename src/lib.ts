@@ -18,6 +18,7 @@ export type Item = {
   brand: string | null
   notes: string | null
   link: string | null
+  materials: Material[]
   photo_path: string | null
   thumb_path: string | null
   favorite: boolean
@@ -27,6 +28,12 @@ export type Item = {
 }
 
 export type Option = { id: string; label: string }
+
+// One line of the composition label; pct is optional (unknown share)
+export type Material = { name: string; pct: number | null }
+// "95% Cotton · 5% Elastane", largest share first
+export const compositionText = (m: Material[]) =>
+  [...m].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)).map(x => x.pct != null ? `${x.pct}% ${x.name}` : x.name).join(' · ')
 
 export const CATEGORIES: Option[] = [
   { id: 'top', label: 'Tops' },

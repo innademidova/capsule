@@ -23,7 +23,7 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 
 ## Features (all 5 stages built on 2026-10-31; she tests them on the phone)
 
-1. **Digital wardrobe**: items with photo, category, type, colors, season, style, occasion, brand, notes; gallery with
+1. **Digital wardrobe**: items with photo, category, type, colors, season, style, occasion, brand, composition (`materials` jsonb `[{name, pct|null}]`, suggestions from the `materials` table), notes; gallery with
    category chips, filters, search; favorites; "Wore it today"; "Build outfit" from an item. Background removal: iPhone
    "lift subject" → Copy → **Paste** in the app; transparent edges are auto-trimmed. "Fill in with AI" tags from the photo.
 2. **Outfits**: canvas editor (drag, resize, front, remove; positions in % in `outfits.layout`), save, favorite,

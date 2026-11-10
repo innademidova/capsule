@@ -351,3 +351,14 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .ref button .icon { width: 12px; height: 12px; }
 .ref.add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted, #888); cursor: pointer; }
 .ref.add .icon { width: 18px; height: 18px; }
+
+/* Composition editor */
+.materials { display: flex; flex-direction: column; gap: 8px; }
+.material-row { display: flex; gap: 8px; align-items: center; }
+.material-row > input { flex: 1; min-width: 0; }
+.material-row .pct { position: relative; width: 84px; flex: none; }
+.material-row .pct input { width: 100%; padding-right: 26px; }
+.material-row .pct span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.material-row .icon-btn { flex: none; }
+.material-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.hint.warn { color: #b26b00; }
