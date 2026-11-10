@@ -219,7 +219,7 @@ export async function removePhotos(...paths: (string | null)[]) {
 }
 
 // Creates an item draft from a photo of a person (garment function); returns its storage path and exact cost
-export async function generateGarment(body: { source_path: string; previous_path?: string; piece: string; corrections: string[] }) {
+export async function generateGarment(body: { source_path: string; ref_paths?: string[]; previous_path?: string; piece: string; corrections: string[] }) {
   const res = await supabase.functions.invoke('garment', { body })
   if (res.error) {
     let msg = res.error.message

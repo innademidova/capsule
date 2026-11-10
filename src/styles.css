@@ -341,3 +341,13 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
   .pill.missing, .pill.p1 { background: #3d2222; color: #f0a0a0; }
   .verdict.buy { color: #8fd3a2; } .verdict.maybe { color: #e3c27a; } .verdict.skip { color: #f0a0a0; }
 }
+
+/* Extra photos for the AI run */
+.refs { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.ref { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; background: var(--photo); border: 1px solid var(--line); padding: 0; }
+.ref img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ref button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; padding: 0;
+  background: rgba(0, 0, 0, .55); color: #fff; display: grid; place-items: center; }
+.ref button .icon { width: 12px; height: 12px; }
+.ref.add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted, #888); cursor: pointer; }
+.ref.add .icon { width: 18px; height: 18px; }

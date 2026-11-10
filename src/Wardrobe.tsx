@@ -222,7 +222,10 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   // AI draft made from the chosen photo; it replaces the photo only when the form is saved
-  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[]; image: number; tags: number; tries: number } | null>(null)
+  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[]; refs: string[]; image: number; tags: number; tries: number } | null>(null)
+  // Extra photos of the same garment (back, close-up, true colour) waiting for the next AI run
+  const [extra, setExtra] = useState<{ blob: Blob; url: string }[]>([])
+  const extraRef = useRef<HTMLInputElement>(null)
   const [genBusy, setGenBusy] = useState('')
   const [fix, setFix] = useState('')
   const genAfterPick = useRef(false)
@@ -264,21 +267,39 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
   }))
 
+  const addExtra = async (files: FileList | null) => {
+    for (const f of Array.from(files ?? [])) {
+      try { const p = await processPhoto(f); setExtra(x => [...x, { blob: p.full, url: p.preview }]) }
+      catch { setError('Could not read this image. Try another one.') }
+    }
+  }
+  const uploadExtra = async (uid: string) => {
+    const paths: string[] = []
+    for (const e of extra) {
+      const path = `${uid}/drafts/${crypto.randomUUID()}.${e.blob.type.split('/')[1]}`
+      const up = await supabase.storage.from('photos').upload(path, e.blob, { contentType: e.blob.type })
+      if (up.error) { await removePhotos(...paths); throw up.error }
+      paths.push(path)
+    }
+    return paths
+  }
+
   const startGen = async (p: Processed) => {
     setGenBusy('Creating the image, this can take a minute or two…'); setError('')
-    let source = ''
+    let source = '', refs: string[] = []
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Please sign in again')
       source = `${user.id}/drafts/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
       const up = await supabase.storage.from('photos').upload(source, p.full, { contentType: p.full.type })
       if (up.error) { source = ''; throw up.error }
+      refs = await uploadExtra(user.id)
       const piece = d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
       // Optional instructions typed before the first run count as the first correction
       const first = fix.trim() ? [fix.trim()] : []
-      const g = await generateGarment({ source_path: source, piece, corrections: first })
+      const g = await generateGarment({ source_path: source, ref_paths: refs, piece, corrections: first })
       const draft = g.path
-      setGen({ source, draft, piece, corrections: first, image: g.cost_usd ?? 0, tags: 0, tries: 1 }); setFix('')
+      setGen({ source, draft, piece, corrections: first, refs, image: g.cost_usd ?? 0, tags: 0, tries: 1 }); setFix(''); setExtra([])
       setGenBusy('Filling in the details…')
       // Tags are a bonus: if this fails, the fields can be filled by hand
       try {
@@ -287,7 +308,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         setGen(x => x && { ...x, tags: x.tags + (r.cost_usd ?? 0) })
       } catch { /* fill by hand */ }
     } catch (err) {
-      if (source) await removePhotos(source)
+      if (source) await removePhotos(source, ...refs)
       setError((err as Error).message)
     }
     setGenBusy('')
@@ -304,17 +325,23 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     const note = fix.trim()
     const corrections = note ? [...gen.corrections, note] : gen.corrections
     setGenBusy('Creating the image, this can take a minute or two…'); setError('')
+    let added: string[] = []
     try {
-      const g = await generateGarment({ source_path: gen.source, piece: gen.piece, corrections, previous_path: note ? gen.draft : undefined })
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Please sign in again')
+      added = await uploadExtra(user.id)
+      const refs = [...gen.refs, ...added]
+      // Without any new note or photo it is a fresh try; otherwise the model fixes its previous attempt
+      const g = await generateGarment({ source_path: gen.source, ref_paths: refs, piece: gen.piece, corrections, previous_path: note || added.length ? gen.draft : undefined })
       await removePhotos(gen.draft)
-      setGen({ ...gen, draft: g.path, corrections, image: gen.image + (g.cost_usd ?? 0), tries: gen.tries + 1 }); setFix('')
-    } catch (err) { setError((err as Error).message) }
+      setGen({ ...gen, draft: g.path, corrections, refs, image: gen.image + (g.cost_usd ?? 0), tries: gen.tries + 1 }); setFix(''); setExtra([])
+    } catch (err) { await removePhotos(...added); setError((err as Error).message) }
     setGenBusy('')
   }
 
   const discardGen = async () => {
-    if (gen) await removePhotos(gen.source, gen.draft)
-    setGen(null); setFix('')
+    if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs)
+    setGen(null); setFix(''); setExtra([])
   }
 
   // AI looks at the photo and fills in the fields (only empty ones, the rest stay untouched)
@@ -362,7 +389,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       if (row.brand && !brands.some(b => b.toLowerCase() === row.brand!.toLowerCase()))
         await supabase.from('brands').insert({ name: row.brand })
       if (item && photo) await removePhotos(item.photo_path, item.thumb_path)
-      if (gen) await removePhotos(gen.source, gen.draft, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
+      if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
       onSaved(data as Item)
       if (item) back(`/i/${item.id}`)
       else location.replace(`#/i/${(data as Item).id}`)
@@ -385,8 +412,17 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             : <div className="photo big"><span className="photo-empty">{processing ? 'Processing…' : <Icon name="camera" />}</span></div>}
           {gen ? <>
             <Section title="What to fix (optional)">
-              <textarea rows={2} placeholder="e.g. remove the belt, make the sleeves longer" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
+              <textarea rows={2} placeholder="e.g. make it red, remove the belt, no cut-out on the back" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
             </Section>
+            <div className="refs">
+              {extra.map((e, i) => (
+                <div key={e.url} className="ref"><img src={e.url} alt="" />
+                  <button type="button" aria-label="Remove photo" onClick={() => setExtra(x => x.filter((_, j) => j !== i))}><Icon name="x" /></button>
+                </div>
+              ))}
+              <button type="button" className="ref add" onClick={() => extraRef.current?.click()} disabled={!!genBusy || gen.refs.length + extra.length >= 8}><Icon name="plus" /><span>Photo</span></button>
+            </div>
+            <p className="hint">Extra photos of the same piece help: the back, a close-up, the true colour. About +1¢ each.</p>
             {gen.corrections.length > 0 && <p className="hint">Already asked: {gen.corrections.join(' · ')}</p>}
             <p className="hint">Spent so far: {cents(gen.image + gen.tags)} (image{gen.tries > 1 ? ` ×${gen.tries}` : ''} {cents(gen.image)}, details {cents(gen.tags)})</p>
             <div className="picker-btns">
@@ -406,12 +442,24 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             <p className="hint">Tip: in the Photos app, touch and hold the item until it lifts, tap <b>Copy</b>, then tap <b>Paste</b> here. iPhone removes the background for you.</p>
           )}
           {!item && <>
-            <textarea rows={2} placeholder="Instructions for AI (optional), e.g. without the belt, only the skirt" value={fix} onChange={e => setFix(e.target.value)} disabled={processing || !!genBusy} />
+            <Section title="Instructions for AI (optional)">
+              <textarea rows={2} placeholder="e.g. make it red, only the skirt, without the belt" value={fix} onChange={e => setFix(e.target.value)} disabled={processing || !!genBusy} />
+            </Section>
+            <div className="refs">
+              {extra.map((e, i) => (
+                <div key={e.url} className="ref"><img src={e.url} alt="" />
+                  <button type="button" aria-label="Remove photo" onClick={() => setExtra(x => x.filter((_, j) => j !== i))}><Icon name="x" /></button>
+                </div>
+              ))}
+              <button type="button" className="ref add" onClick={() => extraRef.current?.click()} disabled={!!genBusy || 0 + extra.length >= 8}><Icon name="plus" /><span>Photo</span></button>
+            </div>
+            <p className="hint">Extra photos of the same piece help: the back, a close-up, the true colour. About +1¢ each.</p>
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
               <Icon name="sparkle" /> Enhance with AI<span className="cost">≈6¢</span>
             </button>
           </>}
           </>}
+          <input ref={extraRef} type="file" accept="image/*" multiple hidden onChange={e => { addExtra(e.target.files); e.target.value = '' }} />
           {genBusy && <p className="hint">{genBusy}</p>}
         </div>
 

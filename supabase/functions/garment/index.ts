@@ -13,12 +13,14 @@ const cors = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-function buildPrompt(piece: string, corrections: string[], hasPrevious: boolean) {
-  const images = hasPrevious
-    ? "The first image is the original photo. The second image is your previous attempt: keep what is right in it and change only what the corrections ask for."
-    : "The image is a photo, often of a person wearing the clothes.";
+function buildPrompt(piece: string, corrections: string[], refs: number, hasPrevious: boolean) {
+  // Image order: original, then extra reference photos, then the previous attempt
+  const lines = ["Image 1 is the main photo, often of a person wearing the clothes."];
+  if (refs) lines.push(`Image${refs > 1 ? `s 2-${refs + 1} are` : " 2 is"} extra photo${refs > 1 ? "s" : ""} of the same garment from the owner (another angle, the back, a close-up, the true colour). Use them for details the main photo does not show.`);
+  if (hasPrevious) lines.push(`The last image (image ${refs + 2}) is your previous attempt: keep what is right in it and change only what the instructions ask for.`);
+  const images = lines.join(" ");
   const fixes = corrections.length
-    ? `\n\nCORRECTIONS FROM THE OWNER (all of them still apply, the last one is the newest)\n${corrections.map(c => `- ${c}`).join("\n")}\nWhere a correction conflicts with the accuracy rules below, follow the correction.`
+    ? `\n\nINSTRUCTIONS FROM THE OWNER (all of them still apply, the last one is the newest)\n${corrections.map(c => `- ${c}`).join("\n")}\nWhere an instruction conflicts with the accuracy rules below, follow the instruction.`
     : "";
   return `${images}
 
@@ -31,7 +33,7 @@ OUTPUT
 - Soft, even studio lighting, no harsh shadows, no props, no text, no watermark.
 
 ACCURACY (most important)
-- Reproduce the garment exactly as it appears in the photo. Do not redesign, "improve" or simplify it.
+- Reproduce the garment exactly as it appears in the photos. Do not redesign, "improve" or simplify it.
 - Keep the exact colour and shade, fabric and texture (knit, linen, denim, satin and so on), pattern or print, and its scale.
 - Keep every detail exactly: number, colour, shape and placement of buttons, zippers, pockets, seams, pleats, darts, collar and lapel shape, cuffs, belt, buckles, hardware, embroidery, logos.
 - Keep the real proportions: length, sleeve length, fit (cropped, oversized, wide-leg and so on).
@@ -82,12 +84,14 @@ Deno.serve(async req => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
     if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
-    const { source_path, previous_path, piece, corrections = [] } = await req.json() as {
-      source_path: string; previous_path?: string; piece: string; corrections?: string[];
+    const { source_path, ref_paths = [], previous_path, piece, corrections = [] } = await req.json() as {
+      source_path: string; ref_paths?: string[]; previous_path?: string; piece: string; corrections?: string[];
     };
+    const refs = ref_paths.slice(0, 8);
     const images = [await download(sb, source_path)];
+    for (const r of refs) images.push(await download(sb, r));
     if (previous_path) images.push(await download(sb, previous_path));
-    const prompt = buildPrompt(piece, corrections, !!previous_path);
+    const prompt = buildPrompt(piece, corrections, refs.length, !!previous_path);
 
     let r = await callOpenAI(images, prompt, "transparent");
     // If a transparent background is refused, use white; the app removes it
