@@ -388,14 +388,14 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           )}
           {!item && (
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
-              <Icon name="sparkle" /> Create from a photo with AI<span className="cost">≈6¢</span>
+              <Icon name="sparkle" /> Enhance with AI<span className="cost">≈6¢</span>
             </button>
           )}
           </>}
           {genBusy && <p className="hint">{genBusy}</p>}
         </div>
 
-        {(photo || item || gen) && (
+        {(photo || item) && !gen && (
           <button type="button" className="btn wide ai-fill" onClick={autoFill} disabled={tagging || processing}>
             <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">≈1¢</span>
           </button>

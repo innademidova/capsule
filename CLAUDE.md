@@ -37,7 +37,7 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 
 **Wishlist** (`#/wish`, switch on the Wardrobe screen): same cards, stored in `items` with `wishlist = true`; `store.items` is wardrobe only, so the stylist, outfits, stats and AI never see wishlist pieces. "I bought it" moves a piece to the wardrobe. To add one by script, put `"wishlist":true` in the JSON for `scripts/add-item.mjs`.
 
-**Create from a photo with AI** (button inside the new-item form, `ItemForm` in `src/Wardrobe.tsx`): uses the chosen photo right away (asks for one if none); the Name field, if filled, says which piece → Edge Function `garment` (`gpt-image-2.6-sunburst`, medium quality, needs Supabase secret `OPENAI_API_KEY`) writes a draft to `photos/<uid>/drafts/`. She approves it ("Add" saves the item) or regenerates: corrections accumulate and the previous attempt is sent with the original. Tags are filled into the form from the draft. Deploy like `ai`.
+**Enhance with AI** (button inside the new-item form, `ItemForm` in `src/Wardrobe.tsx`): uses the chosen photo right away (asks for one if none); the Name field, if filled, says which piece → Edge Function `garment` (`gpt-image-2.6-sunburst`, medium quality, needs Supabase secret `OPENAI_API_KEY`) writes a draft to `photos/<uid>/drafts/`. She approves it ("Add" saves the item) or regenerates: corrections accumulate and the previous attempt is sent with the original. Tags are filled into the form from the draft, so "Fill in with AI" is hidden while a draft is shown. Deploy like `ai`.
 
 Test data: the 15 illustrated basics from `scripts/seed-basics.mjs` were deleted on 2026-11-04 at her request; her real
 items start with the beige cropped trench (2026-11-04). Do not seed test items again.
