@@ -84,6 +84,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
   `#/n/<id>`, `#/shop`, `#/buy`, `#/me`), 5-tab bar, Me screen. Data reloads when the app becomes visible again.
 - `supabase/schema.sql` full schema; apply changes via the Management API (append new statements to this file too).
 - `scripts/add-item.mjs <photo> <json>` adds an item and prepares its photo.
+- Costs: every paid OpenAI call logs exact tokens and USD to `ai_usage` (prices are constants in the functions; update them if OpenAI changes pricing). Measured 2026-11-10: Enhance ≈6.2¢ per image, tagging ≈0.3¢.
 - `scripts/garment.mjs <photo> <out.png> ['<piece>'] ['<correction>'...]` runs the `garment` function (Enhance with AI, ≈6¢) on a local photo. Use it when the cutout cannot work: a person in the photo, or a fake checkerboard "transparency" baked into the image; then add the result with `KEEP=1 ALPHA=230`.
 - `scripts/cutout.mjs <photo> <item id>` removes a plain light background (edge colour + enclosed holes) and replaces the item photo/thumb; `<photo> x <out.png>` = preview only. Use it when she sends item photos to add. Env: `TOL` (default 26, 7 for near-white garments on white), `WARM=1` + `MINL` (light warm garment on grey), `KEEP=1` (PNG already transparent; add `ALPHA=230` to drop a soft glow around it).
 - `scripts/ai-queue.mjs` export/apply for the free AI queue. `scripts/seed-basics.mjs` test items.
