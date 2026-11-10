@@ -167,3 +167,15 @@ create trigger ai_apply before update on public.ai_requests
 
 -- Wishlist: pieces not owned yet; the stylist and outfits do not see them
 alter table items add column if not exists wishlist boolean not null default false;
+
+-- Brands: suggestions for the Brand field (items.brand stays free text)
+create table if not exists public.brands (
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, name)
+);
+alter table public.brands enable row level security;
+drop policy if exists "own brands" on public.brands;
+create policy "own brands" on public.brands for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());

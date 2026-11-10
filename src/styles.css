@@ -135,10 +135,10 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .field h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
 
 /* Item grid */
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-@media (min-width: 600px) { .grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
-@media (min-width: 900px) { .grid { grid-template-columns: repeat(5, 1fr); } }
-.tile {
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 600px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } }
+@media (min-width: 900px) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.tile { min-width: 0;
   position: relative; text-align: left; background: var(--card); border-radius: var(--radius);
   padding: 8px 8px 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px;
 }

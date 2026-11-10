@@ -220,6 +220,10 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [fix, setFix] = useState('')
   const genAfterPick = useRef(false)
   const set = (patch: Partial<Draft>) => setD(x => ({ ...x, ...patch }))
+  const [brands, setBrands] = useState<string[]>([])
+  useEffect(() => {
+    supabase.from('brands').select('name').order('name').then(({ data }) => setBrands((data ?? []).map(b => b.name)))
+  }, [])
 
   const take = async (blob: Blob | null | undefined) => {
     if (!blob) return
@@ -343,6 +347,9 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
       const { data, error } = await q.select().single()
       if (error) throw error
+      // Remember a new brand for the suggestions; the same name in another case counts as known
+      if (row.brand && !brands.some(b => b.toLowerCase() === row.brand!.toLowerCase()))
+        await supabase.from('brands').insert({ name: row.brand })
       if (item && photo) await removePhotos(item.photo_path, item.thumb_path)
       if (gen) await removePhotos(gen.source, gen.draft, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
       onSaved(data as Item)
@@ -414,12 +421,16 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           <input placeholder="e.g. Cream cable-knit sweater" value={d.name ?? ''} onChange={e => set({ name: e.target.value })} />
         </Section>
 
+        <Section title="Brand (optional)">
+          <input list="brands" placeholder="e.g. SOLMAR" value={d.brand ?? ''} onChange={e => set({ brand: e.target.value })} />
+          <datalist id="brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
+        </Section>
+
         <Section title="Colors"><Chips options={COLORS} value={d.colors} onChange={colors => set({ colors })} swatches /></Section>
         <Section title="Season"><Chips options={SEASONS} value={d.seasons} onChange={seasons => set({ seasons })} /></Section>
         <Section title="Style"><Chips options={STYLES} value={d.styles} onChange={styles => set({ styles })} /></Section>
         <Section title="Occasion"><Chips options={OCCASIONS} value={d.occasions} onChange={occasions => set({ occasions })} /></Section>
 
-        <Section title="Brand"><input placeholder="Optional" value={d.brand ?? ''} onChange={e => set({ brand: e.target.value })} /></Section>
         <Section title="Notes">
           <textarea rows={3} placeholder="Fit, fabric, what it goes with…" value={d.notes ?? ''} onChange={e => set({ notes: e.target.value })} />
         </Section>
