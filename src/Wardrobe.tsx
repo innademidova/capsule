@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, today, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, cents, today, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
@@ -215,7 +215,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   // AI draft made from the chosen photo; it replaces the photo only when the form is saved
-  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[] } | null>(null)
+  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[]; image: number; tags: number; tries: number } | null>(null)
   const [genBusy, setGenBusy] = useState('')
   const [fix, setFix] = useState('')
   const genAfterPick = useRef(false)
@@ -267,13 +267,15 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const up = await supabase.storage.from('photos').upload(source, p.full, { contentType: p.full.type })
       if (up.error) { source = ''; throw up.error }
       const piece = d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
-      const draft = await generateGarment({ source_path: source, piece, corrections: [] })
-      setGen({ source, draft, piece, corrections: [] })
+      const g = await generateGarment({ source_path: source, piece, corrections: [] })
+      const draft = g.path
+      setGen({ source, draft, piece, corrections: [], image: g.cost_usd ?? 0, tags: 0, tries: 1 })
       setGenBusy('Filling in the details…')
       // Tags are a bonus: if this fails, the fields can be filled by hand
       try {
         const r = await askAI('tag', { category: d.category || null }, 'now', draft)
         setRequests(upsert(r)); fillEmpty(r.result as Draft)
+        setGen(x => x && { ...x, tags: x.tags + (r.cost_usd ?? 0) })
       } catch { /* fill by hand */ }
     } catch (err) {
       if (source) await removePhotos(source)
@@ -294,9 +296,9 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     const corrections = note ? [...gen.corrections, note] : gen.corrections
     setGenBusy('Creating the image, this can take a minute or two…'); setError('')
     try {
-      const draft = await generateGarment({ source_path: gen.source, piece: gen.piece, corrections, previous_path: note ? gen.draft : undefined })
+      const g = await generateGarment({ source_path: gen.source, piece: gen.piece, corrections, previous_path: note ? gen.draft : undefined })
       await removePhotos(gen.draft)
-      setGen({ ...gen, draft, corrections }); setFix('')
+      setGen({ ...gen, draft: g.path, corrections, image: gen.image + (g.cost_usd ?? 0), tries: gen.tries + 1 }); setFix('')
     } catch (err) { setError((err as Error).message) }
     setGenBusy('')
   }
@@ -377,6 +379,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
               <textarea rows={2} placeholder="e.g. remove the belt, make the sleeves longer" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
             </Section>
             {gen.corrections.length > 0 && <p className="hint">Already asked: {gen.corrections.join(' · ')}</p>}
+            <p className="hint">Spent so far: {cents(gen.image + gen.tags)} (image{gen.tries > 1 ? ` ×${gen.tries}` : ''} {cents(gen.image)}, details {cents(gen.tags)})</p>
             <div className="picker-btns">
               <button type="button" className="btn" onClick={regenerate} disabled={!!genBusy}><Icon name="sparkle" /> Regenerate<span className="cost">≈6¢</span></button>
               <button type="button" className="btn ghost" onClick={discardGen} disabled={!!genBusy}>Use original photo</button>

@@ -217,7 +217,7 @@ export async function removePhotos(...paths: (string | null)[]) {
   if (list.length) await supabase.storage.from('photos').remove(list)
 }
 
-// Creates an item draft from a photo of a person (garment function); returns its storage path
+// Creates an item draft from a photo of a person (garment function); returns its storage path and exact cost
 export async function generateGarment(body: { source_path: string; previous_path?: string; piece: string; corrections: string[] }) {
   const res = await supabase.functions.invoke('garment', { body })
   if (res.error) {
@@ -225,7 +225,7 @@ export async function generateGarment(body: { source_path: string; previous_path
     try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
     throw new Error(msg)
   }
-  return res.data.path as string
+  return res.data as { path: string; cost_usd: number; text_in: number; image_in: number; output: number }
 }
 
 // If the model returned a white background instead of a transparent one, remove it with a flood fill from the edges
@@ -282,6 +282,7 @@ export type ShopItem = { id: string; name: string; category: string | null; why:
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
   status: 'queued' | 'done' | 'error'; result: any; error: string | null; created_at: string; done_at: string | null
+  cost_usd?: number | null
 }
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 
@@ -298,7 +299,7 @@ export async function askAI(kind: string, input: Record<string, unknown>, mode: 
     try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
     throw Object.assign(new Error(msg), { request: { ...req, status: 'error', error: msg } as AIRequest })
   }
-  return { ...req, status: 'done', result: res.data.result, done_at: new Date().toISOString() } as AIRequest
+  return { ...req, status: 'done', result: res.data.result, cost_usd: res.data.cost_usd ?? null, done_at: new Date().toISOString() } as AIRequest
 }
 
 export async function requeue(req: AIRequest) {
@@ -343,3 +344,6 @@ export async function currentWeather(): Promise<string> {
 }
 
 export const today = () => new Date().toLocaleDateString('sv-SE')
+
+// Exact cost as cents with two decimals, e.g. 0.0583 -> "5.83¢"
+export const cents = (usd: number) => `${(usd * 100).toFixed(2)}¢`

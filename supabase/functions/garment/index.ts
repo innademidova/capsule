@@ -61,6 +61,18 @@ async function callOpenAI(images: Blob[], prompt: string, background: "transpare
   });
 }
 
+// USD per 1M tokens, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
+const PRICE = { text_in: 5, image_in: 8, output: 30 };
+type ImageUsage = { input_tokens?: number; output_tokens?: number; input_tokens_details?: { text_tokens?: number; image_tokens?: number } };
+
+function costOf(u: ImageUsage) {
+  const text_in = u.input_tokens_details?.text_tokens ?? 0;
+  const image_in = u.input_tokens_details?.image_tokens ?? Math.max(0, (u.input_tokens ?? 0) - text_in);
+  const output = u.output_tokens ?? 0;
+  const cost_usd = (text_in * PRICE.text_in + image_in * PRICE.image_in + output * PRICE.output) / 1e6;
+  return { text_in, image_in, output, cost_usd };
+}
+
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -86,7 +98,9 @@ Deno.serve(async req => {
     const path = `${user.id}/drafts/${crypto.randomUUID()}.png`;
     const { error } = await sb.storage.from("photos").upload(path, decodeBase64(body.data[0].b64_json), { contentType: "image/png" });
     if (error) throw error;
-    return json({ path });
+    const usage = costOf(body.usage ?? {});
+    await sb.from("ai_usage").insert({ kind: "garment", model: MODEL, ...usage, raw: body.usage ?? null });
+    return json({ path, ...usage });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }

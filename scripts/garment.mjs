@@ -16,4 +16,4 @@ if (error) { console.error(error, await error.context?.text?.()); process.exit(1
 const { data: blob } = await sb.storage.from('photos').download(data.path)
 writeFileSync(out, Buffer.from(await blob.arrayBuffer()))
 await sb.storage.from('photos').remove([source, data.path])
-console.log('saved', out)
+console.log('saved', out, '| tokens: text in', data.text_in, 'image in', data.image_in, 'out', data.output, '| cost', (data.cost_usd * 100).toFixed(2) + '¢')

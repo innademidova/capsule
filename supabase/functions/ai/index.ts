@@ -180,7 +180,10 @@ summary: 2–3 sentences with the main reason.` }] };
 // Photo tagging runs on the owner's OpenAI key; the other tasks use Claude.
 const TAG_MODEL = "gpt-6.1-terra";
 
-async function tagWithOpenAI(content: unknown) {
+// USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
+const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
+
+async function tagWithOpenAI(sb: SupabaseClient, content: unknown, meta: Meta) {
   const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
   const input = blocks.map(b => b.type === "text"
     ? { type: "input_text", text: b.text }
@@ -199,12 +202,23 @@ async function tagWithOpenAI(content: unknown) {
   if (body.status === "incomplete") throw new Error("The answer was too long, try again");
   const parts = (body.output ?? []).flatMap((o: { content?: { type: string; text?: string }[] }) => o.content ?? []);
   if (parts.some((p: { type: string }) => p.type === "refusal")) throw new Error("The AI declined this request");
+  const u = body.usage ?? {};
+  const cached_in = u.input_tokens_details?.cached_tokens ?? 0, output = u.output_tokens ?? 0;
+  // input_tokens includes cache reads and cache writes; writes are billed above the normal input rate
+  const writes = u.input_tokens_details?.cache_write_tokens ?? 0;
+  const text_in = (u.input_tokens ?? 0) - cached_in;
+  const cost_usd = ((text_in - writes) * TAG_PRICE.input + writes * TAG_PRICE.cache_write + cached_in * TAG_PRICE.cached + output * TAG_PRICE.output) / 1e6;
+  await sb.from("ai_usage").insert({ kind: "tag", model: TAG_MODEL, text_in, cached_in, output, cost_usd, raw: body.usage ?? null });
+  meta.cost_usd = cost_usd;
   return JSON.parse(parts.filter((p: { type: string }) => p.type === "output_text").map((p: { text: string }) => p.text).join(""));
 }
 
-async function run(sb: SupabaseClient, r: Req) {
+// Per-request extras for the response (only the OpenAI tagging reports a cost for now)
+type Meta = { cost_usd: number | null };
+
+async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
-  if (r.kind === "tag") return await tagWithOpenAI(content);
+  if (r.kind === "tag") return await tagWithOpenAI(sb, content, meta);
   const res = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -226,14 +240,15 @@ Deno.serve(async req => {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
   });
   let id = "";
+  const meta: Meta = { cost_usd: null };
   try {
     ({ id } = await req.json());
     const { data: r, error } = await sb.from("ai_requests").select("id,kind,input,image_path").eq("id", id).single();
     if (error || !r) return json({ error: "Request not found" }, 404);
     if (!Deno.env.get(r.kind === "tag" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
-    const result = await run(sb, r as Req);
+    const result = await run(sb, r as Req, meta);
     await sb.from("ai_requests").update({ status: "done", mode: "now", result }).eq("id", id);
-    return json({ result });
+    return json({ result, cost_usd: meta.cost_usd });
   } catch (e) {
     const msg = e instanceof Anthropic.APIError ? `AI error ${e.status}: ${e.message}` : e instanceof Error ? e.message : String(e);
     if (id) await sb.from("ai_requests").update({ status: "error", error: msg }).eq("id", id);

@@ -179,3 +179,22 @@ alter table public.brands enable row level security;
 drop policy if exists "own brands" on public.brands;
 create policy "own brands" on public.brands for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- AI usage: exact tokens and cost of every paid call, from the provider's `usage` field
+create table if not exists public.ai_usage (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  kind          text not null,                    -- garment, tag, ...
+  model         text not null,
+  text_in       int not null default 0,           -- text input tokens (uncached)
+  image_in      int not null default 0,           -- image input tokens
+  cached_in     int not null default 0,
+  output        int not null default 0,
+  cost_usd      numeric(10, 6) not null,
+  raw           jsonb                             -- the provider's usage object as returned
+);
+alter table public.ai_usage enable row level security;
+drop policy if exists "own usage" on public.ai_usage;
+create policy "own usage" on public.ai_usage for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
