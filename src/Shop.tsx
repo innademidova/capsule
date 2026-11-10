@@ -150,8 +150,8 @@ export function BeforeBuy() {
           <div className="picker-btns"><button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="camera" /> {photo ? 'Change photo' : 'Photo of the item'}</button></div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { pick(e.target.files?.[0]); e.target.value = '' }} />
         </div>
-        <Section title="Note (optional)"><input placeholder="e.g. wool, oversized, for the office" value={note} onChange={e => setNote(e.target.value)} /></Section>
-        <Section title="Price (optional)"><input placeholder="e.g. 2500 ₴" value={price} onChange={e => setPrice(e.target.value)} /></Section>
+        <Section title="Note"><input placeholder="e.g. wool, oversized, for the office" value={note} onChange={e => setNote(e.target.value)} /></Section>
+        <Section title="Price"><input placeholder="e.g. 2500 ₴" value={price} onChange={e => setPrice(e.target.value)} /></Section>
         <AIActions label="Check" onRun={run} busy={busy} disabled={!photo} />
       </div>
 

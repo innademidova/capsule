@@ -39,6 +39,8 @@ const obj = (properties: Record<string, unknown>) =>
 const TAG = obj({
   category: { type: "string", enum: CATEGORIES }, kind: str, name: str,
   colors: enumArr(COLORS), seasons: enumArr(SEASONS), styles: enumArr(STYLES), occasions: enumArr(OCCASIONS),
+  brand: str,
+  materials: { type: "array", items: obj({ name: str, pct: { type: ["integer", "null"] } }) },
 });
 
 const SCHEMAS: Record<string, unknown> = {
@@ -114,10 +116,18 @@ async function buildPrompt(sb: SupabaseClient, r: Req): Promise<{ content: Anthr
   switch (r.kind) {
     case "tag": {
       if (!r.image_path) throw new Error("No photo to tag");
-      return { effort: "low", content: [await imageBlock(sb, r.image_path), { type: "text", text:
+      // Original photos (and close-ups of labels) that the item image was made from
+      const extra = ((i.extra_paths as string[] | undefined) ?? []).slice(0, 8);
+      const images = [await imageBlock(sb, r.image_path)];
+      for (const p of extra) images.push(await imageBlock(sb, p));
+      const { data: mats } = await sb.from("materials").select("name");
+      const known = (mats ?? []).map((m: { name: string }) => m.name).join(", ");
+      return { effort: "low", content: [...images, { type: "text", text:
         `Describe this clothing item for her digital wardrobe. kind: a short lowercase type like "sweater", "straight jeans",
 "ankle boots". name: a short English product-style name, e.g. "Cream cable-knit sweater". Pick only fitting colors
-(main colors first), seasons, styles and occasions. A body-hugging one-piece is a bodysuit (category "top"), not a swimsuit, unless she says the category is "swim".${i.category ? ` She says the category is "${i.category}".` : ""}` }] };
+(main colors first), seasons, styles and occasions. A body-hugging one-piece is a bodysuit (category "top"), not a swimsuit, unless she says the category is "swim".${i.category ? ` She says the category is "${i.category}".` : ""}
+${extra.length ? `Image 1 is the item. The other ${extra.length} image(s) are the original photos it was made from; they may show a logo or a care label.\n` : ""}${i.notes ? `Her notes about this item: ${i.notes}\n` : ""}brand: only if she names it or a brand name is clearly readable on a logo or label in the images; otherwise "". Never guess a brand from the style.
+materials: the composition only if she gives it or a care/composition label is clearly readable in the images, e.g. [{"name":"Cotton","pct":95},{"name":"Elastane","pct":5}]; pct is null when the label shows no percent. Otherwise []. Never guess the fabric from looks. Use these names when they fit: ${known}.` }] };
     }
     case "outfits": {
       const w = await wardrobe(sb);

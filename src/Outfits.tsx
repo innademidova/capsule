@@ -276,7 +276,7 @@ export function Stylist() {
             <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
           </div>
         </Section>
-        <Section title="Mood or wish (optional)">
+        <Section title="Mood or wish">
           <input placeholder="e.g. something bright, comfy, look taller" value={mood} onChange={e => setMood(e.target.value)} />
         </Section>
         <AIActions label="Get ideas" onRun={run} busy={busy} disabled={items.length < 3} />

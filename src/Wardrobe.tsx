@@ -300,6 +300,8 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     ...x, category: x.category || t.category, kind: x.kind || t.kind, name: x.name || t.name,
     colors: x.colors.length ? x.colors : t.colors, seasons: x.seasons.length ? x.seasons : t.seasons,
     styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
+    brand: x.brand?.trim() || t.brand || '',
+    materials: x.materials.some(m => m.name.trim()) ? x.materials : (t.materials ?? []),
   }))
 
   const addExtra = async (files: FileList | Blob[] | null) => {
@@ -338,7 +340,8 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       setGenBusy('Filling in the details…')
       // Tags are a bonus: if this fails, the fields can be filled by hand
       try {
-        const r = await askAI('tag', { category: d.category || null }, 'now', draft)
+        // The original photos go along: a logo or care label there gives the brand and composition
+        const r = await askAI('tag', { category: d.category || null, extra_paths: [source, ...refs], notes: first.join('; ') || null }, 'now', draft)
         setRequests(upsert(r)); fillEmpty(r.result as Draft)
         setGen(x => x && { ...x, tags: x.tags + (r.cost_usd ?? 0) })
       } catch { /* fill by hand */ }
@@ -450,7 +453,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             : item ? <Photo path={item.photo_path} alt="" className="big" />
             : <div className="photo big"><span className="photo-empty">{processing ? 'Processing…' : <Icon name="camera" />}</span></div>}
           {gen ? <>
-            <Section title="What to fix (optional)">
+            <Section title="What to fix">
               <textarea rows={2} placeholder="e.g. make it red, remove the belt, no cut-out on the back" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
             </Section>
             <div className="refs">
@@ -482,7 +485,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             <p className="hint">Tip: in the Photos app, touch and hold the item until it lifts, tap <b>Copy</b>, then tap <b>Paste</b> here. iPhone removes the background for you.</p>
           )}
           {!item && <>
-            <Section title="Instructions for AI (optional)">
+            <Section title="Instructions for AI">
               <textarea rows={2} placeholder="e.g. make it red, only the skirt, without the belt" value={fix} onChange={e => setFix(e.target.value)} disabled={processing || !!genBusy} />
             </Section>
             <div className="refs">
@@ -519,21 +522,21 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           <datalist id="kinds">{(KINDS[d.category] ?? Object.values(KINDS).flat()).map(k => <option key={k} value={k} />)}</datalist>
         </Section>
 
-        <Section title="Name (optional)">
+        <Section title="Name">
           <input placeholder="e.g. Cream cable-knit sweater" value={d.name ?? ''} onChange={e => set({ name: e.target.value })} />
         </Section>
 
-        <Section title="Composition (optional)">
+        <Section title="Composition">
           <MaterialsInput value={d.materials} names={materialNames} onChange={materials => set({ materials })} />
         </Section>
 
-        <Section title="Brand (optional)">
+        <Section title="Brand">
           <input list="brands" placeholder="e.g. SOLMAR" value={d.brand ?? ''} onChange={e => set({ brand: e.target.value })} />
           <datalist id="brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
         </Section>
 
         {(wish || item?.wishlist) && (
-          <Section title="Link (optional)">
+          <Section title="Link">
             <input type="url" inputMode="url" placeholder="https://shop…" value={d.link ?? ''} onChange={e => set({ link: e.target.value })} />
           </Section>
         )}
