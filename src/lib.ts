@@ -48,7 +48,7 @@ export const KINDS: Record<string, string[]> = {
   outerwear: ['coat', 'trench coat', 'jacket', 'blazer', 'leather jacket', 'denim jacket', 'puffer', 'vest', 'raincoat'],
   shoes: ['sneakers', 'boots', 'ankle boots', 'loafers', 'heels', 'flats', 'sandals', 'mules', 'ballet flats'],
   bag: ['tote', 'shoulder bag', 'crossbody', 'clutch', 'backpack', 'mini bag'],
-  accessory: ['belt', 'scarf', 'hat', 'cap', 'jewelry', 'sunglasses', 'gloves', 'watch', 'hair accessory'],
+  accessory: ['belt', 'sunglasses', 'glasses', 'necklace', 'earrings', 'bracelet', 'ring', 'watch', 'scarf', 'hat', 'cap', 'gloves', 'hair accessory', 'brooch'],
   swim: ['swimsuit', 'bikini', 'cover-up', 'beach dress'],
 }
 
@@ -70,6 +70,7 @@ export const COLORS: (Option & { hex: string })[] = [
   { id: 'burgundy', label: 'Burgundy', hex: '#6b1c2c' },
   { id: 'pink', label: 'Pink', hex: '#f1a7c0' },
   { id: 'purple', label: 'Purple', hex: '#7b58bf' },
+  { id: 'butter-yellow', label: 'Butter yellow', hex: '#f3e3a0' },
   { id: 'yellow', label: 'Yellow', hex: '#f0c74a' },
   { id: 'orange', label: 'Orange', hex: '#e27b2a' },
   { id: 'silver', label: 'Silver', hex: '#c4c6ca' },

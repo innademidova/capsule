@@ -25,7 +25,7 @@ const anthropic = new Anthropic({
 
 const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory", "swim"];
 const COLORS = ["black", "white", "cream", "beige", "camel", "brown", "grey", "navy", "blue", "light-blue", "denim",
-  "green", "olive", "red", "burgundy", "pink", "purple", "yellow", "orange", "silver", "gold", "print"];
+  "green", "olive", "red", "burgundy", "pink", "purple", "butter-yellow", "yellow", "orange", "silver", "gold", "print"];
 const SEASONS = ["spring", "summer", "autumn", "winter"];
 const STYLES = ["casual", "classic", "minimal", "elegant", "business", "sporty", "romantic", "edgy", "boho"];
 const OCCASIONS = ["everyday", "work", "evening", "party", "date", "travel", "sport", "home"];
