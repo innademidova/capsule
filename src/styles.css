@@ -374,3 +374,28 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .set-mates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .set-mates button { display: flex; flex-direction: column; gap: 4px; background: none; border: 0; padding: 0; text-align: left; min-width: 0; cursor: pointer; }
 .set-mates span { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Looks: ideas around one item, the stylist assistant, AI photos next to the real pieces */
+.style-hero { display: grid; justify-items: center; gap: 4px; text-align: center; margin-bottom: 16px; }
+.style-hero .photo.big { width: min(260px, 70%); margin-top: 10px; }
+.looks-title { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-weight: 500; font-size: 24px; text-transform: lowercase; }
+.looks-title.big { font-size: 34px; }
+.looks-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 10px; }
+.palette { display: flex; gap: 6px; }
+.palette span { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); }
+.looks { display: grid; gap: 14px; }
+@media (min-width: 760px) { .looks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.look { display: grid; gap: 8px; margin: 0; min-width: 0; }
+.look-label { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; }
+.look-flat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.look-flat button, .look-pieces button { padding: 0; border: 0; background: none; min-width: 0; cursor: pointer; }
+.look-flat .photo { aspect-ratio: 3 / 4; border-radius: 12px; }
+.look-pair { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 8px; align-items: stretch; }
+.look-pair .look-img { aspect-ratio: 2 / 3; border-radius: 16px; }
+.look-img img, .look-thumb img { object-fit: cover; padding: 0; }
+.look-pieces { display: grid; grid-auto-rows: minmax(0, 1fr); gap: 6px; }
+.look-pieces.many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.look-pieces .photo { height: 100%; border-radius: 12px; }
+.look-pieces .photo img { padding: 6%; }
+.detail > .look-pair { margin-bottom: 4px; }
+.tile .photo.look-thumb { aspect-ratio: 3 / 4; }

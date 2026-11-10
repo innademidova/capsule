@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import {
-  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, askAI, requeue, currentWeather, today, itemTitle, labelOf,
-  type Item, type Outfit, type Placement, type OutfitIdea, type AIRequest, type Wear,
+  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, today, itemTitle, labelOf,
+  type Item, type Outfit, type Placement, type Wear,
 } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Collage, Chips, Section, Photo, AIActions, RequestState, Sheet } from './ui'
 import { go, back } from './App'
+import { LookPair } from './Looks'
 
 const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
   o.layout.map(p => items.find(i => i.id === p.item_id)).filter((i): i is Item => !!i)
@@ -29,7 +30,7 @@ export function OutfitList() {
       } />
       <button className="card stylist-cta" onClick={() => go('/stylist')}>
         <span className="cta-icon"><Icon name="sparkle" /></span>
-        <span><b>Ask your stylist</b><span className="muted small">Outfit ideas from your own clothes for any occasion and weather</span></span>
+        <span><b>Ask your stylist</b><span className="muted small">Describe what you need: looks from your own clothes, with a photo on you</span></span>
       </button>
       {outfits.length === 0 ? (
         <div className="empty">
@@ -42,7 +43,7 @@ export function OutfitList() {
         <div className="grid outfits">
           {shown.map(o => (
             <button key={o.id} className="tile" onClick={() => go(`/o/${o.id}`)}>
-              <Collage layout={o.layout} items={items} />
+              {o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={items} />}
               {o.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
               <span className="tile-name">{o.name || 'Outfit'}</span>
             </button>
@@ -75,6 +76,14 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
   const wore = async () => {
     try { const w = await logWear(list.map(i => i.id), outfit.id); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
   }
+  // AI photo of a woman wearing these pieces
+  const [drawing, setDrawing] = useState(false)
+  const draw = async () => {
+    setDrawing(true)
+    try { const r = await renderLook({ item_ids: list.map(i => i.id), vibe: outfit.name ?? '' }); await patch({ image_path: r.path }) }
+    catch (e) { alert((e as Error).message) }
+    setDrawing(false)
+  }
 
   return (
     <div className="screen">
@@ -84,7 +93,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label="Edit"><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        <Collage layout={outfit.layout} items={items} className="big" />
+        {outfit.image_path ? <LookPair image={outfit.image_path} items={list} /> : <Collage layout={outfit.layout} items={items} className="big" />}
         <div className="detail-info">
           {outfit.source === 'ai' && <p className="eyebrow">Stylist idea</p>}
           <h2 className="title">{outfit.name || 'Outfit'}</h2>
@@ -92,6 +101,9 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
             <p className="muted">{[...outfit.occasions.map(o => labelOf(OCCASIONS, o)), ...outfit.seasons.map(s => labelOf(SEASONS, s))].join(' · ')}</p>
           )}
           {outfit.notes && <div className="card notes">{outfit.notes}</div>}
+          <button className="btn" onClick={draw} disabled={drawing || !list.length}>
+            <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">≈7¢</span>
+          </button>
           <button className="btn primary" onClick={wore} disabled={wornToday}>
             <Icon name="check" /> {wornToday ? 'Worn today' : 'I wore this today'}
           </button>
@@ -226,87 +238,5 @@ function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle:
       </div>
       <button className="btn primary wide" onClick={onClose}>Done</button>
     </Sheet>
-  )
-}
-
-// --- AI stylist: outfit ideas ---
-
-export function Stylist() {
-  const { items, requests, setRequests, setOutfits } = useStore()
-  const [occasion, setOccasion] = useState<string[]>([])
-  const [weather, setWeather] = useState('')
-  const [mood, setMood] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [wBusy, setWBusy] = useState(false)
-  const past = useMemo(() => requests.filter(r => r.kind === 'outfits'), [requests])
-
-  const getWeather = async () => {
-    setWBusy(true)
-    try { setWeather(await currentWeather()) } catch { alert('Could not get the weather. Allow location access or type it in.') }
-    setWBusy(false)
-  }
-  const run = async (mode: 'now' | 'queue') => {
-    setBusy(true)
-    try {
-      const r = await askAI('outfits', { occasion: occasion.map(o => labelOf(OCCASIONS, o)).join(', '), weather, mood, count: 3 }, mode)
-      setRequests(upsert(r))
-    } catch (e) { const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message) }
-    setBusy(false)
-  }
-  const saveIdea = async (idea: OutfitIdea, r: AIRequest) => {
-    const its = idea.item_ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
-    const { data, error } = await supabase.from('outfits').insert({
-      name: idea.title, layout: autoLayout(its), source: 'ai',
-      notes: [idea.why, idea.tip && `Tip: ${idea.tip}`].filter(Boolean).join('\n\n'),
-      occasions: OCCASIONS.filter(o => String(r.input.occasion ?? '').includes(o.label)).map(o => o.id),
-    }).select().single()
-    if (error) return alert(error.message)
-    setOutfits(upsert(data as Outfit)); go(`/o/${(data as Outfit).id}`)
-  }
-
-  return (
-    <div className="screen">
-      <Header title="Stylist" left={<button className="icon-btn" onClick={() => back('/outfits')} aria-label="Back"><Icon name="back" /></button>} />
-      <div className="form">
-        {items.length < 3 && <p className="queued err">Add at least a few items to your wardrobe first.</p>}
-        <Section title="Occasion"><Chips options={OCCASIONS} value={occasion} onChange={setOccasion} /></Section>
-        <Section title="Weather">
-          <div className="row">
-            <input placeholder="e.g. +8°C, rain" value={weather} onChange={e => setWeather(e.target.value)} />
-            <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
-          </div>
-        </Section>
-        <Section title="Mood or wish">
-          <input placeholder="e.g. something bright, comfy, look taller" value={mood} onChange={e => setMood(e.target.value)} />
-        </Section>
-        <AIActions label="Get ideas" onRun={run} busy={busy} disabled={items.length < 3} />
-      </div>
-
-      {past.map(r => (
-        <div key={r.id} className="idea-block">
-          <p className="eyebrow">{[r.input.occasion, r.input.weather, r.input.mood].filter(Boolean).join(' · ') || 'Any occasion'}</p>
-          <RequestState req={r} onRequeue={async x => setRequests(upsert(await requeue(x)))} />
-          {r.status === 'done' && (
-            <>
-              {r.result.note && <p className="muted small">{r.result.note}</p>}
-              <div className="ideas">
-                {(r.result.outfits as OutfitIdea[]).map((idea, n) => {
-                  const its = idea.item_ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
-                  return (
-                    <div key={n} className="card idea">
-                      <Collage layout={autoLayout(its)} items={items} />
-                      <h3>{idea.title}</h3>
-                      <p>{idea.why}</p>
-                      {idea.tip && <p className="muted small">💡 {idea.tip}</p>}
-                      <button className="btn sm" onClick={() => saveIdea(idea, r)}><Icon name="heart" /> Save outfit</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      ))}
-    </div>
   )
 }

@@ -176,6 +176,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
           {item.link && (
             <a className="btn" href={item.link} target="_blank" rel="noopener noreferrer"><Icon name="link" /> Open in shop<span className="cost">{hostOf(item.link)}</span></a>
           )}
+          <button className="btn wide ai-fill" onClick={() => go(`/style/${item.id}`)}><Icon name="sparkle" /> Style it: looks with this piece</button>
           {item.wishlist ? (
             <button className="btn primary" onClick={bought} disabled={busy}><Icon name="check" /> I bought it</button>
           ) : <>

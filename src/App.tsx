@@ -7,7 +7,8 @@ import {
 import { Icon, Header, Swatch } from './ui'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
-import { OutfitList, OutfitDetail, OutfitEditor, Stylist } from './Outfits'
+import { OutfitList, OutfitDetail, OutfitEditor } from './Outfits'
+import { StyleItem, Assistant } from './Looks'
 import { InspoList, InspoDetail } from './Inspo'
 import { Shop, BeforeBuy, MiniItems } from './Shop'
 
@@ -15,7 +16,7 @@ import { Shop, BeforeBuy, MiniItems } from './Shop'
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
-  | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
+  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
@@ -28,6 +29,7 @@ function parse(hash: string): Route {
   if (a === 'o' && b && c === 'edit') return { view: 'outfit-edit', id: b }
   if (a === 'o' && b) return { view: 'outfit', id: b }
   if (a === 'stylist') return { view: 'stylist' }
+  if (a === 'style' && b) return { view: 'style', id: b }
   if (a === 'inspo') return { view: 'inspo' }
   if (a === 'n' && b) return { view: 'insp', id: b }
   if (a === 'shop') return { view: 'shop' }
@@ -166,7 +168,8 @@ function Main({ email }: { email: string }) {
     case 'outfit-edit':
       screen = route.id && !findO(route.id) ? notFound : <OutfitEditor key={route.id ?? route.with ?? 'new'} outfit={findO(route.id)} preset={route.with ? route.with.split(',') : undefined} />
       break
-    case 'stylist': screen = <Stylist />; break
+    case 'stylist': screen = <Assistant />; break
+    case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
     case 'inspo': screen = <InspoList />; break
     case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
     case 'shop': screen = <Shop />; break
@@ -174,7 +177,7 @@ function Main({ email }: { email: string }) {
     case 'me': screen = <Me email={email} />; break
   }
 
-  const tab = route.view.startsWith('item') || route.view === 'wishlist' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
+  const tab = route.view.startsWith('item') || route.view === 'wishlist' || route.view === 'style' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
     : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
   const tabs = [
     { id: 'wardrobe', label: 'Wardrobe', icon: 'hanger', path: '/' },
@@ -213,8 +216,16 @@ function NotFound() {
 }
 
 function Me({ email }: { email: string }) {
-  const { items, wear, requests, setRequests } = useStore()
+  const { items, wear, requests, setRequests, profile, reload } = useStore()
   const [busy, setBusy] = useState(false)
+  const [look, setLook] = useState(profile?.appearance ?? '')
+  const [lookSaved, setLookSaved] = useState(true)
+  const saveLook = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.from('style_profile').upsert({ user_id: user.id, appearance: look.trim() || null })
+    if (error) alert(error.message); else { setLookSaved(true); reload() }
+  }
   const max = Math.max(1, ...CATEGORIES.map(c => items.filter(i => i.category === c.id).length))
   const colorCounts = COLORS.map(c => ({ ...c, n: items.filter(i => i.colors.includes(c.id)).length }))
     .filter(c => c.n > 0).sort((a, b) => b.n - a.n)
@@ -275,6 +286,12 @@ function Me({ email }: { email: string }) {
           <button className="btn sm" onClick={tagAll} disabled={busy || tagQueued}><Icon name="clock" /> {tagQueued ? 'In the queue' : 'Tag them via the queue'}</button>
         </div>
       )}
+      <div className="card">
+        <h3 className="card-title"><Icon name="user" /> My appearance</h3>
+        <p className="muted small">The AI draws a woman who looks like this when it shows outfits on you. Write in English.</p>
+        <textarea rows={5} value={look} onChange={e => { setLook(e.target.value); setLookSaved(false) }} placeholder="Hair, skin, face, figure…" />
+        <button className="btn sm" onClick={saveLook} disabled={lookSaved}><Icon name="check" /> {lookSaved ? 'Saved' : 'Save'}</button>
+      </div>
       <div className="card">
         <h3 className="card-title"><Icon name="clock" /> AI queue</h3>
         {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “process the queue” and the answers will appear in the app.</p>

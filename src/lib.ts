@@ -312,13 +312,13 @@ export async function pasteImage(): Promise<Blob | null> {
 export type Placement = { item_id: string; x: number; y: number; w: number; z: number }
 export type Outfit = {
   id: string; name: string | null; layout: Placement[]; occasions: string[]; seasons: string[]
-  notes: string | null; favorite: boolean; source: string; created_at: string; updated_at: string
+  notes: string | null; favorite: boolean; source: string; image_path: string | null; created_at: string; updated_at: string
 }
 export type Wear = { id: string; worn_on: string; outfit_id: string | null; item_ids: string[] }
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
-export type StyleProfile = { summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type StyleProfile = { appearance: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
@@ -326,6 +326,20 @@ export type AIRequest = {
   cost_usd?: number | null
 }
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
+// Result of the 'looks' AI task; image_path / outfit_id are added by the app later
+export type LookIdea = { label: string; item_ids: string[]; why: string; scene: string; image_path?: string | null; outfit_id?: string | null }
+export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string }
+
+// AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
+export async function renderLook(body: { item_ids: string[]; scene?: string; vibe?: string }) {
+  const res = await supabase.functions.invoke('look', { body })
+  if (res.error) {
+    let msg = res.error.message
+    try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
+    throw new Error(msg)
+  }
+  return res.data as { path: string; cost_usd: number }
+}
 
 // AI request: "now" goes straight to the Edge Function (paid), "queue" waits for Claude Code (free)
 export async function askAI(kind: string, input: Record<string, unknown>, mode: 'now' | 'queue', image_path?: string | null) {

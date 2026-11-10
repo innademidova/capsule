@@ -67,6 +67,14 @@ const SCHEMAS: Record<string, unknown> = {
     too_many: { type: "array", items: obj({ what: str, why: str }) },
     strengths: strs,
   }),
+  // Fashion looks: around one item, or from a free request ("soft autumn looks for +15")
+  looks: obj({
+    title: str,
+    palette: strs,
+    looks: { type: "array", items: obj({ label: str, item_ids: strs, why: str, scene: str }) },
+    missing: strs,
+    note: str,
+  }),
   buy: obj({
     verdict: { type: "string", enum: ["buy", "maybe", "skip"] }, summary: str,
     pairs_with: strs, similar: strs, outfit_ideas: strs,
@@ -173,6 +181,39 @@ Analyze her wardrobe as a capsule. summary: 2–3 sentences, honest. gaps: missi
 most new outfits (priority 1 = must-have, 2 = good to have, 3 = someday), name in English. too_many: categories/colors
 she has more than she needs (empty array if none). strengths: what already works well.` }] };
     }
+    case "looks": {
+      const w = await wardrobe(sb);
+      const { data: prof } = await sb.from("style_profile").select("summary,appearance").maybeSingle();
+      const count = Math.min(6, Math.max(1, Number(i.count) || 4));
+      const blocks: Anthropic.ContentBlockParam[] = [];
+      let anchor = "";
+      if (i.item_id) {
+        const { data: it } = await sb.from("items").select("id,category,kind,name,colors,styles,photo_path,wishlist").eq("id", i.item_id).single();
+        if (!it) throw new Error("Item not found");
+        if (it.photo_path) blocks.push(await imageBlock(sb, it.photo_path));
+        anchor = `THE ITEM (shown in the image): id ${it.id} | ${it.category} | ${it.kind ?? ""} | ${it.name ?? ""} | ${(it.colors as string[]).join("/")}${it.wishlist ? " | she does not own it yet, she is thinking of buying it" : ""}`;
+      }
+      const task = i.item_id
+        ? `Create ${count} different fashionable looks that ALL include THE ITEM (put its id in every look), each one for a different vibe, e.g. casual day, city chic, office style, cozy vibes, feminine touch, evening out.${i.request ? ` Her wish: ${i.request}.` : ""}`
+        : `Create ${count} different fashionable looks for her request: "${i.request || "any"}".`;
+      blocks.push({ type: "text", text: `${w.text}
+${prof?.summary ? `\nHER STYLE PROFILE: ${prof.summary}` : ""}${prof?.appearance ? `\nHER APPEARANCE: ${prof.appearance}` : ""}
+${anchor ? `\n${anchor}\n` : ""}
+${task}${i.weather ? ` Weather: ${i.weather}.` : ""}
+
+Think like a fashion editor making an Instagram carousel: current, polished, wearable street style, not a catalogue.
+Rules for each look:
+- item_ids: 2–7 of her item ids that truly work together: a top + bottom or a dress, then outerwear, bag, belt or other accessories when they lift the look. Respect the season and weather. Use only ids from the lists above.
+- No two looks may be the same combination; vary silhouettes, layers and colour stories. Prefer pieces she wears rarely when they fit.
+- label: 1–3 lowercase English words naming the vibe, e.g. "city chic".
+- why: one short sentence in Ukrainian on why it works (colours, proportions, the styling trick).
+- scene: one English sentence for a photographer: the place, light and pose that suit the vibe and season, e.g. "a cobbled old-town street in soft autumn daylight, walking towards the camera with a coffee". Do not describe the clothes.
+title: a short English headline for the whole set, e.g. "one sweater, many looks" or "soft autumn layers".
+palette: 3–6 hex colours that sum up the looks, main colour first.
+missing: up to 3 short English names of pieces she does not have that would make these looks better (e.g. "white leather sneakers"), [] if nothing. Shoes count: she may have few in the app.
+note: one short sentence in Ukrainian if something important is missing for this request, else "".` });
+      return { effort: "medium", content: blocks };
+    }
     case "buy": {
       if (!r.image_path) throw new Error("No photo of the item");
       const w = await wardrobe(sb);
@@ -188,13 +229,15 @@ summary: 2–3 sentences with the main reason.` }] };
   throw new Error("Unknown request kind");
 }
 
-// Photo tagging runs on the owner's OpenAI key; the other tasks use Claude.
+// Tagging and looks run on the owner's OpenAI key; the other tasks use Claude when its key is set, else OpenAI too.
 const TAG_MODEL = "gpt-6.1-terra";
+const OPENAI_KINDS = ["tag", "looks"];
+const useOpenAI = (kind: string) => OPENAI_KINDS.includes(kind) || !Deno.env.get("ANTHROPIC_API_KEY");
 
 // USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
 
-async function tagWithOpenAI(sb: SupabaseClient, content: unknown, meta: Meta) {
+async function withOpenAI(sb: SupabaseClient, kind: string, content: unknown, meta: Meta) {
   const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
   const input = blocks.map(b => b.type === "text"
     ? { type: "input_text", text: b.text }
@@ -205,7 +248,7 @@ async function tagWithOpenAI(sb: SupabaseClient, content: unknown, meta: Meta) {
     body: JSON.stringify({
       model: TAG_MODEL,
       input: [{ role: "system", content: VOICE }, { role: "user", content: input }],
-      text: { format: { type: "json_schema", name: "item_tags", schema: SCHEMAS.tag, strict: true } },
+      text: { format: { type: "json_schema", name: kind, schema: SCHEMAS[kind], strict: true } },
     }),
   });
   const body = await r.json();
@@ -219,17 +262,17 @@ async function tagWithOpenAI(sb: SupabaseClient, content: unknown, meta: Meta) {
   const writes = u.input_tokens_details?.cache_write_tokens ?? 0;
   const text_in = (u.input_tokens ?? 0) - cached_in;
   const cost_usd = ((text_in - writes) * TAG_PRICE.input + writes * TAG_PRICE.cache_write + cached_in * TAG_PRICE.cached + output * TAG_PRICE.output) / 1e6;
-  await sb.from("ai_usage").insert({ kind: "tag", model: TAG_MODEL, text_in, cached_in, output, cost_usd, raw: body.usage ?? null });
+  await sb.from("ai_usage").insert({ kind, model: TAG_MODEL, text_in, cached_in, output, cost_usd, raw: body.usage ?? null });
   meta.cost_usd = cost_usd;
   return JSON.parse(parts.filter((p: { type: string }) => p.type === "output_text").map((p: { text: string }) => p.text).join(""));
 }
 
-// Per-request extras for the response (only the OpenAI tagging reports a cost for now)
+// Per-request extras for the response (only OpenAI calls report a cost for now)
 type Meta = { cost_usd: number | null };
 
 async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
-  if (r.kind === "tag") return await tagWithOpenAI(sb, content, meta);
+  if (useOpenAI(r.kind)) return await withOpenAI(sb, r.kind, content, meta);
   const res = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -256,7 +299,7 @@ Deno.serve(async req => {
     ({ id } = await req.json());
     const { data: r, error } = await sb.from("ai_requests").select("id,kind,input,image_path").eq("id", id).single();
     if (error || !r) return json({ error: "Request not found" }, 404);
-    if (!Deno.env.get(r.kind === "tag" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
+    if (!Deno.env.get(useOpenAI(r.kind) ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
     const result = await run(sb, r as Req, meta);
     await sb.from("ai_requests").update({ status: "done", mode: "now", result }).eq("id", id);
     return json({ result, cost_usd: meta.cost_usd });

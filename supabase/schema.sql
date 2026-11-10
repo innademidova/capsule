@@ -218,3 +218,8 @@ create policy "own materials" on public.materials for all to authenticated
 -- Pieces of one set (suit, co-ord) share a set_id
 alter table items add column if not exists set_id uuid;
 create index if not exists items_set_id on items (set_id) where set_id is not null;
+
+-- How she looks, in words; the AI draws a similar woman in outfit photos
+alter table style_profile add column if not exists appearance text;
+-- AI photo of a woman wearing the outfit (photos/<uid>/looks/...)
+alter table outfits add column if not exists image_path text;
