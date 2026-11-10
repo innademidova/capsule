@@ -171,6 +171,9 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             {!item.seasons.length && !item.styles.length && !item.occasions.length && <p className="muted small">No tags yet</p>}
           </div>
           {item.notes && <div className="card notes">{item.notes}</div>}
+          {item.link && (
+            <a className="btn" href={item.link} target="_blank" rel="noopener noreferrer"><Icon name="link" /> Open in shop<span className="cost">{hostOf(item.link)}</span></a>
+          )}
           {item.wishlist ? (
             <button className="btn primary" onClick={bought} disabled={busy}><Icon name="check" /> I bought it</button>
           ) : <>
@@ -201,8 +204,12 @@ type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishl
 
 const toDraft = (i?: Item): Draft => ({
   name: i?.name ?? '', category: i?.category ?? '', kind: i?.kind ?? '', colors: i?.colors ?? [], seasons: i?.seasons ?? [],
-  styles: i?.styles ?? [], occasions: i?.occasions ?? [], brand: i?.brand ?? '', notes: i?.notes ?? '',
+  styles: i?.styles ?? [], occasions: i?.occasions ?? [], brand: i?.brand ?? '', notes: i?.notes ?? '', link: i?.link ?? '',
 })
+
+// "zara.com/..." -> "https://zara.com/..."; empty -> null
+const normLink = (v?: string | null) => { const t = v?.trim(); return !t ? null : /^https?:\/\//i.test(t) ? t : `https://${t}` }
+const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 
 export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean; onSaved: (i: Item) => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(item))
@@ -343,7 +350,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const row = {
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
-        brand: d.brand?.trim() || null, notes: d.notes?.trim() || null,
+        brand: d.brand?.trim() || null, notes: d.notes?.trim() || null, link: normLink(d.link),
         ...(!item && wish ? { wishlist: true } : {}),
       }
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
@@ -428,6 +435,12 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           <input list="brands" placeholder="e.g. SOLMAR" value={d.brand ?? ''} onChange={e => set({ brand: e.target.value })} />
           <datalist id="brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
         </Section>
+
+        {(wish || item?.wishlist) && (
+          <Section title="Link (optional)">
+            <input type="url" inputMode="url" placeholder="https://shop…" value={d.link ?? ''} onChange={e => set({ link: e.target.value })} />
+          </Section>
+        )}
 
         <Section title="Colors"><Chips options={COLORS} value={d.colors} onChange={colors => set({ colors })} swatches /></Section>
         <Section title="Season"><Chips options={SEASONS} value={d.seasons} onChange={seasons => set({ seasons })} /></Section>

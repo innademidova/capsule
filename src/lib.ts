@@ -17,6 +17,7 @@ export type Item = {
   occasions: string[]
   brand: string | null
   notes: string | null
+  link: string | null
   photo_path: string | null
   thumb_path: string | null
   favorite: boolean

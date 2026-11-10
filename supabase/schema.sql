@@ -167,6 +167,7 @@ create trigger ai_apply before update on public.ai_requests
 
 -- Wishlist: pieces not owned yet; the stylist and outfits do not see them
 alter table items add column if not exists wishlist boolean not null default false;
+alter table items add column if not exists link text;  -- shop link, used for wishlist pieces
 
 -- Brands: suggestions for the Brand field (items.brand stays free text)
 create table if not exists public.brands (
