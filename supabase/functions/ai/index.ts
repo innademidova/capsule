@@ -36,15 +36,22 @@ const enumArr = (e: string[]) => ({ type: "array", items: { type: "string", enum
 const obj = (properties: Record<string, unknown>) =>
   ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
 
-const TAG = obj({
+// Colors, styles and occasions can be edited on the admin page (table dict); the constants are the fallback
+type Options = { colors: string[]; styles: string[]; occasions: string[] };
+async function options(sb: SupabaseClient): Promise<Options> {
+  const { data } = await sb.from("dict").select("type,id").in("type", ["color", "style", "occasion"]).order("sort");
+  const of = (t: string, fallback: string[]) => { const v = (data ?? []).filter((r: { type: string }) => r.type === t).map((r: { id: string }) => r.id); return v.length ? v : fallback; };
+  return { colors: of("color", COLORS), styles: of("style", STYLES), occasions: of("occasion", OCCASIONS) };
+}
+const tagSchema = (o: Options) => obj({
   category: { type: "string", enum: CATEGORIES }, kind: str, name: str,
-  colors: enumArr(COLORS), seasons: enumArr(SEASONS), styles: enumArr(STYLES), occasions: enumArr(OCCASIONS),
+  colors: enumArr(o.colors), seasons: enumArr(SEASONS), styles: enumArr(o.styles), occasions: enumArr(o.occasions),
   brand: str,
   materials: { type: "array", items: obj({ name: str, pct: { type: ["integer", "null"] } }) },
 });
 
 const SCHEMAS: Record<string, unknown> = {
-  tag: TAG,
+  tag: tagSchema({ colors: COLORS, styles: STYLES, occasions: OCCASIONS }),
   outfits: obj({
     outfits: { type: "array", items: obj({ title: str, item_ids: strs, why: str, tip: str }) },
     note: str,
@@ -237,7 +244,7 @@ const useOpenAI = (kind: string) => OPENAI_KINDS.includes(kind) || !Deno.env.get
 // USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
 
-async function withOpenAI(sb: SupabaseClient, kind: string, content: unknown, meta: Meta) {
+async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, content: unknown, meta: Meta) {
   const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
   const input = blocks.map(b => b.type === "text"
     ? { type: "input_text", text: b.text }
@@ -248,7 +255,7 @@ async function withOpenAI(sb: SupabaseClient, kind: string, content: unknown, me
     body: JSON.stringify({
       model: TAG_MODEL,
       input: [{ role: "system", content: VOICE }, { role: "user", content: input }],
-      text: { format: { type: "json_schema", name: kind, schema: SCHEMAS[kind], strict: true } },
+      text: { format: { type: "json_schema", name: kind, schema, strict: true } },
     }),
   });
   const body = await r.json();
@@ -272,14 +279,15 @@ type Meta = { cost_usd: number | null };
 
 async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
-  if (useOpenAI(r.kind)) return await withOpenAI(sb, r.kind, content, meta);
+  const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
+  if (useOpenAI(r.kind)) return await withOpenAI(sb, r.kind, schema, content, meta);
   const res = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: VOICE,
-    output_config: { effort, format: { type: "json_schema", schema: SCHEMAS[r.kind] } },
+    output_config: { effort, format: { type: "json_schema", schema } },
     messages: [{ role: "user", content }],
   } as never) as Anthropic.Beta.BetaMessage;
   if (res.stop_reason === "refusal") throw new Error("The AI declined this request");

@@ -223,3 +223,19 @@ create index if not exists items_set_id on items (set_id) where set_id is not nu
 alter table style_profile add column if not exists appearance text;
 -- AI photo of a woman wearing the outfit (photos/<uid>/looks/...)
 alter table outfits add column if not exists image_path text;
+
+-- Editable option lists (admin page): colors (with hex), kinds per category, styles, occasions.
+-- Ids are stored in items (colors[], kind, styles[], occasions[]); labels are what the app shows.
+create table if not exists public.dict (
+  user_id  uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  type     text not null check (type in ('color', 'kind', 'style', 'occasion')),
+  category text not null default '',  -- kinds only: the item category they belong to
+  id       text not null,
+  label    text not null,
+  hex      text,                       -- colors only
+  sort     int not null default 0,
+  primary key (user_id, type, category, id)
+);
+alter table public.dict enable row level security;
+drop policy if exists "own dict" on public.dict;
+create policy "own dict" on public.dict for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());

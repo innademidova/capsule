@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
-  supabase, CATEGORIES, COLORS, askAI,
+  supabase, CATEGORIES, COLORS, askAI, applyDict, type DictRow,
   type Item, type Outfit, type Wear, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
 } from './lib'
 import { Icon, Header, Swatch } from './ui'
@@ -9,6 +9,7 @@ import { StoreCtx, useStore, upsert, without, type Store } from './store'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
 import { OutfitList, OutfitDetail, OutfitEditor } from './Outfits'
 import { StyleItem, Assistant } from './Looks'
+import { Admin } from './Admin'
 import { InspoList, InspoDetail } from './Inspo'
 import { Shop, BeforeBuy, MiniItems } from './Shop'
 
@@ -16,7 +17,7 @@ import { Shop, BeforeBuy, MiniItems } from './Shop'
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
-  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' }
+  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me' } | { view: 'admin' }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
@@ -35,6 +36,7 @@ function parse(hash: string): Route {
   if (a === 'shop') return { view: 'shop' }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me' }
+  if (a === 'admin') return { view: 'admin' }
   return { view: 'wardrobe' }
 }
 
@@ -116,11 +118,13 @@ function Main({ email }: { email: string }) {
   const load = useCallback(async () => {
     setLoadError('')
     const by = (t: string) => supabase.from(t).select('*').order('created_at', { ascending: false })
-    const [it, ou, we, ins, pr, sh, rq] = await Promise.all([
+    const [it, ou, we, ins, pr, sh, rq, di] = await Promise.all([
       by('items'), by('outfits'), supabase.from('wear_log').select('*').order('worn_on', { ascending: false }),
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
+      supabase.from('dict').select('type,category,id,label,hex,sort'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
+    applyDict((di.data ?? []) as DictRow[])
     setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[]); setWear((we.data ?? []) as Wear[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
     setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
@@ -175,10 +179,11 @@ function Main({ email }: { email: string }) {
     case 'shop': screen = <Shop />; break
     case 'buy': screen = <BeforeBuy />; break
     case 'me': screen = <Me email={email} />; break
+    case 'admin': screen = <Admin />; break
   }
 
   const tab = route.view.startsWith('item') || route.view === 'wishlist' || route.view === 'style' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
-    : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
+    : route.view === 'admin' ? 'me' : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
   const tabs = [
     { id: 'wardrobe', label: 'Wardrobe', icon: 'hanger', path: '/' },
     { id: 'outfits', label: 'Outfits', icon: 'layers', path: '/outfits' },
@@ -297,6 +302,10 @@ function Me({ email }: { email: string }) {
         {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “process the queue” and the answers will appear in the app.</p>
           : <p className="muted small">Empty. Free requests you add to the queue appear here.</p>}
       </div>
+      <button className="card stylist-cta" onClick={() => go('/admin')}>
+        <span className="cta-icon"><Icon name="edit" /></span>
+        <span><b>Admin: dictionaries</b><span className="muted small">Brands, materials, colors, types, styles, occasions</span></span>
+      </button>
       <div className="card row">
         <span className="muted small grow">{email}</span>
         <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Sign out</button>

@@ -399,3 +399,10 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .look-pieces .photo img { padding: 6%; }
 .detail > .look-pair { margin-bottom: 4px; }
 .tile .photo.look-thumb { aspect-ratio: 3 / 4; }
+
+/* Admin: dictionaries */
+.dict-list { display: grid; gap: 6px; }
+.dict-row { display: flex; gap: 8px; align-items: center; }
+.dict-row > input:not([type=color]) { flex: 1; min-width: 0; }
+.dict-row input[type=color] { width: 40px; height: 40px; padding: 2px; border-radius: 10px; flex: none; }
+.dict-row .uses { width: 28px; text-align: right; flex: none; }

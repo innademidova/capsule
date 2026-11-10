@@ -88,6 +88,22 @@ export const COLORS: (Option & { hex: string })[] = [
 ]
 export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 
+// The lists above and below (colors, kinds, styles, occasions) are defaults: the admin page keeps them in the
+// dict table, and applyDict() replaces the contents of these arrays when the app loads
+export type DictRow = { type: 'color' | 'kind' | 'style' | 'occasion'; category: string; id: string; label: string; hex: string | null; sort: number }
+export function applyDict(rows: DictRow[]) {
+  const of = (t: DictRow['type']) => rows.filter(r => r.type === t).sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label))
+  const put = <T,>(arr: T[], v: T[]) => { if (v.length) arr.splice(0, arr.length, ...v) }
+  put(COLORS, of('color').map(r => ({ id: r.id, label: r.label, hex: r.hex || '#cccccc' })))
+  put(STYLES, of('style').map(r => ({ id: r.id, label: r.label })))
+  put(OCCASIONS, of('occasion').map(r => ({ id: r.id, label: r.label })))
+  const kinds = of('kind')
+  if (kinds.length) {
+    for (const k of Object.keys(KINDS)) delete KINDS[k]
+    for (const r of kinds) (KINDS[r.category] ??= []).push(r.id)
+  }
+}
+
 export const SEASONS: Option[] = [
   { id: 'spring', label: 'Spring' }, { id: 'summer', label: 'Summer' },
   { id: 'autumn', label: 'Autumn' }, { id: 'winter', label: 'Winter' },
