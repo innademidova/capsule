@@ -115,6 +115,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 
 `npm run deploy` (builds and force-pushes `dist` to the `gh-pages` branch; Pages in legacy branch mode), then commit +
 push `main`. After deploy, tell her to close and reopen the app on the iPhone (PWA cache).
+PWA updates: the service worker uses skipWaiting + clientsClaim (vite.config.ts) and `src/main.tsx` reloads the page when a new version takes control and checks for updates on focus. Without skipWaiting a new version stayed "waiting" until every Capsule tab was closed. To check what a browser runs, compare its `index-*.js` with the live one.
 
 ## Testing notes
 
