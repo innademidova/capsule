@@ -138,7 +138,8 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
   const [picker, setPicker] = useState(false)
   const [busy, setBusy] = useState(false)
   const board = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number } | null>(null)
+  // Moving a piece, or resizing it by a corner handle (the opposite corner stays in place)
+  const drag = useRef<{ id: string; sx: number; sy: number; x: number; y: number; w: number; h: number; corner?: Corner } | null>(null)
 
   const upd = (id: string, p: Partial<Placement>) => setLayout(l => l.map(x => x.item_id === id ? { ...x, ...p } : x))
   const selected = layout.find(p => p.item_id === sel)
@@ -150,14 +151,23 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
     setLayout(l => [...l, { ...p, z: maxZ + 1 }]); setSel(it.id)
   }
 
-  const down = (e: React.PointerEvent, p: Placement) => {
-    e.preventDefault(); (e.target as Element).setPointerCapture(e.pointerId)
-    setSel(p.item_id); drag.current = { id: p.item_id, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y }
+  const down = (e: React.PointerEvent, p: Placement, corner?: Corner) => {
+    e.preventDefault(); e.stopPropagation(); (e.target as Element).setPointerCapture(e.pointerId)
+    const r = board.current?.getBoundingClientRect()
+    const box = (e.currentTarget as Element).closest('.board-item')?.getBoundingClientRect()
+    const h = r && box ? (box.height / r.height) * 100 : p.w
+    setSel(p.item_id); drag.current = { id: p.item_id, sx: e.clientX, sy: e.clientY, x: p.x, y: p.y, w: p.w, h, corner }
   }
   const move = (e: React.PointerEvent) => {
     const d = drag.current; const r = board.current?.getBoundingClientRect()
     if (!d || !r) return
-    upd(d.id, { x: d.x + ((e.clientX - d.sx) / r.width) * 100, y: d.y + ((e.clientY - d.sy) / r.height) * 100 })
+    const dx = ((e.clientX - d.sx) / r.width) * 100, dy = ((e.clientY - d.sy) / r.height) * 100
+    if (!d.corner) return upd(d.id, { x: d.x + dx, y: d.y + dy })
+    // Follow the larger of the two movements, scaled to keep the proportions
+    const sx = d.corner.includes('e') ? 1 : -1, sy = d.corner.includes('s') ? 1 : -1
+    const grow = Math.abs(dx) * d.h > Math.abs(dy) * d.w ? sx * dx : (sy * dy * d.w) / d.h
+    const w = Math.min(100, Math.max(8, d.w + grow)), h = (d.h * w) / d.w
+    upd(d.id, { w, x: d.corner.includes('w') ? d.x + d.w - w : d.x, y: d.corner.includes('n') ? d.y + d.h - h : d.y })
   }
 
   const byId = new Map(items.map(i => [i.id, i]))
@@ -185,12 +195,10 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
           </div>
           {selected ? (
             <div className="board-tools">
-              <button className="icon-btn" onClick={() => upd(selected.item_id, { w: Math.max(10, selected.w - 6) })} aria-label="Smaller"><Icon name="minus" /></button>
-              <button className="icon-btn" onClick={() => upd(selected.item_id, { w: Math.min(95, selected.w + 6) })} aria-label="Bigger"><Icon name="plus" /></button>
               <button className="btn sm" onClick={() => upd(selected.item_id, { z: maxZ + 1 })}><Icon name="layers" /> Front</button>
               <button className="btn sm danger" onClick={() => { setLayout(l => l.filter(p => p.item_id !== selected.item_id)); setSel(null) }}><Icon name="trash" /> Remove</button>
             </div>
-          ) : <p className="hint">Drag pieces to arrange them. Tap one to resize or remove it.</p>}
+          ) : <p className="hint">Drag pieces to arrange them. Tap one, then pull a corner to resize it.</p>}
         </div>
         <div className="form">
           <button className="btn wide" onClick={() => setPicker(true)}><Icon name="plus" /> Add pieces</button>
@@ -205,12 +213,19 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
   )
 }
 
-function BoardItem({ p, item, on, onDown }: { p: Placement; item?: Item; on: boolean; onDown: (e: React.PointerEvent, p: Placement) => void }) {
+type Corner = 'nw' | 'ne' | 'sw' | 'se'
+
+function BoardItem({ p, item, on, onDown }: { p: Placement; item?: Item; on: boolean; onDown: (e: React.PointerEvent, p: Placement, corner?: Corner) => void }) {
   if (!item) return null
   return (
     <div className={'board-item' + (on ? ' on' : '')} style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.w}%`, zIndex: p.z }}
       onPointerDown={e => onDown(e, p)}>
       <Photo path={item.thumb_path ?? item.photo_path} alt="" className="bare" />
+      {on && (['nw', 'ne', 'sw', 'se'] as Corner[]).map(c => (
+        <span key={c} className={`handle ${c}`} onPointerDown={e => onDown(e, p, c)} aria-label="Resize">
+          <svg viewBox="0 0 12 12"><path d="M3 9 9 3M3 9V5.5M3 9h3.5M9 3H5.5M9 3v3.5" /></svg>
+        </span>
+      ))}
     </div>
   )
 }

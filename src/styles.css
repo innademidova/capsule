@@ -406,3 +406,14 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .dict-row > input:not([type=color]) { flex: 1; min-width: 0; }
 .dict-row input[type=color] { width: 40px; height: 40px; padding: 2px; border-radius: 10px; flex: none; }
 .dict-row .uses { width: 28px; text-align: right; flex: none; }
+
+/* Corner handles to resize a piece on the outfit board */
+.board-item .handle { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--ink);
+  display: grid; place-items: center; cursor: nwse-resize; touch-action: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .18); }
+.board-item .handle::before { content: ''; position: absolute; inset: -10px; } /* bigger touch area */
+.board-item .handle svg { width: 12px; height: 12px; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.board-item .handle.nw { top: -8px; left: -8px; }
+.board-item .handle.ne { top: -8px; right: -8px; cursor: nesw-resize; }
+.board-item .handle.ne svg, .board-item .handle.sw svg { transform: scaleX(-1); }
+.board-item .handle.sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
+.board-item .handle.se { bottom: -8px; right: -8px; }
