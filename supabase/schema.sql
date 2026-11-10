@@ -214,3 +214,7 @@ alter table public.materials enable row level security;
 drop policy if exists "own materials" on public.materials;
 create policy "own materials" on public.materials for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Pieces of one set (suit, co-ord) share a set_id
+alter table items add column if not exists set_id uuid;
+create index if not exists items_set_id on items (set_id) where set_id is not null;

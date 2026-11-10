@@ -1,5 +1,5 @@
 // Runs the `garment` Edge Function (same as "Enhance with AI" in the app) on a local photo and saves the PNG.
-//   node scripts/garment.mjs <photo> <out.png> ['<piece>'] ['<instruction>' ...]   (REFS=a.jpg,b.jpg adds extra photos)
+//   node scripts/garment.mjs <photo> <out.png> ['<piece>'] ['<instruction>' ...]   (REFS=a.jpg,b.jpg adds extra photos; SET=1 draws every piece of a set side by side)
 import { readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -18,7 +18,7 @@ for (const f of (process.env.REFS || '').split(',').filter(Boolean)) {
   if (e) throw e
   refs.push(p)
 }
-const { data, error } = await sb.functions.invoke('garment', { body: { source_path: source, ref_paths: refs, piece, corrections } })
+const { data, error } = await sb.functions.invoke('garment', { body: { source_path: source, ref_paths: refs, piece, corrections, set: !!process.env.SET } })
 if (error) { console.error(error, await error.context?.text?.()); process.exit(1) }
 const { data: blob } = await sb.storage.from('photos').download(data.path)
 writeFileSync(out, Buffer.from(await blob.arrayBuffer()))

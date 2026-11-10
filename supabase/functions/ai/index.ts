@@ -84,7 +84,7 @@ type Item = Record<string, unknown> & { id: string };
 
 async function wardrobe(sb: SupabaseClient) {
   const [{ data: items }, { data: wear }] = await Promise.all([
-    sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,materials,notes").eq("wishlist", false).order("created_at"),
+    sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,materials,notes,set_id").eq("wishlist", false).order("created_at"),
     sb.from("wear_log").select("item_ids"),
   ]);
   const worn = new Map<string, number>();
@@ -93,8 +93,8 @@ async function wardrobe(sb: SupabaseClient) {
   const text = list.map(i => [i.id, i.category, i.kind ?? "", i.name ?? "", (i.colors as string[]).join("/"),
     (i.seasons as string[]).join("/"), (i.styles as string[]).join("/"), (i.occasions as string[]).join("/"),
     i.brand ?? "", ((i.materials ?? []) as { name: string; pct: number | null }[]).map(m => m.pct != null ? `${m.pct}% ${m.name}` : m.name).join(" + "),
-    i.notes ?? "", `worn ${worn.get(i.id) ?? 0}x`].join(" | ")).join("\n");
-  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | wear count):\n${text || "(empty)"}` };
+    i.notes ?? "", i.set_id ? `set ${String(i.set_id).slice(0, 8)}` : "", `worn ${worn.get(i.id) ?? 0}x`].join(" | ")).join("\n");
+  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set | wear count; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up):\n${text || "(empty)"}` };
 }
 
 async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.ImageBlockParam> {

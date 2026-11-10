@@ -13,7 +13,7 @@ const cors = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-function buildPrompt(piece: string, corrections: string[], refs: number, hasPrevious: boolean) {
+function buildPrompt(piece: string, corrections: string[], refs: number, hasPrevious: boolean, set = false) {
   // Image order: original, then extra reference photos, then the previous attempt
   const lines = ["Image 1 is the main photo, often of a person wearing the clothes."];
   if (refs) lines.push(`Image${refs > 1 ? `s 2-${refs + 1} are` : " 2 is"} extra photo${refs > 1 ? "s" : ""} of the same garment from the owner (another angle, the back, a close-up, the true colour). Use them for details the main photo does not show.`);
@@ -24,11 +24,17 @@ function buildPrompt(piece: string, corrections: string[], refs: number, hasPrev
     : "";
   return `${images}
 
-Create ONE image of only this garment as a clean e-commerce product photo: ${piece}${fixes}
+${set
+    ? `Create ONE image of all the pieces of this matching set (a suit or co-ord) as a clean e-commerce product photo: ${piece}`
+    : `Create ONE image of only this garment as a clean e-commerce product photo: ${piece}`}${fixes}
 
-OUTPUT
+OUTPUT${set ? `
+- Every piece of the set appears once, laid out side by side (for example top on the left, bottom on the right), each one complete.
+- Leave clear empty space between the pieces, at least 5% of the image width. No piece may touch, overlap or cast a shadow onto another: the image will be cut into one picture per piece.
+- Only the set itself: no shoes, bags, belts or other accessories unless they are made of the same fabric as part of the set.
+- All pieces are the same fabric: render them with exactly the same colour, shade and texture under the same light.` : ""}
 - Transparent background. If transparency is not possible, use pure white #FFFFFF.
-- Flat lay, viewed straight from above, garment centered, fully visible, nothing cropped, with small even margins.
+- Flat lay, viewed straight from above, ${set ? "pieces" : "garment"} centered, fully visible, nothing cropped, with small even margins.
 - Garment laid out neatly in its natural shape: no body, mannequin, hanger, hands, hair or other clothes.
 - Soft, even studio lighting, no harsh shadows, no props, no text, no watermark.
 
@@ -91,14 +97,14 @@ Deno.serve(async req => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
     if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
-    const { source_path, ref_paths = [], previous_path, piece, corrections = [] } = await req.json() as {
-      source_path: string; ref_paths?: string[]; previous_path?: string; piece: string; corrections?: string[];
+    const { source_path, ref_paths = [], previous_path, piece, corrections = [], set = false } = await req.json() as {
+      source_path: string; ref_paths?: string[]; previous_path?: string; set?: boolean; piece: string; corrections?: string[];
     };
     const refs = ref_paths.slice(0, 8);
     const images = [await download(sb, source_path)];
     for (const r of refs) images.push(await download(sb, r));
     if (previous_path) images.push(await download(sb, previous_path));
-    const prompt = buildPrompt(piece, corrections, refs.length, !!previous_path);
+    const prompt = buildPrompt(piece, corrections, refs.length, !!previous_path, !!set);
 
     let r = await callOpenAI(images, prompt, "transparent");
     // If a transparent background is refused, use white; the app removes it

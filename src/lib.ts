@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { labelPieces } from './pieces'
 
 // Publishable key: data is protected by database access rules (RLS) and password login
 export const supabase = createClient(
@@ -23,6 +24,7 @@ export type Item = {
   thumb_path: string | null
   favorite: boolean
   wishlist: boolean
+  set_id: string | null
   created_at: string
   updated_at: string
 }
@@ -227,7 +229,7 @@ export async function removePhotos(...paths: (string | null)[]) {
 }
 
 // Creates an item draft from a photo of a person (garment function); returns its storage path and exact cost
-export async function generateGarment(body: { source_path: string; ref_paths?: string[]; previous_path?: string; piece: string; corrections: string[] }) {
+export async function generateGarment(body: { source_path: string; ref_paths?: string[]; previous_path?: string; piece: string; corrections: string[]; set?: boolean }) {
   const res = await supabase.functions.invoke('garment', { body })
   if (res.error) {
     let msg = res.error.message
@@ -261,6 +263,36 @@ export async function whiteToAlpha(file: Blob): Promise<Blob> {
   }
   ctx.putImageData(img, 0, 0)
   return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Could not process the image')), 'image/png'))
+}
+
+// Cut an AI image of a set into one transparent PNG per piece, left to right.
+// The pieces are found on a small copy; a crop keeps only its own piece where boxes overlap.
+export async function splitSet(file: Blob): Promise<Blob[]> {
+  const bitmap = await createImageBitmap(file)
+  const { width: W, height: H } = bitmap
+  const s = Math.min(1, 300 / Math.max(W, H))
+  const w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s))
+  const small = canvasOf(w, h), sctx = small.getContext('2d')!
+  sctx.drawImage(bitmap, 0, 0, w, h)
+  const { labels, boxes } = labelPieces(sctx.getImageData(0, 0, w, h).data, w, h)
+  const full = canvasOf(W, H), fctx = full.getContext('2d')!
+  fctx.drawImage(bitmap, 0, 0)
+  bitmap.close?.()
+  const out: Blob[] = []
+  for (let k = 0; k < boxes.length; k++) {
+    const b = boxes[k], pad = 3
+    const x0 = Math.max(0, Math.floor((b.x0 - pad) / s)), y0 = Math.max(0, Math.floor((b.y0 - pad) / s))
+    const x1 = Math.min(W, Math.ceil((b.x1 + 1 + pad) / s)), y1 = Math.min(H, Math.ceil((b.y1 + 1 + pad) / s))
+    const img = fctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = img.data
+    for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+      const l = labels[Math.min(h - 1, Math.floor((y0 + y) * s)) * w + Math.min(w - 1, Math.floor((x0 + x) * s))]
+      if (l && l !== k + 1) d[(y * img.width + x) * 4 + 3] = 0
+    }
+    const c = canvasOf(img.width, img.height)
+    c.getContext('2d')!.putImageData(img, 0, 0)
+    out.push(await new Promise<Blob>((res, rej) => c.toBlob(x => x ? res(x) : rej(new Error('Could not process the image')), 'image/png')))
+  }
+  return out
 }
 
 // Image from the clipboard (iPhone: "Copy" on a lifted subject in Photos)

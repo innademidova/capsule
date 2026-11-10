@@ -164,7 +164,7 @@ function Main({ email }: { email: string }) {
     case 'outfits': screen = <OutfitList />; break
     case 'outfit': { const o = findO(route.id); screen = o ? <OutfitDetail outfit={o} /> : notFound; break }
     case 'outfit-edit':
-      screen = route.id && !findO(route.id) ? notFound : <OutfitEditor key={route.id ?? route.with ?? 'new'} outfit={findO(route.id)} preset={route.with ? [route.with] : undefined} />
+      screen = route.id && !findO(route.id) ? notFound : <OutfitEditor key={route.id ?? route.with ?? 'new'} outfit={findO(route.id)} preset={route.with ? route.with.split(',') : undefined} />
       break
     case 'stylist': screen = <Stylist />; break
     case 'inspo': screen = <InspoList />; break

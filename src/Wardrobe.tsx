@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, cents, compositionText, type Material, today, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, type Material, today, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
@@ -116,6 +116,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
   const wornToday = worn.some(w => w.worn_on === today())
   const home = item.wishlist ? '/wish' : '/'
   const inOutfits = outfits.filter(o => o.layout.some(p => p.item_id === item.id))
+  const mates = item.set_id ? items.filter(i => i.set_id === item.set_id && i.id !== item.id) : []
   const wore = async () => {
     try { const w = await logWear([item.id], null); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
   }
@@ -184,6 +185,15 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             </div>
             <p className="muted small">{worn.length ? `Worn ${worn.length}× · last ${worn[0].worn_on}` : 'Not worn yet'}</p>
           </>}
+          {mates.length > 0 && (
+            <div className="card">
+              <h3 className="card-title">Part of a set</h3>
+              <div className="set-mates">
+                {mates.map(m => <button key={m.id} onClick={() => go(`/i/${m.id}`)}><Photo path={m.thumb_path ?? m.photo_path} alt={itemTitle(m)} /><span>{itemTitle(m)}</span></button>)}
+              </div>
+              {!item.wishlist && <button className="btn" onClick={() => go(`/o/new/${[item.id, ...mates.map(m => m.id)].join(',')}`)}><Icon name="layers" /> Outfit with the whole set</button>}
+            </div>
+          )}
           {inOutfits.length > 0 && (
             <div className="card">
               <h3 className="card-title">In {inOutfits.length} outfit{inOutfits.length > 1 ? 's' : ''}</h3>
@@ -201,7 +211,9 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
 
 // --- Add / edit ---
 
-type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path'>
+type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path' | 'set_id'>
+// One piece cut out of an AI image of a set; tags come from AI per piece
+type Part = { path: string; url: string; blob: Blob; tags: Draft | null }
 
 const toDraft = (i?: Item): Draft => ({
   name: i?.name ?? '', category: i?.category ?? '', kind: i?.kind ?? '', colors: i?.colors ?? [], seasons: i?.seasons ?? [],
@@ -251,7 +263,12 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   // AI draft made from the chosen photo; it replaces the photo only when the form is saved
-  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[]; refs: string[]; image: number; tags: number; tries: number } | null>(null)
+  const [gen, setGen] = useState<{ source: string; draft: string; piece: string; corrections: string[]; refs: string[]; image: number; tags: number; tries: number; set: boolean } | null>(null)
+  // Set mode: AI draws every piece of a suit/co-ord in one image (same colour), the app cuts it into items
+  const [setMode, setSetMode] = useState(false)
+  const [parts, setParts] = useState<Part[]>([])
+  const partsRef = useRef<Part[]>([])
+  partsRef.current = parts
   // Extra photos of the same garment (back, close-up, true colour) waiting for the next AI run
   const [extra, setExtra] = useState<{ blob: Blob; url: string }[]>([])
   const extraRef = useRef<HTMLInputElement>(null)
@@ -331,12 +348,15 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const up = await supabase.storage.from('photos').upload(source, p.full, { contentType: p.full.type })
       if (up.error) { source = ''; throw up.error }
       refs = await uploadExtra(user.id)
-      const piece = d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
+      const piece = setMode
+        ? `every piece of the matching set in the photo${d.name?.trim() ? `: ${d.name.trim()}` : ' (for example the jacket or vest and the trousers or skirt)'}`
+        : d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
       // Optional instructions typed before the first run count as the first correction
       const first = fix.trim() ? [fix.trim()] : []
-      const g = await generateGarment({ source_path: source, ref_paths: refs, piece, corrections: first })
+      const g = await generateGarment({ source_path: source, ref_paths: refs, piece, corrections: first, set: setMode })
       const draft = g.path
-      setGen({ source, draft, piece, corrections: first, refs, image: g.cost_usd ?? 0, tags: 0, tries: 1 }); setFix(''); setExtra([])
+      setGen({ source, draft, piece, corrections: first, refs, image: g.cost_usd ?? 0, tags: 0, tries: 1, set: setMode }); setFix(''); setExtra([])
+      if (setMode) { await cutParts(user.id, draft, source, refs, first); setGenBusy(''); return }
       setGenBusy('Filling in the details…')
       // Tags are a bonus: if this fails, the fields can be filled by hand
       try {
@@ -351,6 +371,40 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     }
     setGenBusy('')
   }
+
+  // Cut the set image into pieces, upload each (AI needs a path to look at) and let AI describe each one
+  const cutParts = async (uid: string, draft: string, source: string, refs: string[], notes: string[]) => {
+    setGenBusy('Cutting the set into pieces…')
+    await removePhotos(...partsRef.current.map(p => p.path)); setParts([])
+    try {
+      const { data: blob, error: dl } = await supabase.storage.from('photos').download(draft)
+      if (dl || !blob) throw dl ?? new Error('Could not read the image')
+      const blobs = await splitSet(await whiteToAlpha(blob))
+      const list: Part[] = []
+      for (const b of blobs) {
+        const path = `${uid}/drafts/${crypto.randomUUID()}.png`
+        const up = await supabase.storage.from('photos').upload(path, b, { contentType: 'image/png' })
+        if (up.error) throw up.error
+        list.push({ path, url: URL.createObjectURL(b), blob: b, tags: null })
+      }
+      setParts(list)
+      if (list.length < 2) { setError('The pieces touch each other in this image, so they could not be separated. Tap Regenerate.'); return }
+      setGenBusy('Filling in the details…')
+      const found = await Promise.all(list.map(p =>
+        askAI('tag', { category: null, extra_paths: [source, ...refs], notes: ['This image is one piece of a set', ...notes].join('; ') }, 'now', p.path)
+          .then(r => { setRequests(upsert(r)); return r }).catch(() => null)))
+      setParts(list.map((p, i) => ({ ...p, tags: (found[i]?.result as Draft) ?? null })))
+      setGen(x => x && { ...x, tags: x.tags + found.reduce((s, r) => s + (r?.cost_usd ?? 0), 0) })
+      // Brand and composition found on a label go to the shared fields, unless she typed them
+      const t = found.map(r => r?.result as Draft | undefined)
+      setD(x => ({
+        ...x, brand: x.brand?.trim() || t.find(y => y?.brand)?.brand || '',
+        materials: x.materials.some(m => m.name.trim()) ? x.materials : t.find(y => y?.materials?.length)?.materials ?? [],
+      }))
+    } catch (err) { setError((err as Error).message) }
+  }
+  const setPart = (i: number, patch: Partial<Draft>) =>
+    setParts(x => x.map((p, j) => j === i ? { ...p, tags: { ...(p.tags ?? toDraft()), ...patch } } : p))
 
   const createFromPhoto = () => {
     if (photo) startGen(photo)
@@ -370,16 +424,17 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       added = await uploadExtra(user.id)
       const refs = [...gen.refs, ...added]
       // Without any new note or photo it is a fresh try; otherwise the model fixes its previous attempt
-      const g = await generateGarment({ source_path: gen.source, ref_paths: refs, piece: gen.piece, corrections, previous_path: note || added.length ? gen.draft : undefined })
+      const g = await generateGarment({ source_path: gen.source, ref_paths: refs, piece: gen.piece, corrections, previous_path: note || added.length ? gen.draft : undefined, set: gen.set })
       await removePhotos(gen.draft)
       setGen({ ...gen, draft: g.path, corrections, refs, image: gen.image + (g.cost_usd ?? 0), tries: gen.tries + 1 }); setFix(''); setExtra([])
+      if (gen.set) await cutParts(user.id, g.path, gen.source, refs, corrections)
     } catch (err) { await removePhotos(...added); setError((err as Error).message) }
     setGenBusy('')
   }
 
   const discardGen = async () => {
-    if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs)
-    setGen(null); setFix(''); setExtra([])
+    if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs, ...partsRef.current.map(p => p.path))
+    setGen(null); setFix(''); setExtra([]); setParts([])
   }
 
   // AI looks at the photo and fills in the fields (only empty ones, the rest stay untouched)
@@ -402,8 +457,56 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     setTagging(false)
   }
 
+  // Remember new brands and materials for the suggestions; the same name in another case counts as known
+  const remember = async (brand: string | null, materials: Material[]) => {
+    if (brand && !brands.some(b => b.toLowerCase() === brand.toLowerCase())) {
+      await supabase.from('brands').insert({ name: brand }); setBrands(x => [...x, brand])
+    }
+    const fresh = [...new Set(materials.map(m => m.name))].filter(m => !materialNames.some(n => n.toLowerCase() === m.toLowerCase()))
+    if (fresh.length) { await supabase.from('materials').insert(fresh.map(name => ({ name }))); setMaterialNames(x => [...x, ...fresh]) }
+  }
+  const cleanMaterials = (m: Material[]) => m.map(x => ({ name: x.name.trim(), pct: x.pct })).filter(x => x.name)
+
+  // A set becomes one item per piece, linked by set_id; the shared fields apply to all, AI fills the rest
+  const saveSet = async () => {
+    if (!gen) return
+    if (parts.length < 2) { setError('Regenerate first: the pieces could not be separated.'); return }
+    if (parts.some(p => !p.tags?.category)) { setError('Choose a category for each piece'); return }
+    setBusy(true); setError('')
+    try {
+      const set_id = crypto.randomUUID()
+      const shared = cleanMaterials(d.materials)
+      const saved: Item[] = []
+      for (const p of parts) {
+        const t = p.tags!
+        const paths = await uploadPhoto(await processPhoto(p.blob))
+        const row = {
+          ...paths, set_id,
+          name: t.name?.trim() || null, category: t.category, kind: t.kind?.trim().toLowerCase() || null, colors: t.colors ?? [],
+          seasons: d.seasons.length ? d.seasons : t.seasons ?? [], styles: d.styles.length ? d.styles : t.styles ?? [],
+          occasions: d.occasions.length ? d.occasions : t.occasions ?? [],
+          brand: d.brand?.trim() || t.brand?.trim() || null,
+          materials: shared.length ? shared : cleanMaterials(t.materials ?? []),
+          notes: d.notes?.trim() || null, link: normLink(d.link),
+          ...(wish ? { wishlist: true } : {}),
+        }
+        const { data, error } = await supabase.from('items').insert(row).select().single()
+        if (error) throw error
+        saved.push(data as Item)
+        await remember(row.brand, row.materials)
+      }
+      await removePhotos(gen.source, gen.draft, ...gen.refs, ...parts.map(p => p.path))
+      saved.forEach(onSaved)
+      location.replace(`#/i/${saved[0].id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+      setBusy(false)
+    }
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (gen?.set) { await saveSet(); return }
     if (!d.category) { setError('Choose a category'); return }
     if (!item && !photo && !gen) { setError('Add a photo'); return }
     setBusy(true); setError('')
@@ -418,18 +521,13 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         ...d, ...paths,
         name: d.name?.trim() || null, kind: d.kind?.trim().toLowerCase() || null,
         brand: d.brand?.trim() || null, notes: d.notes?.trim() || null, link: normLink(d.link),
-        materials: d.materials.map(m => ({ name: m.name.trim(), pct: m.pct })).filter(m => m.name),
+        materials: cleanMaterials(d.materials),
         ...(!item && wish ? { wishlist: true } : {}),
       }
       const q = item ? supabase.from('items').update(row).eq('id', item.id) : supabase.from('items').insert(row)
       const { data, error } = await q.select().single()
       if (error) throw error
-      // Remember a new brand for the suggestions; the same name in another case counts as known
-      if (row.brand && !brands.some(b => b.toLowerCase() === row.brand!.toLowerCase()))
-        await supabase.from('brands').insert({ name: row.brand })
-      // Same for materials typed by hand
-      const newMaterials = row.materials.filter(m => !materialNames.some(n => n.toLowerCase() === m.name.toLowerCase()))
-      if (newMaterials.length) await supabase.from('materials').insert(newMaterials.map(m => ({ name: m.name })))
+      await remember(row.brand, row.materials)
       if (item && photo) await removePhotos(item.photo_path, item.thumb_path)
       if (gen) await removePhotos(gen.source, gen.draft, ...gen.refs, uploaded?.photo_path ?? null, uploaded?.thumb_path ?? null)
       onSaved(data as Item)
@@ -453,6 +551,20 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             : item ? <Photo path={item.photo_path} alt="" className="big" />
             : <div className="photo big"><span className="photo-empty">{processing ? 'Processing…' : <Icon name="camera" />}</span></div>}
           {gen ? <>
+            {gen.set && parts.length > 0 && (
+              <div className="set-parts">
+                {parts.map((p, i) => (
+                  <div key={p.path} className="set-part">
+                    <div className="set-part-img"><img src={p.url} alt="" /></div>
+                    <input placeholder="Name" value={p.tags?.name ?? ''} onChange={e => setPart(i, { name: e.target.value })} disabled={!!genBusy} />
+                    <select value={p.tags?.category ?? ''} onChange={e => setPart(i, { category: e.target.value })} disabled={!!genBusy}>
+                      <option value="">Category…</option>
+                      {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
             <Section title="What to fix">
               <textarea rows={2} placeholder="e.g. make it red, remove the belt, no cut-out on the back" value={fix} onChange={e => setFix(e.target.value)} disabled={!!genBusy} />
             </Section>
@@ -470,7 +582,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             <p className="hint">Spent so far: {cents(gen.image + gen.tags)} (image{gen.tries > 1 ? ` ×${gen.tries}` : ''} {cents(gen.image)}, details {cents(gen.tags)})</p>
             <div className="picker-btns">
               <button type="button" className="btn" onClick={regenerate} disabled={!!genBusy}><Icon name="sparkle" /> Regenerate<span className="cost">≈6¢</span></button>
-              <button type="button" className="btn ghost" onClick={discardGen} disabled={!!genBusy}>Use original photo</button>
+              <button type="button" className="btn ghost" onClick={discardGen} disabled={!!genBusy}>{gen.set ? 'Start over' : 'Use original photo'}</button>
             </div>
           </> : <>
           <div className="picker-btns">
@@ -498,6 +610,10 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
               {canPaste() && <button type="button" className="ref add" onClick={paste} disabled={!!genBusy}><Icon name="paste" /><span>Paste</span></button>}
             </div>
             <p className="hint">Extra photos of the same piece help: the back, a close-up, the true colour. About +1¢ each.</p>
+            <label className="check-row">
+              <input type="checkbox" checked={setMode} onChange={e => setSetMode(e.target.checked)} disabled={processing || !!genBusy} />
+              <span><b>It's a set</b> (suit, co-ord): AI draws all pieces in one image so the colour matches, then each piece is saved as its own item</span>
+            </label>
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
               <Icon name="sparkle" /> Enhance with AI<span className="cost">≈6¢</span>
             </button>
@@ -513,6 +629,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           </button>
         )}
 
+        {gen?.set ? <p className="hint">These details apply to every piece of the set. Leave a field empty and AI fills it for each piece.</p> : <>
         <Section title="Category">
           <Chips options={CATEGORIES} value={d.category ? [d.category] : []} multi={false} onChange={v => set({ category: v[0] ?? '' })} />
         </Section>
@@ -525,6 +642,8 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         <Section title="Name">
           <input placeholder="e.g. Cream cable-knit sweater" value={d.name ?? ''} onChange={e => set({ name: e.target.value })} />
         </Section>
+
+        </>}
 
         <Section title="Composition">
           <MaterialsInput value={d.materials} names={materialNames} onChange={materials => set({ materials })} />
@@ -541,7 +660,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           </Section>
         )}
 
-        <Section title="Colors"><Chips options={COLORS} value={d.colors} onChange={colors => set({ colors })} swatches /></Section>
+        {!gen?.set && <Section title="Colors"><Chips options={COLORS} value={d.colors} onChange={colors => set({ colors })} swatches /></Section>}
         <Section title="Season"><Chips options={SEASONS} value={d.seasons} onChange={seasons => set({ seasons })} /></Section>
         <Section title="Style"><Chips options={STYLES} value={d.styles} onChange={styles => set({ styles })} /></Section>
         <Section title="Occasion"><Chips options={OCCASIONS} value={d.occasions} onChange={occasions => set({ occasions })} /></Section>
@@ -551,7 +670,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         </Section>
 
         {error && <p className="error">{error}</p>}
-        <button className="btn primary wide" disabled={busy || processing || !!genBusy}>{busy ? 'Saving…' : item ? 'Save changes' : wish ? 'Add to wishlist' : 'Add to wardrobe'}</button>
+        <button className="btn primary wide" disabled={busy || processing || !!genBusy}>{busy ? 'Saving…' : item ? 'Save changes' : gen?.set ? `Add ${parts.length} items${wish ? ' to wishlist' : ''}` : wish ? 'Add to wishlist' : 'Add to wardrobe'}</button>
       </div>
     </form>
   )
