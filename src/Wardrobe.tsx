@@ -274,9 +274,11 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
       const up = await supabase.storage.from('photos').upload(source, p.full, { contentType: p.full.type })
       if (up.error) { source = ''; throw up.error }
       const piece = d.name?.trim() || `the main garment in the photo${d.category ? ` (${categoryLabel(d.category)})` : ''}`
-      const g = await generateGarment({ source_path: source, piece, corrections: [] })
+      // Optional instructions typed before the first run count as the first correction
+      const first = fix.trim() ? [fix.trim()] : []
+      const g = await generateGarment({ source_path: source, piece, corrections: first })
       const draft = g.path
-      setGen({ source, draft, piece, corrections: [], image: g.cost_usd ?? 0, tags: 0, tries: 1 })
+      setGen({ source, draft, piece, corrections: first, image: g.cost_usd ?? 0, tags: 0, tries: 1 }); setFix('')
       setGenBusy('Filling in the details…')
       // Tags are a bonus: if this fails, the fields can be filled by hand
       try {
@@ -403,11 +405,12 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
           {!photo && !item && (
             <p className="hint">Tip: in the Photos app, touch and hold the item until it lifts, tap <b>Copy</b>, then tap <b>Paste</b> here. iPhone removes the background for you.</p>
           )}
-          {!item && (
+          {!item && <>
+            <textarea rows={2} placeholder="Instructions for AI (optional), e.g. without the belt, only the skirt" value={fix} onChange={e => setFix(e.target.value)} disabled={processing || !!genBusy} />
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
               <Icon name="sparkle" /> Enhance with AI<span className="cost">≈6¢</span>
             </button>
-          )}
+          </>}
           </>}
           {genBusy && <p className="hint">{genBusy}</p>}
         </div>
