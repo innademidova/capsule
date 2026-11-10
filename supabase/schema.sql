@@ -239,3 +239,13 @@ create table if not exists public.dict (
 alter table public.dict enable row level security;
 drop policy if exists "own dict" on public.dict;
 create policy "own dict" on public.dict for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Layout reference for AI look images (photos/<uid>/reference/...), replaceable on the admin page
+alter table style_profile add column if not exists look_reference text;
+
+-- The look function writes each finished photo into its request; jsonb_set keeps parallel writes safe
+create or replace function public.set_look_image(req uuid, n int, path text) returns void
+language sql security invoker as $$
+  update public.ai_requests set result = jsonb_set(result, array['looks', n::text, 'image_path'], to_jsonb(path))
+  where id = req and user_id = auth.uid();
+$$;

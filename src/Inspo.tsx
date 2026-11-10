@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import {
-  supabase, processPhoto, uploadPhoto, removePhotos, askAI, requeue, categoryLabel, itemTitle,
+  supabase, processPhoto, uploadPhoto, removePhotos, askAI, categoryLabel, itemTitle,
   type Inspiration, type AIRequest, type ShopItem, type Item,
 } from './lib'
 import { useStore, upsert, without } from './store'
@@ -30,7 +30,7 @@ export function InspoList() {
     } catch (e) { alert((e as Error).message) }
     setBusy(false)
   }
-  const findFormulas = async (mode: 'now' | 'queue') => {
+  const findFormulas = async (mode: 'now') => {
     setFBusy(true)
     try { setRequests(upsert(await askAI('formulas', {}, mode))); if (mode === 'now') await reload() }
     catch (e) { const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message) }
@@ -57,7 +57,7 @@ export function InspoList() {
             <p className="muted small">Based on {profile.based_on} looks.</p>
           </>
         ) : <p className="muted">Save looks you love and analyze them. When you have a few, find the patterns behind your taste.</p>}
-        {formulaReq?.status !== 'done' && <RequestState req={formulaReq} onRequeue={async x => setRequests(upsert(await requeue(x)))} />}
+        {formulaReq?.status !== 'done' && <RequestState req={formulaReq} />}
         <AIActions label={profile?.summary ? 'Update formulas' : 'Find my formulas'} onRun={findFormulas} busy={fBusy}
           disabled={analyzed < 2} cost="≈4¢" />
         {analyzed < 2 && <p className="hint">Analyze at least 2 looks first ({analyzed} so far).</p>}
@@ -95,7 +95,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
   const req = requests.find(r => r.kind === 'inspo' && r.input.inspiration_id === insp.id)
   const a = insp.analysis
 
-  const run = async (mode: 'now' | 'queue') => {
+  const run = async (mode: 'now') => {
     setBusy(true)
     if (note !== (insp.note ?? '')) await supabase.from('inspirations').update({ note: note || null }).eq('id', insp.id)
     try {
@@ -128,7 +128,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
             <>
               <textarea rows={2} placeholder="What do you like about it? (optional)" value={note} onChange={e => setNote(e.target.value)} />
               <AIActions label="Analyze" onRun={run} busy={busy} />
-              <RequestState req={req} onRequeue={async x => setRequests(upsert(await requeue(x)))} />
+              <RequestState req={req} />
             </>
           )}
           {a && (

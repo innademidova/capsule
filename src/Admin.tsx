@@ -1,15 +1,15 @@
 // Admin page: edit the dictionaries (brands, materials, colors, types, styles, occasions).
 // No roles yet: everyone signed in sees it (it is a single-user app for now).
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, COLORS, KINDS, STYLES, OCCASIONS, type Item, type Material } from './lib'
+import { supabase, CATEGORIES, COLORS, KINDS, STYLES, OCCASIONS, processPhoto, renderLook, removePhotos, type Item, type Material } from './lib'
 import { useStore } from './store'
-import { Icon, Header } from './ui'
+import { Icon, Header, Photo } from './ui'
 import { back } from './App'
 
-type Tab = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion'
+type Tab = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion' | 'format'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'brand', label: 'Brands' }, { id: 'material', label: 'Materials' }, { id: 'color', label: 'Colors' },
-  { id: 'kind', label: 'Types' }, { id: 'style', label: 'Styles' }, { id: 'occasion', label: 'Occasions' },
+  { id: 'kind', label: 'Types' }, { id: 'style', label: 'Styles' }, { id: 'occasion', label: 'Occasions' }, { id: 'format', label: 'Look format' },
 ]
 type Row = { id: string; label: string; hex?: string; category?: string; uses: number }
 
@@ -116,7 +116,7 @@ export function Admin() {
           {CATEGORIES.map(c => <button key={c.id} className={'cat' + (cat === c.id ? ' on' : '')} onClick={() => setCat(c.id)}>{c.label}</button>)}
         </div>
       )}
-      <div className="form">
+      {tab === 'format' ? <LookFormat /> : <div className="form">
         <AddRow key={tab + cat} color={tab === 'color'} busy={busy} onAdd={add}
           placeholder={tab === 'kind' ? `New type for ${CATEGORIES.find(c => c.id === cat)?.label.toLowerCase()}` : `New ${TABS.find(t => t.id === tab)!.label.toLowerCase().replace(/s$/, '')}`} />
         {rows.length > 8 && <input placeholder="Search" value={q} onChange={e => setQ(e.target.value)} />}
@@ -125,7 +125,7 @@ export function Admin() {
           {!shown.length && <p className="muted small">Nothing here yet.</p>}
         </div>
         <p className="hint">Renaming updates every item that uses it. Changes reach the AI right away.</p>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -157,6 +157,43 @@ function DictRowEdit({ row, color, busy, onSave, onDelete }: {
       {changed
         ? <button className="icon-btn" onClick={() => onSave(row, label, hex)} disabled={busy} aria-label="Save"><Icon name="check" /></button>
         : <button className="icon-btn" onClick={() => onDelete(row)} disabled={busy} aria-label="Delete"><Icon name="trash" /></button>}
+    </div>
+  )
+}
+
+// The layout reference: every AI look image copies its format (her photo on one side, the pieces and a palette on the other)
+function LookFormat() {
+  const { profile, reload } = useStore()
+  const [clean, setClean] = useState(true)
+  const [busy, setBusy] = useState('')
+  const replace = async (file?: File) => {
+    if (!file) return
+    setBusy(clean ? 'Uploading and cleaning, about a minute…' : 'Uploading…')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Please sign in again')
+      const p = await processPhoto(file)
+      let path = `${user.id}/reference/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
+      fail((await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })).error)
+      if (clean) { const raw = path; path = (await renderLook({ clean_path: raw })).path; await removePhotos(raw) }
+      fail((await supabase.from('style_profile').upsert({ user_id: user.id, look_reference: path })).error)
+      if (profile?.look_reference) await removePhotos(profile.look_reference)
+      await reload()
+    } catch (e) { alert((e as Error).message) }
+    setBusy('')
+  }
+  return (
+    <div className="form">
+      <p className="hint">The AI copies the layout of this picture for every look: you on one side, the pieces and a palette on the other. It never copies its clothes or text.</p>
+      {profile?.look_reference ? <Photo path={profile.look_reference} alt="Look format" className="look-post" /> : <p className="muted small">No reference yet: the AI uses a built-in description of the layout.</p>}
+      <label className="check-row">
+        <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
+        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (≈5¢)</span>
+      </label>
+      <label className={'btn wide' + (busy ? ' disabled' : '')}>
+        <Icon name="image" /> {busy || 'Replace picture'}
+        <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />
+      </label>
     </div>
   )
 }

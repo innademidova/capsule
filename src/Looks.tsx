@@ -1,24 +1,12 @@
 // Fashion looks: ideas around one item ("one sweater, many looks"), the stylist assistant (free request),
 // and AI photos of a woman wearing a look, shown next to the real item photos.
 import { useState } from 'react'
-import { supabase, autoLayout, askAI, requeue, renderLook, currentWeather, itemTitle, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
+import { supabase, autoLayout, askAI, renderLook, currentWeather, itemTitle, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
 import { go, back } from './App'
 
 const pick = (ids: string[], items: Item[]) => ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
-
-// AI photo on the left, the real pieces on the right (like a styling post, without texts)
-export function LookPair({ image, items }: { image: string; items: Item[] }) {
-  return (
-    <div className="look-pair">
-      <Photo path={image} alt="" className="look-img" />
-      <div className={'look-pieces' + (items.length > 4 ? ' many' : '')}>
-        {items.map(i => <button key={i.id} onClick={() => go(`/i/${i.id}`)}><Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} /></button>)}
-      </div>
-    </div>
-  )
-}
 
 // Pieces of a look laid out flat, before there is a photo
 function FlatLay({ items }: { items: Item[] }) {
@@ -33,24 +21,42 @@ export function Palette({ colors }: { colors: string[] }) {
   return <div className="palette">{colors.map(c => <span key={c} style={{ background: c }} />)}</div>
 }
 
-function LookCard({ look, onPatch }: { look: LookIdea; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
+type Drawing = Record<string, 'busy' | 'error'>
+const key = (req: AIRequest, n: number) => `${req.id}:${n}`
+
+// Draws every look of an answer at once; each photo appears as soon as it is ready.
+// The look function also writes the path into the request, so the photos stay after a reload.
+function useDrawing() {
+  const { setRequests } = useStore()
+  const [drawing, setDrawing] = useState<Drawing>({})
+  const draw = async (req: AIRequest, which?: number) => {
+    const r = req.result as LooksResult
+    await Promise.all(r.looks.map(async (l, n) => {
+      if (which != null ? n !== which : l.image_path) return
+      setDrawing(d => ({ ...d, [key(req, n)]: 'busy' }))
+      try {
+        const res = await renderLook({ item_ids: l.item_ids, scene: l.scene, vibe: l.label, palette: r.palette, request_id: req.id, index: n })
+        setRequests(list => list.map(x => x.id !== req.id ? x
+          : { ...x, result: { ...x.result, looks: (x.result as LooksResult).looks.map((y, i) => i === n ? { ...y, image_path: res.path } : y) } }))
+        setDrawing(d => { const c = { ...d }; delete c[key(req, n)]; return c })
+      } catch { setDrawing(d => ({ ...d, [key(req, n)]: 'error' })) }
+    }))
+  }
+  return { drawing, draw }
+}
+
+function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
   const { items, wishlist, setOutfits } = useStore()
   const its = pick(look.item_ids, [...items, ...wishlist])
-  const [busy, setBusy] = useState('')
-  const draw = async () => {
-    setBusy('draw')
-    try { const r = await renderLook({ item_ids: its.map(i => i.id), scene: look.scene, vibe: look.label }); await onPatch({ image_path: r.path }) }
-    catch (e) { alert((e as Error).message) }
-    setBusy('')
-  }
+  const [busy, setBusy] = useState(false)
   const save = async () => {
     if (look.outfit_id) return go(`/o/${look.outfit_id}`)
-    setBusy('save')
+    setBusy(true)
     const { data, error } = await supabase.from('outfits').insert({
       name: look.label.charAt(0).toUpperCase() + look.label.slice(1), layout: autoLayout(its.filter(i => !i.wishlist)),
       source: 'ai', notes: look.why, image_path: look.image_path ?? null,
     }).select().single()
-    setBusy('')
+    setBusy(false)
     if (error) return alert(error.message)
     setOutfits(upsert(data as Outfit))
     await onPatch({ outfit_id: (data as Outfit).id })
@@ -58,24 +64,23 @@ function LookCard({ look, onPatch }: { look: LookIdea; onPatch: (p: Partial<Look
   }
   return (
     <div className="card look">
-      {look.image_path ? <LookPair image={look.image_path} items={its} /> : <FlatLay items={its} />}
+      {look.image_path ? <Photo path={look.image_path} alt={look.label} className="look-post" />
+        : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
+        : <>
+          <FlatLay items={its} />
+          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">≈7¢</span></button>
+        </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
-      <div className="row wrap">
-        <button className="btn sm" onClick={draw} disabled={!!busy}>
-          <Icon name="sparkle" /> {busy === 'draw' ? 'Drawing, about a minute…' : look.image_path ? 'Draw again' : 'Show on me'}<span className="cost">≈7¢</span>
-        </button>
-        <button className="btn sm" onClick={save} disabled={!!busy}><Icon name="heart" filled={!!look.outfit_id} /> {look.outfit_id ? 'Saved' : 'Save outfit'}</button>
-      </div>
+      <button className="btn sm" onClick={save} disabled={busy}><Icon name="heart" filled={!!look.outfit_id} /> {look.outfit_id ? 'Saved' : 'Save outfit'}</button>
     </div>
   )
 }
 
 // One AI answer: headline, palette, looks, what is missing
-export function LooksView({ req, eyebrow }: { req: AIRequest; eyebrow?: string }) {
+function LooksView({ req, eyebrow, drawing, onDraw }: { req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void }) {
   const { setRequests } = useStore()
   const r = req.result as LooksResult | null
-  // Photos and saved outfits are stored back into the request, so they stay after a reload
   const patch = async (n: number, p: Partial<LookIdea>) => {
     const result = { ...r!, looks: r!.looks.map((l, i) => i === n ? { ...l, ...p } : l) }
     const { data, error } = await supabase.from('ai_requests').update({ result }).eq('id', req.id).select().single()
@@ -85,7 +90,7 @@ export function LooksView({ req, eyebrow }: { req: AIRequest; eyebrow?: string }
   return (
     <div className="idea-block">
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <RequestState req={req} onRequeue={async x => setRequests(upsert(await requeue(x)))} />
+      <RequestState req={req} />
       {req.status === 'done' && r && <>
         <div className="looks-head">
           <h2 className="looks-title">{r.title}</h2>
@@ -93,7 +98,7 @@ export function LooksView({ req, eyebrow }: { req: AIRequest; eyebrow?: string }
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
         <div className="looks">
-          {r.looks.map((l, n) => <LookCard key={n} look={l} onPatch={p => patch(n, p)} />)}
+          {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={() => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
         {r.missing.length > 0 && <p className="muted small">Would make these looks even better: {r.missing.join(', ')}</p>}
       </>}
@@ -101,19 +106,32 @@ export function LooksView({ req, eyebrow }: { req: AIRequest; eyebrow?: string }
   )
 }
 
+// Ask for looks, then draw all of them on her right away
+function useLooks() {
+  const { setRequests } = useStore()
+  const { drawing, draw } = useDrawing()
+  const [busy, setBusy] = useState(false)
+  const ask = async (input: Record<string, unknown>) => {
+    setBusy(true)
+    try {
+      const req = await askAI('looks', input, 'now')
+      setRequests(upsert(req)); setBusy(false)
+      await draw(req)
+    } catch (e) {
+      const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message)
+      setBusy(false)
+    }
+  }
+  return { busy, ask, drawing, draw }
+}
+
 // --- Feature 1: one item, many looks ---
 
 export function StyleItem({ item }: { item: Item }) {
-  const { requests, setRequests } = useStore()
+  const { requests } = useStore()
   const [wish, setWish] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { busy, ask, drawing, draw } = useLooks()
   const past = requests.filter(r => r.kind === 'looks' && r.input.item_id === item.id)
-  const run = async (mode: 'now' | 'queue') => {
-    setBusy(true)
-    try { setRequests(upsert(await askAI('looks', { item_id: item.id, count: 4, request: wish.trim() || null }, mode))); setWish('') }
-    catch (e) { const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message) }
-    setBusy(false)
-  }
   return (
     <div className="screen">
       <Header title="" left={<button className="icon-btn" onClick={() => back(`/i/${item.id}`)} aria-label="Back"><Icon name="back" /></button>} />
@@ -124,9 +142,9 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="≈1¢" onRun={run} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="4 looks ≈30¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
-      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} />)}
+      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>
   )
 }
@@ -134,22 +152,16 @@ export function StyleItem({ item }: { item: Item }) {
 // --- Feature 3: the stylist assistant ---
 
 export function Assistant() {
-  const { items, requests, setRequests } = useStore()
+  const { items, requests } = useStore()
   const [request, setRequest] = useState('')
   const [weather, setWeather] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { busy, ask, drawing, draw } = useLooks()
   const [wBusy, setWBusy] = useState(false)
   const past = requests.filter(r => r.kind === 'looks' && !r.input.item_id)
   const getWeather = async () => {
     setWBusy(true)
     try { setWeather(await currentWeather()) } catch { alert('Could not get the weather. Allow location access or type it in.') }
     setWBusy(false)
-  }
-  const run = async (mode: 'now' | 'queue') => {
-    setBusy(true)
-    try { setRequests(upsert(await askAI('looks', { request: request.trim(), weather: weather.trim() || null, count: 3 }, mode))) }
-    catch (e) { const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message) }
-    setBusy(false)
   }
   return (
     <div className="screen">
@@ -161,9 +173,9 @@ export function Assistant() {
           <input placeholder="Weather (optional), e.g. +15°C, sunny" value={weather} onChange={e => setWeather(e.target.value)} />
           <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
         </div>
-        <AIActions label="Get looks" cost="≈1¢" onRun={run} busy={busy} disabled={items.length < 3 || !request.trim()} />
+        <AIActions label="Get looks" cost="3 looks ≈22¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
       </div>
-      {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} />)}
+      {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>
   )
 }

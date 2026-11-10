@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import {
-  supabase, processPhoto, uploadPhoto, askAI, requeue, CATEGORIES, categoryLabel, itemTitle,
+  supabase, processPhoto, uploadPhoto, askAI, CATEGORIES, categoryLabel, itemTitle,
   type AIRequest, type ShopItem, type Item,
 } from './lib'
 import { useStore, upsert, without } from './store'
@@ -22,7 +22,7 @@ export function Shop() {
   const todo = shopping.filter(s => !s.done).sort((a, b) => a.priority - b.priority)
   const done = shopping.filter(s => s.done)
 
-  const analyze = async (mode: 'now' | 'queue') => {
+  const analyze = async (mode: 'now') => {
     setBusy(true)
     try { setRequests(upsert(await askAI('gaps', {}, mode))) }
     catch (e) { const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message) }
@@ -55,7 +55,7 @@ export function Shop() {
         <h3 className="card-title"><Icon name="sparkle" /> Wardrobe check</h3>
         {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
           : <p className="muted">The stylist looks at your whole wardrobe and tells you what's missing, what you have too much of, and what to buy first.</p>}
-        {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} onRequeue={async x => setRequests(upsert(await requeue(x)))} />}
+        {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
         <AIActions label={lastGaps ? 'Check again' : 'Check my wardrobe'} onRun={analyze} busy={busy} cost="≈4¢" />
       </div>
 
@@ -133,7 +133,7 @@ export function BeforeBuy() {
     catch (e) { alert((e as Error).message) }
     setBusy(false)
   }
-  const run = async (mode: 'now' | 'queue') => {
+  const run = async (mode: 'now') => {
     if (!photo) return
     setBusy(true)
     try { setRequests(upsert(await askAI('buy', { note, price }, mode, photo.path))); setPhoto(null); setNote(''); setPrice('') }
@@ -167,7 +167,7 @@ export function BeforeBuy() {
                 {(r.input.note || r.input.price) ? <p className="muted small">{[r.input.note, r.input.price].filter(Boolean).join(' · ') as string}</p> : null}
               </div>
             </div>
-            <RequestState req={r} onRequeue={async x => setRequests(upsert(await requeue(x)))} />
+            <RequestState req={r} />
             {res && (
               <>
                 <p>{res.summary}</p>

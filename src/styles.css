@@ -417,3 +417,9 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .board-item .handle.ne svg, .board-item .handle.sw svg { transform: scaleX(-1); }
 .board-item .handle.sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
 .board-item .handle.se { bottom: -8px; right: -8px; }
+.photo.look-post { aspect-ratio: 2 / 3; border-radius: 18px; width: 100%; }
+.photo.look-post img { object-fit: cover; padding: 0; }
+.detail > .photo.look-post { max-width: 520px; box-shadow: var(--shadow); }
+.look-wait { position: relative; }
+.look-wait .look-flat { opacity: .35; }
+.look-wait p { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-weight: 600; font-size: 14px; padding: 12px; }

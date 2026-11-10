@@ -334,7 +334,7 @@ export type Wear = { id: string; worn_on: string; outfit_id: string | null; item
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
-export type StyleProfile = { appearance: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type StyleProfile = { appearance: string | null; look_reference: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
@@ -347,7 +347,7 @@ export type LookIdea = { label: string; item_ids: string[]; why: string; scene: 
 export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
-export async function renderLook(body: { item_ids: string[]; scene?: string; vibe?: string }) {
+export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string }) {
   const res = await supabase.functions.invoke('look', { body })
   if (res.error) {
     let msg = res.error.message

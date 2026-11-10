@@ -6,7 +6,6 @@ import {
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Collage, Chips, Section, Photo, AIActions, RequestState, Sheet } from './ui'
 import { go, back } from './App'
-import { LookPair } from './Looks'
 
 const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
   o.layout.map(p => items.find(i => i.id === p.item_id)).filter((i): i is Item => !!i)
@@ -93,7 +92,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label="Edit"><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        {outfit.image_path ? <LookPair image={outfit.image_path} items={list} /> : <Collage layout={outfit.layout} items={items} className="big" />}
+        {outfit.image_path ? <Photo path={outfit.image_path} alt="" className="look-post" /> : <Collage layout={outfit.layout} items={items} className="big" />}
         <div className="detail-info">
           {outfit.source === 'ai' && <p className="eyebrow">Stylist idea</p>}
           <h2 className="title">{outfit.name || 'Outfit'}</h2>

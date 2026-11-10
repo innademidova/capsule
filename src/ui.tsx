@@ -120,32 +120,22 @@ export function Collage({ layout, items, className, children }: {
   )
 }
 
-// Two buttons for any AI action: "now" (paid) and "queue" (free)
+// The button for a paid AI action (the free queue was removed at the owner's request on 2026-11-11)
 export function AIActions({ onRun, busy, label, cost = '≈3¢', disabled }: {
-  onRun: (mode: 'now' | 'queue') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
+  onRun: (mode: 'now') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
 }) {
   return (
     <div className="ai-actions">
       <button type="button" className="btn primary" disabled={busy || disabled} onClick={() => onRun('now')}>
-        <Icon name="sparkle" /> {busy ? 'Thinking…' : `${label} now`}<span className="cost">{cost}</span>
-      </button>
-      <button type="button" className="btn ghost" disabled={busy || disabled} onClick={() => onRun('queue')}>
-        <Icon name="clock" /> Add to queue<span className="cost">free</span>
+        <Icon name="sparkle" /> {busy ? 'Thinking…' : label}<span className="cost">{cost}</span>
       </button>
     </div>
   )
 }
 
-export function RequestState({ req, onRequeue }: { req?: AIRequest; onRequeue?: (r: AIRequest) => void }) {
-  if (!req) return null
-  if (req.status === 'queued') return <p className="queued"><Icon name="clock" /> In the queue. Ask Claude to “process the queue” and the answer will appear here.</p>
-  if (req.status === 'error') return (
-    <div className="queued err">
-      <span>{req.error}</span>
-      {onRequeue && <button className="btn ghost sm" onClick={() => onRequeue(req)}>Add to queue instead</button>}
-    </div>
-  )
-  return null
+export function RequestState({ req }: { req?: AIRequest }) {
+  if (req?.status !== 'error') return null
+  return <div className="queued err"><span>{req.error}</span></div>
 }
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {

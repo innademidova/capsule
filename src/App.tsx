@@ -240,14 +240,6 @@ function Me({ email }: { email: string }) {
   const monthAgo = Date.now() - 30 * 864e5
   const never = items.filter(i => !worn.get(i.id) && new Date(i.created_at).getTime() < monthAgo)
   const untagged = items.filter(i => !i.colors.length || !i.kind || !i.seasons.length || !i.styles.length || !i.occasions.length)
-  const queued = requests.filter(r => r.status === 'queued')
-  const tagQueued = queued.some(r => r.kind === 'tag' && !r.image_path)
-
-  const tagAll = async () => {
-    setBusy(true)
-    try { setRequests(upsert(await askAI('tag', {}, 'queue'))) } catch (e) { alert((e as Error).message) }
-    setBusy(false)
-  }
 
   return (
     <div className="screen">
@@ -287,8 +279,8 @@ function Me({ email }: { email: string }) {
       {untagged.length > 0 && (
         <div className="card">
           <h3 className="card-title"><Icon name="wand" /> {untagged.length} items without full tags</h3>
-          <p className="muted small">Tags help the stylist. Claude can look at the photos and fill them in for free.</p>
-          <button className="btn sm" onClick={tagAll} disabled={busy || tagQueued}><Icon name="clock" /> {tagQueued ? 'In the queue' : 'Tag them via the queue'}</button>
+          <p className="muted small">Tags help the stylist. Open an item, tap Edit and then “Fill in with AI”.</p>
+          <MiniItems items={untagged} />
         </div>
       )}
       <div className="card">
@@ -296,11 +288,6 @@ function Me({ email }: { email: string }) {
         <p className="muted small">The AI draws a woman who looks like this when it shows outfits on you. Write in English.</p>
         <textarea rows={5} value={look} onChange={e => { setLook(e.target.value); setLookSaved(false) }} placeholder="Hair, skin, face, figure…" />
         <button className="btn sm" onClick={saveLook} disabled={lookSaved}><Icon name="check" /> {lookSaved ? 'Saved' : 'Save'}</button>
-      </div>
-      <div className="card">
-        <h3 className="card-title"><Icon name="clock" /> AI queue</h3>
-        {queued.length ? <p className="small">{queued.length} request(s) waiting. Tell Claude “process the queue” and the answers will appear in the app.</p>
-          : <p className="muted small">Empty. Free requests you add to the queue appear here.</p>}
       </div>
       <button className="card stylist-cta" onClick={() => go('/admin')}>
         <span className="cta-icon"><Icon name="edit" /></span>
