@@ -37,7 +37,14 @@ ACCURACY (most important)
 - Keep the exact colour and shade, fabric and texture (knit, linen, denim, satin and so on), pattern or print, and its scale.
 - Keep every detail exactly: number, colour, shape and placement of buttons, zippers, pockets, seams, pleats, darts, collar and lapel shape, cuffs, belt, buckles, hardware, embroidery, logos.
 - Keep the real proportions: length, sleeve length, fit (cropped, oversized, wide-leg and so on).
-- Do not add anything that is not in the photo (labels, tags, extra buttons, linings, stitching).
+- Do not add anything that is not in the photo
+
+SILHOUETTE AND WIDTH (flat lays tend to look too wide; avoid that)
+- Judge the true width from the person in the photo: how the garment sits on her shoulders, chest and waist. A piece that fits close on her must look close-fitting, not boxy.
+- Lay it out the way a stylist would for a shop: body neatly shaped, side seams gently following the natural line from bust to waist to hip, a soft hint of waist where the garment has one. Not a sharp or exaggerated wasp waist.
+- Stretch pieces (bodysuits, ribbed knits, jersey tops, fitted sweaters, knit dresses) lie at their relaxed width, which is narrower than when worn. Never stretch them out sideways or show them as a wide rectangle.
+- Do not fan out the hem or sleeves to fill space. Sleeves lie close to the body or slightly angled, at their real width.
+- Only make it wide or boxy when the photo clearly shows an oversized or loose fit. (labels, tags, extra buttons, linings, stitching).
 - If part of the garment is hidden by arms, hair, a bag or another garment, complete it in the most plausible way consistent with the visible parts.`;
 }
 
