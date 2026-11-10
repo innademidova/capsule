@@ -244,18 +244,22 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     setProcessing(false)
     if (processed && genAfterPick.current) { genAfterPick.current = false; startGen(processed) }
   }
+  // On a new item that already has a photo (or an AI draft), a pasted image is an extra photo for the AI;
+  // "Change photo" is the way to replace the main one
+  const pasteTarget = useRef<(b: Blob) => void>(() => {})
+  pasteTarget.current = b => { if (!item && (photo || gen)) addExtra([b]); else take(b) }
   const paste = async () => {
     try {
       const img = await pasteImage()
       if (!img) setError('No image in the clipboard. Copy a cut-out in Photos first.')
-      else take(img)
+      else pasteTarget.current(img)
     } catch { setError('Paste was not allowed. Try again and tap “Paste”.') }
   }
   // Paste from the keyboard (Cmd+V on a computer)
   useEffect(() => {
     const on = (e: ClipboardEvent) => {
-      const f = [...(e.clipboardData?.files ?? [])].find(x => x.type.startsWith('image/'))
-      if (f) { e.preventDefault(); take(f) }
+      const files = [...(e.clipboardData?.files ?? [])].filter(x => x.type.startsWith('image/'))
+      if (files.length) { e.preventDefault(); files.forEach(f => pasteTarget.current(f)) }
     }
     window.addEventListener('paste', on)
     return () => window.removeEventListener('paste', on)
@@ -267,7 +271,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     styles: x.styles.length ? x.styles : t.styles, occasions: x.occasions.length ? x.occasions : t.occasions,
   }))
 
-  const addExtra = async (files: FileList | null) => {
+  const addExtra = async (files: FileList | Blob[] | null) => {
     for (const f of Array.from(files ?? [])) {
       try { const p = await processPhoto(f); setExtra(x => [...x, { blob: p.full, url: p.preview }]) }
       catch { setError('Could not read this image. Try another one.') }
@@ -421,6 +425,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
                 </div>
               ))}
               <button type="button" className="ref add" onClick={() => extraRef.current?.click()} disabled={!!genBusy || gen.refs.length + extra.length >= 8}><Icon name="plus" /><span>Photo</span></button>
+              {canPaste() && <button type="button" className="ref add" onClick={paste} disabled={!!genBusy}><Icon name="paste" /><span>Paste</span></button>}
             </div>
             <p className="hint">Extra photos of the same piece help: the back, a close-up, the true colour. About +1¢ each.</p>
             {gen.corrections.length > 0 && <p className="hint">Already asked: {gen.corrections.join(' · ')}</p>}
@@ -434,7 +439,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             <button type="button" className="btn" onClick={() => { genAfterPick.current = false; fileRef.current?.click() }} disabled={processing || !!genBusy}>
               <Icon name="image" /> {photo || item ? 'Change photo' : 'Choose photo'}
             </button>
-            {canPaste() && <button type="button" className="btn" onClick={paste} disabled={processing}><Icon name="paste" /> Paste</button>}
+            {canPaste() && (item || !photo) && <button type="button" className="btn" onClick={paste} disabled={processing}><Icon name="paste" /> Paste</button>}
           </div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { take(e.target.files?.[0]); e.target.value = '' }} />
           {photo && !photo.cutout && <p className="hint">The background is still there. That's fine, but a cut-out looks neater in outfits.</p>}
@@ -452,6 +457,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
                 </div>
               ))}
               <button type="button" className="ref add" onClick={() => extraRef.current?.click()} disabled={!!genBusy || 0 + extra.length >= 8}><Icon name="plus" /><span>Photo</span></button>
+              {canPaste() && <button type="button" className="ref add" onClick={paste} disabled={!!genBusy}><Icon name="paste" /><span>Paste</span></button>}
             </div>
             <p className="hint">Extra photos of the same piece help: the back, a close-up, the true colour. About +1¢ each.</p>
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
