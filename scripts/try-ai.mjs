@@ -18,7 +18,9 @@ if (e1) throw e1
 const t = Date.now()
 const res = await sb.functions.invoke('ai', { body: { id: req.id } })
 const secs = ((Date.now() - t) / 1000).toFixed(1)
-if (res.error) { console.log('ERROR', secs + 's', await res.error.context?.text?.()); process.exit(1) }
+if (res.error) { console.log('ERROR', secs + 's', await res.error.context?.text?.()); await sb.from('ai_requests').delete().eq('id', req.id); process.exit(1) }
 console.log(`${res.data.model} · ${secs}s · $${res.data.cost_usd}`)
 if (res.data.skipped?.length) console.log('skipped:', res.data.skipped)
 console.log(JSON.stringify(res.data.result, null, 1).slice(0, 2500))
+// a test run must not show up in the app
+await sb.from('ai_requests').delete().eq('id', req.id)
