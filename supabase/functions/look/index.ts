@@ -177,7 +177,8 @@ Deno.serve(async req => {
       const form = new FormData();
       form.append("model", MODEL);
       form.append("prompt", buildManyPrompt(pieces, prof?.appearance ?? "", many, !!ref));
-      form.append("quality", QUALITY);
+      // Many small figures: "medium" smears faces and garment details; "high" costs only ~1c more here
+      form.append("quality", "high");
       form.append("size", "1024x1536");
       form.append("output_format", "webp");
       form.append("output_compression", "90");

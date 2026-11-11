@@ -116,7 +116,7 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
         {r.note && <p className="muted small">{r.note}</p>}
         {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
           : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
-          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈15¢)</span></button>)}
+          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈17¢)</span></button>)}
         <div className="looks">
           {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={onCollage ? undefined : () => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
@@ -162,7 +162,7 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, one collage: OpenAI ≈15¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, one collage: OpenAI ≈17¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
         onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
