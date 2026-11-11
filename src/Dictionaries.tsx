@@ -291,7 +291,7 @@ function TemplateEditor({ scope, id, hint }: { scope: Scope; id: TemplateId; hin
         {hint} The AI copies its layout, never its clothes or person.
         {scope === 'global' ? ' Default for every user.' : own ? ' You use your own picture.' : ' You use the default picture.'}
       </p>
-      {current ? <Photo path={current} alt={hint} className="look-post" /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
+      {current ? <Photo path={current} alt={hint} className="look-post" zoom /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
       <label className="check-row">
         <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
         <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>

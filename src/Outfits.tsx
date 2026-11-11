@@ -101,7 +101,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label="Edit"><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        {outfit.image_path ? <Photo path={outfit.image_path} alt="" className="look-post" /> : <Collage layout={outfit.layout} items={items} className="big" />}
+        {outfit.image_path ? <Photo path={outfit.image_path} alt={outfit.name || "outfit"} className="look-post" zoom /> : <Collage layout={outfit.layout} items={items} className="big" />}
         <div className="detail-info">
           {outfit.source === 'ai' && <p className="eyebrow">Stylist idea</p>}
           <h2 className="title">{outfit.name || 'Outfit'}</h2>

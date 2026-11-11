@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
 
 const PATHS: Record<string, string> = {
@@ -28,6 +29,7 @@ const PATHS: Record<string, string> = {
   shirt: 'M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9l-2 1-3-3z',
   lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
   logout: 'M15 4h4v16h-4M10 17l5-5-5-5M15 12H4',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
 }
 
@@ -66,8 +68,10 @@ export function Chips({ options, value, onChange, multi = true, swatches }: {
 }
 
 // Photo from private storage
-export function Photo({ path, alt, className }: { path: string | null; alt: string; className?: string }) {
+// zoom: a tap opens the picture full screen with a download button (AI images, collages)
+export function Photo({ path, alt, className, zoom }: { path: string | null; alt: string; className?: string; zoom?: boolean }) {
   const [url, setUrl] = useState<string>()
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     let live = true
     if (path) signedUrls([path]).then(m => { if (live) setUrl(m[path]) })
@@ -75,10 +79,46 @@ export function Photo({ path, alt, className }: { path: string | null; alt: stri
     return () => { live = false }
   }, [path])
   return (
-    <div className={'photo ' + (className ?? '')}>
+    <div className={'photo ' + (className ?? '') + (zoom && url ? ' zoomable' : '')} onClick={zoom && url ? () => setOpen(true) : undefined}>
       {url ? <img src={url} alt={alt} loading="lazy" /> : <span className="photo-empty"><Icon name="hanger" /></span>}
+      {open && url && <Lightbox url={url} alt={alt} onClose={() => setOpen(false)} />}
     </div>
   )
+}
+
+function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: () => void }) {
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => { removeEventListener('keydown', onKey); document.body.style.overflow = '' }
+  }, [onClose])
+  // On phones the share sheet has "Save image"; elsewhere a normal file download
+  const download = async () => {
+    setSaving(true)
+    try {
+      const blob = await (await fetch(url)).blob()
+      const ext = blob.type.split('/')[1] || 'webp'
+      const name = (alt || 'capsule').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'capsule'
+      const file = new File([blob], `${name}.${ext}`, { type: blob.type })
+      if (navigator.canShare?.({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
+        await navigator.share({ files: [file] }).catch(() => {})
+      } else {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(file); a.download = file.name; a.click()
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+      }
+    } finally { setSaving(false) }
+  }
+  return createPortal(
+    <div className="lightbox" onClick={e => { e.stopPropagation(); onClose() }}>
+      <div className="lightbox-bar" onClick={e => e.stopPropagation()}>
+        <button className="icon-btn" onClick={download} disabled={saving} aria-label="Download"><Icon name="download" /></button>
+        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
+      </div>
+      <img src={url} alt={alt} onClick={e => e.stopPropagation()} />
+    </div>, document.body)
 }
 
 export function Header({ title, left, right }: { title: ReactNode; left?: ReactNode; right?: ReactNode }) {

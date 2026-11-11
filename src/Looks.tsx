@@ -79,7 +79,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
   }
   return (
     <div className="card look">
-      {look.image_path ? <Photo path={look.image_path} alt={look.label} className="look-post" />
+      {look.image_path ? <Photo path={look.image_path} alt={look.label} className="look-post" zoom />
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
         : <>
           <FlatLay items={its} />
@@ -114,7 +114,7 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
           <Palette colors={r.palette} />
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
-        {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" />
+        {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
           : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
           : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈15¢)</span></button>)}
         <div className="looks">

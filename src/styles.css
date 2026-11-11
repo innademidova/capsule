@@ -488,3 +488,11 @@ details.card .dict-list { margin-top: 12px; }
   .app.editing .tabbar { display: none; }
   .app.editing .screen { padding-bottom: calc(env(safe-area-inset-bottom) + 32px); }
 }
+
+/* Full-screen picture with download */
+.photo.zoomable { cursor: zoom-in; }
+.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(20, 20, 20, .92); display: grid; place-items: center;
+  padding: max(56px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); cursor: zoom-out; animation: fade .15s ease; }
+.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; cursor: default; }
+.lightbox-bar { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; display: flex; gap: 8px; }
+@keyframes fade { from { opacity: 0; } }
