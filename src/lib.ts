@@ -88,12 +88,18 @@ export const COLORS: (Option & { hex: string })[] = [
 ]
 export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 
-// The lists above and below (colors, kinds, styles, occasions) are defaults: the admin page keeps them in the
-// dict table, and applyDict() replaces the contents of these arrays when the app loads
-export type DictRow = { type: 'color' | 'kind' | 'style' | 'occasion'; category: string; id: string; label: string; hex: string | null; sort: number }
+// The lists above and below (colors, kinds, styles, occasions) are only fallbacks. The real lists come from the
+// database view dict_effective (admin defaults + this user's own changes); applyDict() puts them into these arrays.
+// Colors, styles and occasions are stored in items by id; brands, materials and kinds by their text (id = lowercase).
+export type DictType = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion'
+export type DictRow = { type: DictType; category: string; id: string; label: string; hex: string | null; sort: number; is_default?: boolean; is_own?: boolean }
+export const BRANDS: string[] = []
+export const MATERIALS: string[] = []
 export function applyDict(rows: DictRow[]) {
-  const of = (t: DictRow['type']) => rows.filter(r => r.type === t).sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label))
+  const of = (t: DictType) => rows.filter(r => r.type === t).sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label))
   const put = <T,>(arr: T[], v: T[]) => { if (v.length) arr.splice(0, arr.length, ...v) }
+  BRANDS.splice(0, BRANDS.length, ...of('brand').map(r => r.label))
+  MATERIALS.splice(0, MATERIALS.length, ...of('material').map(r => r.label))
   put(COLORS, of('color').map(r => ({ id: r.id, label: r.label, hex: r.hex || '#cccccc' })))
   put(STYLES, of('style').map(r => ({ id: r.id, label: r.label })))
   put(OCCASIONS, of('occasion').map(r => ({ id: r.id, label: r.label })))
@@ -333,7 +339,7 @@ export type Outfit = {
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
-export type StyleProfile = { appearance: string | null; look_reference: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type StyleProfile = { appearance: string | null; look_reference: string | null; /* own override; null = the global default */ summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
@@ -346,7 +352,7 @@ export type LookIdea = { label: string; item_ids: string[]; why: string; scene: 
 export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
-export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string }) {
+export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean }) {
   const res = await supabase.functions.invoke('look', { body })
   if (res.error) {
     let msg = res.error.message

@@ -39,7 +39,8 @@ const obj = (properties: Record<string, unknown>) =>
 // Colors, styles and occasions can be edited on the admin page (table dict); the constants are the fallback
 type Options = { colors: string[]; styles: string[]; occasions: string[] };
 async function options(sb: SupabaseClient): Promise<Options> {
-  const { data } = await sb.from("dict").select("type,id").in("type", ["color", "style", "occasion"]).order("sort");
+  // dict_effective = admin defaults + this user's own changes (the client carries the user's JWT)
+  const { data } = await sb.from("dict_effective").select("type,id").in("type", ["color", "style", "occasion"]).order("sort");
   const of = (t: string, fallback: string[]) => { const v = (data ?? []).filter((r: { type: string }) => r.type === t).map((r: { id: string }) => r.id); return v.length ? v : fallback; };
   return { colors: of("color", COLORS), styles: of("style", STYLES), occasions: of("occasion", OCCASIONS) };
 }
@@ -130,8 +131,8 @@ async function buildPrompt(sb: SupabaseClient, r: Req): Promise<{ content: Anthr
       const extra = ((i.extra_paths as string[] | undefined) ?? []).slice(0, 8);
       const images = [await imageBlock(sb, r.image_path)];
       for (const p of extra) images.push(await imageBlock(sb, p));
-      const { data: mats } = await sb.from("materials").select("name");
-      const known = (mats ?? []).map((m: { name: string }) => m.name).join(", ");
+      const { data: mats } = await sb.from("dict_effective").select("label").eq("type", "material");
+      const known = (mats ?? []).map((m: { label: string }) => m.label).join(", ");
       return { effort: "low", content: [...images, { type: "text", text:
         `Describe this clothing item for her digital wardrobe. kind: a short lowercase type like "sweater", "straight jeans",
 "ankle boots". name: a short English product-style name, e.g. "Cream cable-knit sweater". Pick only fitting colors

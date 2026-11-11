@@ -26,6 +26,8 @@ const PATHS: Record<string, string> = {
   minus: 'M5 12h14',
   wand: 'M4 20L16 8M14 4v2M18 8h2M19 3l-1 1M10 4l1 1M20 13l-1-1',
   shirt: 'M8 3l4 2 4-2 5 4-3 3-2-1v12H8V9l-2 1-3-3z',
+  lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
+  logout: 'M15 4h4v16h-4M10 17l5-5-5-5M15 12H4',
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
 }
 

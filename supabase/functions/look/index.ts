@@ -1,9 +1,10 @@
 // Look images (OpenAI gpt-image-2.6-sunburst), two jobs:
 // 1. {item_ids, scene, vibe, palette?, request_id?, index?}: a styling post in the format of the layout reference
-//    (style_profile.look_reference): the woman wearing the outfit on one side, the separate pieces and a palette on the
+//    (the user's own style_profile.look_reference, else the global app_settings.look_reference): the woman wearing the outfit on one side, the separate pieces and a palette on the
 //    other, no text. The item photos are the clothing references; her appearance comes from style_profile.appearance.
 //    With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
-// 2. {clean_path}: removes text, page numbers and app icons from a screenshot meant to be the layout reference.
+// 2. {clean_path, global?}: removes text, page numbers and app icons from a screenshot meant to be the layout reference.
+//    global: save it to photos/global/reference/ (the storage policy lets only admins write there).
 // Writes to photos/<uid>/looks/ (or reference/) and returns the path. The key is a Supabase secret (OPENAI_API_KEY).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
@@ -98,8 +99,8 @@ Deno.serve(async req => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
     if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
-    const body0 = await req.json() as { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string };
-    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path } = body0;
+    const body0 = await req.json() as { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean };
+    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false } = body0;
 
     if (clean_path) {
       const form = new FormData();
@@ -112,7 +113,7 @@ Deno.serve(async req => {
       const img = await download(sb, clean_path);
       form.append("image[]", img, `reference.${img.type.split("/")[1] || "png"}`);
       const out = await callImages(form);
-      const path = `${user.id}/reference/${crypto.randomUUID()}.webp`;
+      const path = `${global ? "global" : user.id}/reference/${crypto.randomUUID()}.webp`;
       await save(sb, path, out.b64);
       const usage = costOf(out.usage);
       await sb.from("ai_usage").insert({ kind: "reference", model: MODEL, ...usage, raw: out.usage });
@@ -124,7 +125,9 @@ Deno.serve(async req => {
       .sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category)).slice(0, 8);
     if (!pieces.length) throw new Error("No pieces with photos in this outfit");
     const { data: prof } = await sb.from("style_profile").select("appearance,look_reference").maybeSingle();
-    const ref = prof?.look_reference ? await download(sb, prof.look_reference).catch(() => null) : null;
+    const { data: def } = await sb.from("app_settings").select("value").eq("key", "look_reference").maybeSingle();
+    const refPath: string | null = prof?.look_reference ?? def?.value?.path ?? null;
+    const ref = refPath ? await download(sb, refPath).catch(() => null) : null;
 
     const form = new FormData();
     form.append("model", MODEL);

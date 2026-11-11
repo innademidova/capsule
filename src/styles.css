@@ -445,3 +445,23 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .look-wait { position: relative; }
 .look-wait .look-flat { opacity: .35; }
 .look-wait p { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-weight: 600; font-size: 14px; padding: 12px; }
+
+/* Profile */
+.tabs-row .cat { display: inline-flex; align-items: center; gap: 6px; }
+.tabs-row .cat .icon { width: 15px; height: 15px; }
+.form.narrow { max-width: 520px; }
+.form-card { display: grid; gap: 12px; margin: 0; }
+.form-card .card-title { margin: 0; }
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+input:disabled { opacity: 0.7; }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--soft); margin: 12px auto 16px; max-width: 640px; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { flex: 1; white-space: nowrap; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+.dict-badge { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--soft); padding: 3px 7px; border-radius: 999px; }
+.dict-swatch { width: 40px; height: 40px; border-radius: 10px; flex: none; border: 1px solid var(--line); }
+details.card summary { cursor: pointer; }
+details.card .dict-list { margin-top: 12px; }
+.user-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.user-row select { flex: none; width: auto; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font: inherit; color: inherit; }

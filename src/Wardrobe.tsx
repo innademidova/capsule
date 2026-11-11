@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, type Material, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
@@ -269,12 +269,9 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
   const [fix, setFix] = useState('')
   const genAfterPick = useRef(false)
   const set = (patch: Partial<Draft>) => setD(x => ({ ...x, ...patch }))
-  const [brands, setBrands] = useState<string[]>([])
-  const [materialNames, setMaterialNames] = useState<string[]>([])
-  useEffect(() => {
-    supabase.from('brands').select('name').order('name').then(({ data }) => setBrands((data ?? []).map(b => b.name)))
-    supabase.from('materials').select('name').order('name').then(({ data }) => setMaterialNames((data ?? []).map(m => m.name)))
-  }, [])
+  // My brand and material lists (admin defaults + my changes), loaded with the app
+  const [brands, setBrands] = useState<string[]>(() => [...BRANDS])
+  const [materialNames, setMaterialNames] = useState<string[]>(() => [...MATERIALS])
 
   const take = async (blob: Blob | null | undefined) => {
     if (!blob) return
@@ -450,13 +447,15 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
     setTagging(false)
   }
 
-  // Remember new brands and materials for the suggestions; the same name in another case counts as known
+  // Remember new brands and materials in MY lists (dict_user); the same name in another case counts as known.
+  // Upsert: if I had hidden that default, using it again brings it back.
   const remember = async (brand: string | null, materials: Material[]) => {
+    const row = (type: 'brand' | 'material', label: string) => ({ type, category: '', id: label.trim().toLowerCase(), label: label.trim(), hex: null, sort: null, hidden: false })
     if (brand && !brands.some(b => b.toLowerCase() === brand.toLowerCase())) {
-      await supabase.from('brands').insert({ name: brand }); setBrands(x => [...x, brand])
+      await supabase.from('dict_user').upsert(row('brand', brand)); setBrands(x => [...x, brand]); BRANDS.push(brand)
     }
     const fresh = [...new Set(materials.map(m => m.name))].filter(m => !materialNames.some(n => n.toLowerCase() === m.toLowerCase()))
-    if (fresh.length) { await supabase.from('materials').insert(fresh.map(name => ({ name }))); setMaterialNames(x => [...x, ...fresh]) }
+    if (fresh.length) { await supabase.from('dict_user').upsert(fresh.map(m => row('material', m))); setMaterialNames(x => [...x, ...fresh]); MATERIALS.push(...fresh) }
   }
   const cleanMaterials = (m: Material[]) => m.map(x => ({ name: x.name.trim(), pct: x.pct })).filter(x => x.name)
 
