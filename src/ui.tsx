@@ -136,8 +136,8 @@ export function AIActions({ onRun, busy, label, cost = 'Gemini · free', disable
   )
 }
 
-export function RequestState({ req }: { req?: AIRequest }) {
-  if (req?.status === 'done' && req.model) return <p className="by-model">by {req.model}</p>
+export function RequestState({ req, hideModel }: { req?: AIRequest; hideModel?: boolean }) {
+  if (req?.status === 'done' && req.model && !hideModel) return <p className="by-model">by {req.model}</p>
   if (req?.status !== 'error') return null
   return <div className="queued err"><span>{req.error}</span></div>
 }

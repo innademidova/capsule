@@ -59,7 +59,8 @@ function useDrawing() {
   return { drawing, draw, drawCollage }
 }
 
-function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
+// onDraw is left out on "Style it": there the looks are drawn together in one collage
+function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw?: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
   const { items, wishlist, setOutfits } = useStore()
   const its = pick(look.item_ids, [...items, ...wishlist])
   const [busy, setBusy] = useState(false)
@@ -82,7 +83,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
         : <>
           <FlatLay items={its} />
-          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span></button>
+          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span></button>}
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
@@ -106,7 +107,7 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
   return (
     <div className="idea-block">
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <RequestState req={req} />
+      <RequestState req={req} hideModel={!!onCollage} />
       {req.status === 'done' && r && <>
         <div className="looks-head">
           <h2 className="looks-title">{r.title}</h2>
@@ -114,10 +115,10 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
         {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" />
-          : drawing[key(req, 'collage')] === 'busy' ? <div className="look-wait"><p><Icon name="sparkle" /> Drawing all looks on you, about a minute…</p></div>
+          : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
           : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈15¢)</span></button>)}
         <div className="looks">
-          {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={() => onDraw(n)} onPatch={p => patch(n, p)} />)}
+          {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={onCollage ? undefined : () => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
         {r.missing.length > 0 && <p className="muted small">Would make these looks even better: {r.missing.join(', ')}</p>}
       </>}

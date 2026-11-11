@@ -472,6 +472,9 @@ details.card summary { cursor: pointer; }
 details.card .dict-list { margin-top: 12px; }
 .user-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .user-row select { flex: none; width: auto; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font: inherit; color: inherit; }
+.collage-wait { background: var(--collage-bg); }
+.collage-wait p { margin: 0; padding: 24px; text-align: center; font-weight: 600; font-size: 14px; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
 .by-model { margin: 0; font-size: 12px; color: var(--muted); }
 
 /* Outfit editor: two ways to save */
