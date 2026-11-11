@@ -121,6 +121,20 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     </div>, document.body)
 }
 
+// A password field with an eye button that shows / hides what is typed
+export function PasswordInput({ value, onChange, placeholder, autoComplete }: { value: string; onChange: (v: string) => void; placeholder: string; autoComplete: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="pw-wrap">
+      <input type={show ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
+        autoComplete={autoComplete} autoCapitalize="none" autoCorrect="off" />
+      <button type="button" className="pw-eye" onClick={() => setShow(v => !v)} aria-label={show ? 'Hide password' : 'Show password'}>
+        <Icon name={show ? 'eye-off' : 'eye'} />
+      </button>
+    </div>
+  )
+}
+
 export function Header({ title, left, right }: { title: ReactNode; left?: ReactNode; right?: ReactNode }) {
   return (
     <header className="top">

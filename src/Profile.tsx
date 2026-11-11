@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react'
 import { supabase, CATEGORIES, COLORS } from './lib'
 import { useStore } from './store'
-import { Icon, Header, Swatch } from './ui'
+import { Icon, Header, Swatch, PasswordInput } from './ui'
 import { MiniItems } from './Shop'
 import { DictEditor, Templates, Users } from './Dictionaries'
 
@@ -119,8 +119,8 @@ function Account({ email }: { email: string }) {
     <form className="card form-card" onSubmit={savePw}>
       <h3 className="card-title"><Icon name="lock" /> Password</h3>
       <input type="text" autoComplete="username" value={email} readOnly hidden />
-      <input type="password" placeholder="New password" value={pw} onChange={e => { setPw(e.target.value); setPwMsg('') }} autoComplete="new-password" />
-      <input type="password" placeholder="Repeat the new password" value={pw2} onChange={e => { setPw2(e.target.value); setPwMsg('') }} autoComplete="new-password" />
+      <PasswordInput placeholder="New password" value={pw} onChange={v => { setPw(v); setPwMsg('') }} autoComplete="new-password" />
+      <PasswordInput placeholder="Repeat the new password" value={pw2} onChange={v => { setPw2(v); setPwMsg('') }} autoComplete="new-password" />
       <div className="row">
         <button className="btn sm primary" disabled={busy || !pw || !pw2}>{busy ? 'Saving…' : 'Change password'}</button>
         {pwMsg && <span className={'small ' + (pwMsg === 'Password changed' ? 'muted' : 'error')}>{pwMsg}</span>}
