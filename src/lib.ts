@@ -344,7 +344,7 @@ export type ShopItem = { id: string; name: string; category: string | null; why:
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
   status: 'queued' | 'done' | 'error'; result: any; error: string | null; created_at: string; done_at: string | null
-  cost_usd?: number | null
+  cost_usd?: number | null; model?: string | null // which model answered, e.g. "Gemini 3.8 Flash"
 }
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 // Result of the 'looks' AI task; image_path / outfit_id are added by the app later
@@ -375,7 +375,7 @@ export async function askAI(kind: string, input: Record<string, unknown>, mode: 
     try { msg = (await (res.error as { context?: Response }).context?.json())?.error ?? msg } catch { /* ignore */ }
     throw Object.assign(new Error(msg), { request: { ...req, status: 'error', error: msg } as AIRequest })
   }
-  return { ...req, status: 'done', result: res.data.result, cost_usd: res.data.cost_usd ?? null, done_at: new Date().toISOString() } as AIRequest
+  return { ...req, status: 'done', result: res.data.result, cost_usd: res.data.cost_usd ?? null, model: res.data.model ?? null, done_at: new Date().toISOString() } as AIRequest
 }
 
 export async function requeue(req: AIRequest) {

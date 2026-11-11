@@ -123,19 +123,21 @@ export function Collage({ layout, items, className, children }: {
 }
 
 // The button for a paid AI action (the free queue was removed at the owner's request on 2026-11-11)
-export function AIActions({ onRun, busy, label, cost = '≈3¢', disabled }: {
+// Text tasks run on Gemini (free; OpenAI only steps in when Gemini is out of quota), images on OpenAI
+export function AIActions({ onRun, busy, label, cost = 'Gemini · free', disabled }: {
   onRun: (mode: 'now') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
 }) {
   return (
     <div className="ai-actions">
       <button type="button" className="btn primary" disabled={busy || disabled} onClick={() => onRun('now')}>
-        <Icon name="sparkle" /> {busy ? 'Thinking…' : label}<span className="cost">{cost}</span>
+        <Icon name="sparkle" /> {busy ? 'Thinking…' : label}<span className="cost">({cost})</span>
       </button>
     </div>
   )
 }
 
 export function RequestState({ req }: { req?: AIRequest }) {
+  if (req?.status === 'done' && req.model) return <p className="by-model">by {req.model}</p>
   if (req?.status !== 'error') return null
   return <div className="queued err"><span>{req.error}</span></div>
 }

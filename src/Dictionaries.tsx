@@ -280,7 +280,7 @@ export function LookFormat({ scope }: { scope: Scope }) {
       {current ? <Photo path={current} alt="Look format" className="look-post" /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
       <label className="check-row">
         <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
-        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (≈5¢)</span>
+        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>
       </label>
       <label className={'btn wide' + (busy ? ' disabled' : '')}>
         <Icon name="image" /> {busy || (scope === 'user' && !own ? 'Use my own picture' : 'Replace picture')}

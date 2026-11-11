@@ -1,4 +1,5 @@
-// AI stylist Edge Function (Claude Opus 5.5 through the API).
+// AI stylist Edge Function: every text task. Gemini first (free key, GEMINI_API_KEY), OpenAI when Gemini is out of quota,
+// slow or failing (OPENAI_API_KEY). Claude (ANTHROPIC_API_KEY) is kept as an option but no key is set.
 // Handles one row from ai_requests: item tagging, outfit ideas, inspiration breakdown,
 // style formulas, wardrobe check, before-you-buy. Writes the result to ai_requests.result,
 // and a database trigger distributes it to the right tables.
@@ -232,10 +233,58 @@ summary: 2–3 sentences with the main reason.` }] };
   throw new Error("Unknown request kind");
 }
 
-// Tagging and looks run on the owner's OpenAI key; the other tasks use Claude when its key is set, else OpenAI too.
-const TAG_MODEL = "gpt-6.1-terra";
-const OPENAI_KINDS = ["tag", "looks"];
-const useOpenAI = (kind: string) => OPENAI_KINDS.includes(kind) || !Deno.env.get("ANTHROPIC_API_KEY");
+const TAG_MODEL = "gpt-6.1-terra"; // the OpenAI fallback for every task
+
+// Gemini free tier (checked in AI Studio on 2026-11-11, project of the key):
+//   gemini-3.8-flash, gemini-3.6-flash: 5 requests/min, 20/day each (the strongest free models)
+//   gemini-3.5-flash-lite, gemini-3.1-flash-lite: 15/min, 500/day each
+// Gemini 3.7 and 4 are paid only. Free-tier prompts may be used by Google to improve its products.
+const SMART = ["gemini-3.8-flash", "gemini-3.6-flash"];
+const LITE = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+const GEMINI: Record<string, string[]> = { tag: LITE };
+// Free models are often "high demand" (503): walk down the list, OpenAI only after all of them
+const geminiFor = (kind: string) => Deno.env.get("GEMINI_API_KEY") ? GEMINI[kind] ?? [...SMART, ...LITE] : [];
+const GEMINI_TIMEOUT_MS = 45_000; // the free tier is sometimes very slow; then try the next model
+const GEMINI_NAMES: Record<string, string> = {
+  "gemini-3.8-flash": "Gemini 3.8 Flash", "gemini-3.6-flash": "Gemini 3.6 Flash",
+  "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite", "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
+};
+
+// A Gemini failure that should move on to the next model (quota, overload, timeout) rather than stop
+class TryNext extends Error {}
+
+async function withGemini(sb: SupabaseClient, kind: string, model: string, schema: unknown, content: unknown, effort: "low" | "medium") {
+  const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
+  const parts = blocks.map(b => b.type === "text"
+    ? { text: b.text }
+    : { inlineData: { mimeType: (b.source as Anthropic.Base64ImageSource).media_type, data: (b.source as Anthropic.Base64ImageSource).data } });
+  let r: Response;
+  try {
+    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")!, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: VOICE }] },
+        contents: [{ role: "user", parts }],
+        generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, thinkingConfig: { thinkingLevel: effort } },
+      }),
+    });
+  } catch (e) {
+    throw new TryNext(`${model}: ${e instanceof Error && e.name === "TimeoutError" ? "too slow" : String(e)}`);
+  }
+  const body = await r.json();
+  if (r.status === 429 || r.status >= 500) throw new TryNext(`${model}: ${r.status} ${body.error?.message ?? ""}`.slice(0, 200));
+  if (!r.ok) throw new TryNext(`${model}: ${r.status} ${body.error?.message ?? "error"}`.slice(0, 200));
+  const cand = body.candidates?.[0];
+  if (!cand || cand.finishReason === "SAFETY" || body.promptFeedback?.blockReason) throw new Error("The AI declined this request");
+  if (cand.finishReason === "MAX_TOKENS") throw new TryNext(`${model}: answer too long`);
+  const text = (cand.content?.parts ?? []).filter((p: { text?: string; thought?: boolean }) => p.text && !p.thought).map((p: { text: string }) => p.text).join("");
+  const u = body.usageMetadata ?? {};
+  await sb.from("ai_usage").insert({ kind, model, text_in: u.promptTokenCount ?? 0, cached_in: u.cachedContentTokenCount ?? 0,
+    output: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0), cost_usd: 0, raw: u });
+  try { return JSON.parse(text); } catch { throw new TryNext(`${model}: not valid JSON`); }
+}
 
 // USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
@@ -270,13 +319,29 @@ async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, con
   return JSON.parse(parts.filter((p: { type: string }) => p.type === "output_text").map((p: { text: string }) => p.text).join(""));
 }
 
-// Per-request extras for the response (only OpenAI calls report a cost for now)
-type Meta = { cost_usd: number | null };
+// Per-request extras for the response: the cost (0 on Gemini) and which model answered
+type Meta = { cost_usd: number | null; model: string | null; skipped: string[] };
 
 async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
   const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
-  if (useOpenAI(r.kind)) return await withOpenAI(sb, r.kind, schema, content, meta);
+  const misses = meta.skipped;
+  for (const model of geminiFor(r.kind)) {
+    try {
+      const out = await withGemini(sb, r.kind, model, schema, content, effort);
+      meta.cost_usd = 0; meta.model = GEMINI_NAMES[model] ?? model;
+      return out;
+    } catch (e) {
+      if (!(e instanceof TryNext)) throw e;
+      misses.push(e.message); console.warn("gemini miss", e.message);
+    }
+  }
+  if (Deno.env.get("OPENAI_API_KEY")) {
+    const out = await withOpenAI(sb, r.kind, schema, content, meta);
+    meta.model = "OpenAI"; return out;
+  }
+  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new Error(misses.length ? `Gemini is busy, try again in a minute (${misses.join("; ")})` : "AI key is not set up yet.");
+  meta.model = "Claude";
   const res = await anthropic.beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -298,15 +363,14 @@ Deno.serve(async req => {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
   });
   let id = "";
-  const meta: Meta = { cost_usd: null };
+  const meta: Meta = { cost_usd: null, model: null, skipped: [] };
   try {
     ({ id } = await req.json());
     const { data: r, error } = await sb.from("ai_requests").select("id,kind,input,image_path").eq("id", id).single();
     if (error || !r) return json({ error: "Request not found" }, 404);
-    if (!Deno.env.get(useOpenAI(r.kind) ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet. Use “Add to queue” for now.");
     const result = await run(sb, r as Req, meta);
-    await sb.from("ai_requests").update({ status: "done", mode: "now", result }).eq("id", id);
-    return json({ result, cost_usd: meta.cost_usd });
+    await sb.from("ai_requests").update({ status: "done", mode: "now", result, model: meta.model }).eq("id", id);
+    return json({ result, cost_usd: meta.cost_usd, model: meta.model, skipped: meta.skipped });
   } catch (e) {
     const msg = e instanceof Anthropic.APIError ? `AI error ${e.status}: ${e.message}` : e instanceof Error ? e.message : String(e);
     if (id) await sb.from("ai_requests").update({ status: "error", error: msg }).eq("id", id);

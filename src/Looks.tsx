@@ -68,7 +68,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
         : <>
           <FlatLay items={its} />
-          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">≈7¢</span></button>
+          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈7¢)</span></button>
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
@@ -142,7 +142,7 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="4 looks ≈30¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, 4 photos: OpenAI ≈27¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>
@@ -173,7 +173,7 @@ export function Assistant() {
           <input placeholder="Weather (optional), e.g. +15°C, sunny" value={weather} onChange={e => setWeather(e.target.value)} />
           <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
         </div>
-        <AIActions label="Get looks" cost="3 looks ≈22¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
+        <AIActions label="Get looks" cost="ideas: Gemini · free, 3 photos: OpenAI ≈20¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>

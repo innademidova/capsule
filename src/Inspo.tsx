@@ -59,7 +59,7 @@ export function InspoList() {
         ) : <p className="muted">Save looks you love and analyze them. When you have a few, find the patterns behind your taste.</p>}
         {formulaReq?.status !== 'done' && <RequestState req={formulaReq} />}
         <AIActions label={profile?.summary ? 'Update formulas' : 'Find my formulas'} onRun={findFormulas} busy={fBusy}
-          disabled={analyzed < 2} cost="≈4¢" />
+          disabled={analyzed < 2} />
         {analyzed < 2 && <p className="hint">Analyze at least 2 looks first ({analyzed} so far).</p>}
       </div>
 
@@ -164,7 +164,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
                 </div>
               )}
               {insp.note && <p className="muted small">Your note: {insp.note}</p>}
-              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? 'Thinking…' : 'Analyze again (≈3¢)'}</button>
+              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? 'Thinking…' : 'Analyze again (Gemini · free)'}</button>
             </>
           )}
         </div>

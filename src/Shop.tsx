@@ -56,7 +56,7 @@ export function Shop() {
         {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
           : <p className="muted">The stylist looks at your whole wardrobe and tells you what's missing, what you have too much of, and what to buy first.</p>}
         {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
-        <AIActions label={lastGaps ? 'Check again' : 'Check my wardrobe'} onRun={analyze} busy={busy} cost="≈4¢" />
+        <AIActions label={lastGaps ? 'Check again' : 'Check my wardrobe'} onRun={analyze} busy={busy}  />
       </div>
 
       <div className="card">

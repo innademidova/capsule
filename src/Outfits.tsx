@@ -90,7 +90,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           )}
           {outfit.notes && <div className="card notes">{outfit.notes}</div>}
           <button className="btn" onClick={draw} disabled={drawing || !list.length}>
-            <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">≈7¢</span>
+            <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">(OpenAI ≈7¢)</span>
           </button>
           <div className="card">
             <h3 className="card-title">Pieces</h3>

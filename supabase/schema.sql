@@ -453,3 +453,6 @@ create policy "admins write global photos" on storage.objects for all to authent
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = 'global' and public.is_admin());
 
 -- style_profile.look_reference is now the user's own override; null = use the global default
+
+-- Which model answered an AI request (e.g. "Gemini 3.8 Flash", "OpenAI")
+alter table public.ai_requests add column if not exists model text;

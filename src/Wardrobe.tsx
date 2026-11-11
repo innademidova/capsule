@@ -573,7 +573,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
             {gen.corrections.length > 0 && <p className="hint">Already asked: {gen.corrections.join(' · ')}</p>}
             <p className="hint">Spent so far: {cents(gen.image + gen.tags)} (image{gen.tries > 1 ? ` ×${gen.tries}` : ''} {cents(gen.image)}, details {cents(gen.tags)})</p>
             <div className="picker-btns">
-              <button type="button" className="btn" onClick={regenerate} disabled={!!genBusy}><Icon name="sparkle" /> Regenerate<span className="cost">≈6¢</span></button>
+              <button type="button" className="btn" onClick={regenerate} disabled={!!genBusy}><Icon name="sparkle" /> Regenerate<span className="cost">(OpenAI ≈6¢)</span></button>
               <button type="button" className="btn ghost" onClick={discardGen} disabled={!!genBusy}>{gen.set ? 'Start over' : 'Use original photo'}</button>
             </div>
           </> : <>
@@ -607,7 +607,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
               <span><b>It's a set</b> (suit, co-ord): AI draws all pieces in one image so the colour matches, then each piece is saved as its own item</span>
             </label>
             <button type="button" className="btn wide ai-fill" onClick={createFromPhoto} disabled={processing || !!genBusy}>
-              <Icon name="sparkle" /> Enhance with AI<span className="cost">≈6¢</span>
+              <Icon name="sparkle" /> Enhance with AI<span className="cost">(OpenAI ≈6¢)</span>
             </button>
           </>}
           </>}
@@ -617,7 +617,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
 
         {(photo || item) && !gen && (
           <button type="button" className="btn wide ai-fill" onClick={autoFill} disabled={tagging || processing}>
-            <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">≈0.3¢</span>
+            <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">(Gemini · free)</span>
           </button>
         )}
 
