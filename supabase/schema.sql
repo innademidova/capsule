@@ -190,8 +190,6 @@ alter table style_profile add column if not exists appearance text;
 -- AI photo of a woman wearing the outfit (photos/<uid>/looks/...)
 alter table outfits add column if not exists image_path text;
 
--- Own layout reference for AI look images (photos/<uid>/reference/...); null = the global default in app_settings
-alter table style_profile add column if not exists look_reference text;
 
 -- The look function writes each finished photo into its request; jsonb_set keeps parallel writes safe
 create or replace function public.set_look_image(req uuid, n int, path text) returns void
@@ -430,7 +428,7 @@ grant execute on function public.admin_list_users(), public.admin_set_role(uuid,
 
 -- ===== Global settings =====
 -- key/value, readable by everyone signed in, written by admins. Keys:
---   look_reference: {"path": "global/reference/<file>"}  default layout reference for AI look images
+--   template:<id>: {"path": "global/reference/<file>"}  default template picture for AI images (ids in src/lib.ts)
 create table if not exists public.app_settings (
   key        text primary key,
   value      jsonb not null,
@@ -452,7 +450,15 @@ create policy "admins write global photos" on storage.objects for all to authent
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = 'global' and public.is_admin())
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = 'global' and public.is_admin());
 
--- style_profile.look_reference is now the user's own override; null = use the global default
 
 -- Which model answered an AI request (e.g. "Gemini 3.8 Flash", "OpenAI")
 alter table public.ai_requests add column if not exists model text;
+
+-- Image templates per purpose (supabase/migrations/20261111b_image_templates.sql): own pictures {"<id>": path};
+-- global defaults in app_settings 'template:<id>'
+alter table public.style_profile add column if not exists templates jsonb not null default '{}';
+create or replace function public.set_request_collage(req uuid, path text) returns void
+language sql security invoker as $$
+  update public.ai_requests set result = jsonb_set(result, '{collage_path}', to_jsonb(path))
+  where id = req and user_id = auth.uid();
+$$;

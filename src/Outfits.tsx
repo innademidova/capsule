@@ -110,7 +110,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           )}
           {outfit.notes && <div className="card notes">{outfit.notes}</div>}
           <button className="btn" onClick={draw} disabled={drawing || !list.length}>
-            <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">(OpenAI ≈7¢)</span>
+            <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span>
           </button>
           <div className="card">
             <h3 className="card-title">Pieces</h3>
@@ -214,7 +214,7 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
           <div className="save-row">
             <button className="btn wide" onClick={() => save()} disabled={busy || !layout.length}><Icon name="check" /> {busy ? 'Saving…' : 'Save outfit'}</button>
             <button className="btn primary wide" onClick={() => save(true)} disabled={busy || !layout.length}>
-              <Icon name="sparkle" /> Generate with AI<span className="cost">(OpenAI ≈7¢)</span>
+              <Icon name="sparkle" /> Generate with AI<span className="cost">(OpenAI ≈9¢)</span>
             </button>
           </div>
           <p className="hint">“Save outfit” keeps this collage. “Generate with AI” saves it and draws you wearing it, in the look format.</p>

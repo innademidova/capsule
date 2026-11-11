@@ -91,6 +91,14 @@ export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 // The lists above and below (colors, kinds, styles, occasions) are only fallbacks. The real lists come from the
 // database view dict_effective (admin defaults + this user's own changes); applyDict() puts them into these arrays.
 // Colors, styles and occasions are stored in items by id; brands, materials and kinds by their text (id = lowercase).
+// Layout templates for AI images, one per purpose. The AI copies the layout of the picture, never its clothes.
+// Global defaults: app_settings 'template:<id>' (admins); own pictures: style_profile.templates[<id>].
+export const TEMPLATES = [
+  { id: 'look', label: 'One outfit on me', hint: 'Saved outfits and the stylist’s looks: you wearing one outfit, with the pieces and a palette.' },
+  { id: 'many', label: 'One piece, many looks', hint: '“Style it” on an item: one collage with the piece in the middle and several looks around it.' },
+] as const
+export type TemplateId = typeof TEMPLATES[number]['id']
+
 export type DictType = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion'
 export type DictRow = { type: DictType; category: string; id: string; label: string; hex: string | null; sort: number; is_default?: boolean; is_own?: boolean }
 export const BRANDS: string[] = []
@@ -339,7 +347,7 @@ export type Outfit = {
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
-export type StyleProfile = { appearance: string | null; look_reference: string | null; /* own override; null = the global default */ summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type StyleProfile = { appearance: string | null; templates: Partial<Record<TemplateId, string>>; /* own template pictures; a missing id = the global default */ summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
@@ -349,10 +357,12 @@ export type AIRequest = {
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 // Result of the 'looks' AI task; image_path / outfit_id are added by the app later
 export type LookIdea = { label: string; item_ids: string[]; why: string; scene: string; image_path?: string | null; outfit_id?: string | null }
-export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string }
+export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string; collage_path?: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
-export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean }) {
+export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean
+  many?: { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] }
+}) {
   const res = await supabase.functions.invoke('look', { body })
   if (res.error) {
     let msg = res.error.message

@@ -4,7 +4,7 @@
 //            touches my overrides; the default itself stays for everyone else.
 //   'global' the defaults themselves (dict_global, app_settings); admins only.
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, processPhoto, renderLook, removePhotos, type Item, type Material, type DictType } from './lib'
+import { supabase, CATEGORIES, TEMPLATES, processPhoto, renderLook, removePhotos, type Item, type Material, type DictType, type TemplateId } from './lib'
 import { useStore } from './store'
 import { Icon, Photo } from './ui'
 
@@ -225,27 +225,41 @@ function DictRowEdit({ row, color, busy, badge, onSave, onDelete, onReset }: {
   )
 }
 
-// The layout reference for AI look images (her photo on one side, the pieces and a palette on the other).
-// 'global' is the default for everyone (app_settings.look_reference, photos/global/...);
-// 'user' is an own picture (style_profile.look_reference) that wins over the default.
-export function LookFormat({ scope }: { scope: Scope }) {
+// Layout templates for AI images, one per purpose (TEMPLATES in lib.ts).
+// 'global' edits the defaults for everyone (app_settings 'template:<id>', photos/global/reference/);
+// 'user' edits own pictures (style_profile.templates[<id>]) that win over the defaults.
+export function Templates({ scope }: { scope: Scope }) {
+  return <>
+    {TEMPLATES.map(t => (
+      <div key={t.id} className="card template-card">
+        <h3 className="card-title"><Icon name="image" /> {t.label}</h3>
+        <TemplateEditor scope={scope} id={t.id} hint={t.hint} />
+      </div>
+    ))}
+  </>
+}
+
+function TemplateEditor({ scope, id, hint }: { scope: Scope; id: TemplateId; hint: string }) {
   const { profile, settings, reload } = useStore()
-  const [clean, setClean] = useState(true)
+  const [clean, setClean] = useState(false)
   const [busy, setBusy] = useState('')
-  const def = settings.look_reference ?? null
-  const own = profile?.look_reference ?? null
+  const def = settings.templates[id] ?? null
+  const own = profile?.templates?.[id] ?? null
   const current = scope === 'global' ? def : own ?? def
 
   const store = async (path: string | null) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Please sign in again')
     if (scope === 'global') {
+      const key = `template:${id}`
       fail((path
-        ? await supabase.from('app_settings').upsert({ key: 'look_reference', value: { path }, updated_at: new Date().toISOString() })
-        : await supabase.from('app_settings').delete().eq('key', 'look_reference')).error)
+        ? await supabase.from('app_settings').upsert({ key, value: { path }, updated_at: new Date().toISOString() })
+        : await supabase.from('app_settings').delete().eq('key', key)).error)
       if (def) await removePhotos(def)
     } else {
-      fail((await supabase.from('style_profile').upsert({ user_id: user.id, look_reference: path })).error)
+      const templates = { ...(profile?.templates ?? {}) }
+      if (path) templates[id] = path; else delete templates[id]
+      fail((await supabase.from('style_profile').upsert({ user_id: user.id, templates })).error)
       if (own) await removePhotos(own)
     }
   }
@@ -274,10 +288,10 @@ export function LookFormat({ scope }: { scope: Scope }) {
   return (
     <div className="form">
       <p className="hint">
-        The AI copies the layout of this picture for every look: you on one side, the pieces and a palette on the other. It never copies its clothes or text.
-        {scope === 'global' ? ' This is the default for every user.' : own ? ' You use your own picture.' : ' You use the default picture.'}
+        {hint} The AI copies its layout, never its clothes or person.
+        {scope === 'global' ? ' Default for every user.' : own ? ' You use your own picture.' : ' You use the default picture.'}
       </p>
-      {current ? <Photo path={current} alt="Look format" className="look-post" /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
+      {current ? <Photo path={current} alt={hint} className="look-post" /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
       <label className="check-row">
         <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
         <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>

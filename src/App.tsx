@@ -106,7 +106,7 @@ function Main({ email }: { email: string }) {
   const [requests, setRequests] = useState<AIRequest[]>([])
   const [role, setRole] = useState<Store['role']>('user')
   const [account, setAccount] = useState<Store['account']>({ display_name: null })
-  const [settings, setSettings] = useState<Store['settings']>({})
+  const [settings, setSettings] = useState<Store['settings']>({ templates: {} })
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [wishFilters, setWishFilters] = useState<Filters>(emptyFilters)
   const [loadError, setLoadError] = useState('')
@@ -130,8 +130,9 @@ function Main({ email }: { email: string }) {
     if (it.error) { setLoadError(it.error.message); return }
     applyDict((di.data ?? []) as DictRow[])
     setRole(ro.data?.role === 'admin' ? 'admin' : 'user'); setAccount({ display_name: ac.data?.display_name ?? null })
-    const set = Object.fromEntries((st.data ?? []).map(r => [r.key, r.value]))
-    setSettings({ look_reference: set.look_reference?.path })
+    // template:<id> -> {path}
+    const templates = Object.fromEntries((st.data ?? []).filter(r => r.key.startsWith('template:')).map(r => [r.key.slice(9), r.value?.path]))
+    setSettings({ templates })
     setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
     setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])

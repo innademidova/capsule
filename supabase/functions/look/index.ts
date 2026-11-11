@@ -1,8 +1,11 @@
-// Look images (OpenAI gpt-image-2.6-sunburst), two jobs:
-// 1. {item_ids, scene, vibe, palette?, request_id?, index?}: a styling post in the format of the layout reference
-//    (the user's own style_profile.look_reference, else the global app_settings.look_reference): the woman wearing the outfit on one side, the separate pieces and a palette on the
+// Look images (OpenAI gpt-image-2.6-sunburst). Every image copies the layout of a template picture for its purpose:
+// the user's own style_profile.templates[<id>], else the global app_settings 'template:<id>' (ids in src/lib.ts TEMPLATES).
+// Three jobs:
+// 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', a styling post: the woman wearing the outfit on one side, the separate pieces and a palette on the
 //    other, no text. The item photos are the clothing references; her appearance comes from style_profile.appearance.
 //    With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
+// 3. {many: {anchor_id, title, looks: [{label, item_ids}], palette}, request_id?}: template 'many', one collage:
+//    the anchor piece in the middle and the same woman in each look around it. Written to result.collage_path.
 // 2. {clean_path, global?}: removes text, page numbers and app icons from a screenshot meant to be the layout reference.
 //    global: save it to photos/global/reference/ (the storage policy lets only admins write there).
 // Writes to photos/<uid>/looks/ (or reference/) and returns the path. The key is a Supabase secret (OPENAI_API_KEY).
@@ -48,6 +51,40 @@ THE CLOTHES (most important)
 THE PHOTO OF HER
 - ${scene || "A calm European city street in soft daylight, walking towards the camera."}
 - Full body from head to shoes, camera at about waist height, soft natural light, gentle background blur, true-to-life colours.`;
+}
+
+type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
+
+// One collage: the anchor piece in the middle, the same woman wearing each look around it
+function buildManyPrompt(pieces: Piece[], appearance: string, many: Many, hasRef: boolean) {
+  const num = new Map(pieces.map((p, n) => [p.id, n + 1]));
+  const list = pieces.map((p, n) => `- Image ${n + 1}: ${p.name ?? p.kind ?? p.category} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")})`).join("\n");
+  const looks = many.looks.map((l, k) => {
+    const imgs = l.item_ids.map(id => num.get(id)).filter(Boolean);
+    return `- Photo ${k + 1}, label "${l.label}": she wears images ${imgs.join(", ")}`;
+  }).join("\n");
+  const anchor = pieces[0];
+  return `Create a vertical Pinterest-style styling collage (2:3) in the same format as the layout reference${hasRef ? ` (the last image, image ${pieces.length + 1})` : ""}:
+- In the centre, large: a clean product photo of image 1 (${anchor.name ?? anchor.kind ?? anchor.category}) on its own, exactly as it is.
+- Around it, ${many.looks.length} separate full-body street-style photos of the SAME woman, one per look below, arranged like the photos in the reference (torn-paper edges, small tilt, soft shadow), all fully visible and not overlapping the centre piece.
+- Background: a warm, plain beige paper texture like the reference.
+- Text, in the same elegant fonts and places as the reference, and nothing else: the headline "${many.title.toUpperCase()}" with "many looks" in script under it; next to each photo its short handwritten label with a small arrow; at the bottom a row of ${many.palette.length || 5} round colour dots${many.palette.length ? ` in these colours, left to right: ${many.palette.join(", ")}` : ""}. Spell every word exactly as given.
+- ${hasRef ? "Copy ONLY the layout, proportions, fonts and mood of the reference. Do not copy its clothes, person or colours." : "Calm, editorial, airy."}
+
+The pieces (product photos):
+${list}
+
+The looks (every photo shows image 1 plus the listed pieces, and no other visible garments; simple shoes if none are listed):
+${looks}
+
+THE WOMAN (the same person in every photo)
+${appearance || "A woman in her late twenties with a natural, elegant look."}
+Natural, relaxed and confident; light natural make-up; different natural poses and city backgrounds per photo.
+
+THE CLOTHES (most important)
+- Each piece must look exactly like its photo: the same colour and shade, fabric and texture, length, fit and details.
+- Image 1 must be identical in the centre and in every look.
+- True-to-life colours, soft daylight.`;
 }
 
 const CLEAN = `This is a screenshot of an Instagram styling post. Return the same post, cleaned:
@@ -99,8 +136,11 @@ Deno.serve(async req => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
     if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
-    const body0 = await req.json() as { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean };
-    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false } = body0;
+    const body0 = await req.json() as {
+      item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number;
+      clean_path?: string; global?: boolean; many?: Many;
+    };
+    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false, many } = body0;
 
     if (clean_path) {
       const form = new FormData();
@@ -120,14 +160,46 @@ Deno.serve(async req => {
       return json({ path, ...usage });
     }
 
+    const { data: prof } = await sb.from("style_profile").select("appearance,templates").maybeSingle();
+    const template = async (id: string) => {
+      const { data: def } = await sb.from("app_settings").select("value").eq("key", `template:${id}`).maybeSingle();
+      const path: string | null = prof?.templates?.[id] ?? def?.value?.path ?? null;
+      return path ? await download(sb, path).catch(() => null) : null;
+    };
+
+    if (many) {
+      // Every piece once: the anchor first, then the rest in the order the looks use them (max 14 + the template)
+      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 14);
+      const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", ids);
+      const pieces = ids.map(id => ((rows ?? []) as Piece[]).find(p => p.id === id)).filter((p): p is Piece => !!p?.photo_path);
+      if (!pieces.length || pieces[0].id !== many.anchor_id) throw new Error("The piece has no photo");
+      const ref = await template("many");
+      const form = new FormData();
+      form.append("model", MODEL);
+      form.append("prompt", buildManyPrompt(pieces, prof?.appearance ?? "", many, !!ref));
+      form.append("quality", QUALITY);
+      form.append("size", "1024x1536");
+      form.append("output_format", "webp");
+      form.append("output_compression", "90");
+      for (const [n, p] of pieces.entries()) {
+        const img = await download(sb, p.photo_path!);
+        form.append("image[]", img, `image-${n}.${img.type.split("/")[1] || "webp"}`);
+      }
+      if (ref) form.append("image[]", ref, `layout.${ref.type.split("/")[1] || "webp"}`);
+      const out = await callImages(form);
+      const path = `${user.id}/looks/${crypto.randomUUID()}.webp`;
+      await save(sb, path, out.b64);
+      const usage = costOf(out.usage);
+      await sb.from("ai_usage").insert({ kind: "looks-collage", model: MODEL, ...usage, raw: out.usage });
+      if (request_id) await sb.rpc("set_request_collage", { req: request_id, path });
+      return json({ path, ...usage });
+    }
+
     const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", item_ids.slice(0, 10));
     const pieces = ((rows ?? []) as Piece[]).filter(p => p.photo_path)
       .sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category)).slice(0, 8);
     if (!pieces.length) throw new Error("No pieces with photos in this outfit");
-    const { data: prof } = await sb.from("style_profile").select("appearance,look_reference").maybeSingle();
-    const { data: def } = await sb.from("app_settings").select("value").eq("key", "look_reference").maybeSingle();
-    const refPath: string | null = prof?.look_reference ?? def?.value?.path ?? null;
-    const ref = refPath ? await download(sb, refPath).catch(() => null) : null;
+    const ref = await template("look");
 
     const form = new FormData();
     form.append("model", MODEL);

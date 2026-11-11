@@ -5,7 +5,7 @@ import { supabase, CATEGORIES, COLORS } from './lib'
 import { useStore } from './store'
 import { Icon, Header, Swatch } from './ui'
 import { MiniItems } from './Shop'
-import { DictEditor, LookFormat, Users } from './Dictionaries'
+import { DictEditor, Templates, Users } from './Dictionaries'
 
 export type ProfileTab = 'overview' | 'account' | 'preferences' | 'dictionaries' | 'settings'
 
@@ -147,10 +147,8 @@ function Preferences() {
       <textarea rows={5} value={look} onChange={e => { setLook(e.target.value); setSaved(false) }} placeholder="Hair, skin, face, figure…" />
       <button className="btn sm" onClick={save} disabled={saved}><Icon name="check" /> {saved ? 'Saved' : 'Save'}</button>
     </div>
-    <div className="card">
-      <h3 className="card-title"><Icon name="image" /> Look image format</h3>
-      <LookFormat scope="user" />
-    </div>
+    <h3 className="section-title">Image templates</h3>
+    <Templates scope="user" />
   </>
 }
 
@@ -158,7 +156,7 @@ type SettingsTab = 'dicts' | 'format' | 'users'
 function Settings() {
   const [tab, setTab] = useState<SettingsTab>('dicts')
   const tabs: { id: SettingsTab; label: string }[] = [
-    { id: 'dicts', label: 'Default dictionaries' }, { id: 'format', label: 'Default look format' }, { id: 'users', label: 'Users and roles' },
+    { id: 'dicts', label: 'Default dictionaries' }, { id: 'format', label: 'Default image templates' }, { id: 'users', label: 'Users and roles' },
   ]
   return <>
     <p className="hint">Platform settings. Only admins see this tab.</p>
@@ -166,7 +164,7 @@ function Settings() {
       {tabs.map(t => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>)}
     </div>
     {tab === 'dicts' && <DictEditor scope="global" />}
-    {tab === 'format' && <LookFormat scope="global" />}
+    {tab === 'format' && <Templates scope="global" />}
     {tab === 'users' && <Users />}
   </>
 }

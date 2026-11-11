@@ -441,8 +441,13 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .board-item .handle.ne svg, .board-item .handle.sw svg { transform: scaleX(-1); }
 .board-item .handle.sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
 .board-item .handle.se { bottom: -8px; right: -8px; }
-.photo.look-post { aspect-ratio: 2 / 3; border-radius: 18px; width: 100%; }
-.photo.look-post img { object-fit: cover; padding: 0; }
+/* AI pictures and templates: always shown whole, at their own proportions (never cropped) */
+.photo.look-post { aspect-ratio: auto; display: block; border-radius: 18px; width: 100%; }
+.photo.look-post:not(:has(img)) { aspect-ratio: 2 / 3; display: grid; }
+.photo.look-post img { position: static; width: 100%; height: auto; object-fit: contain; padding: 0; }
+.photo.collage-post { max-width: 560px; margin: 0 auto 16px; box-shadow: var(--shadow); }
+.template-card .photo.look-post { max-width: 420px; margin: 0 auto; }
+.section-title { font-size: 15px; margin: 20px 0 10px; }
 .detail > .photo.look-post { max-width: 520px; box-shadow: var(--shadow); }
 .look-wait { position: relative; }
 .look-wait .look-flat { opacity: .35; }

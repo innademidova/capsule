@@ -6,7 +6,7 @@ export type Store = {
   items: Item[]; wishlist: Item[]; outfits: Outfit[]; inspirations: Inspiration[]
   profile: StyleProfile | null; shopping: ShopItem[]; requests: AIRequest[]
   // role is only for showing admin screens; the database enforces it (RLS)
-  role: 'admin' | 'user'; account: { display_name: string | null }; settings: { look_reference?: string }
+  role: 'admin' | 'user'; account: { display_name: string | null }; settings: { templates: Record<string, string> }
   setItems: (f: (x: Item[]) => Item[]) => void
   setOutfits: (f: (x: Outfit[]) => Outfit[]) => void
   setInspirations: (f: (x: Inspiration[]) => Inspiration[]) => void

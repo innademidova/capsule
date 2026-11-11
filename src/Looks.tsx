@@ -22,7 +22,7 @@ export function Palette({ colors }: { colors: string[] }) {
 }
 
 type Drawing = Record<string, 'busy' | 'error'>
-const key = (req: AIRequest, n: number) => `${req.id}:${n}`
+const key = (req: AIRequest, n: number | 'collage') => `${req.id}:${n}`
 
 // Draws every look of an answer at once; each photo appears as soon as it is ready.
 // The look function also writes the path into the request, so the photos stay after a reload.
@@ -42,7 +42,21 @@ function useDrawing() {
       } catch { setDrawing(d => ({ ...d, [key(req, n)]: 'error' })) }
     }))
   }
-  return { drawing, draw }
+  // "Style it": all looks in one collage around the piece (one image instead of one per look)
+  const drawCollage = async (req: AIRequest, anchor: Item) => {
+    const r = req.result as LooksResult
+    const k = key(req, 'collage')
+    setDrawing(d => ({ ...d, [k]: 'busy' }))
+    try {
+      const res = await renderLook({ request_id: req.id, many: {
+        anchor_id: anchor.id, title: `One ${anchor.kind || 'piece'}`, palette: r.palette,
+        looks: r.looks.map(l => ({ label: l.label, item_ids: l.item_ids })),
+      } })
+      setRequests(list => list.map(x => x.id !== req.id ? x : { ...x, result: { ...x.result, collage_path: res.path } }))
+      setDrawing(d => { const c = { ...d }; delete c[k]; return c })
+    } catch { setDrawing(d => ({ ...d, [k]: 'error' })) }
+  }
+  return { drawing, draw, drawCollage }
 }
 
 function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
@@ -68,7 +82,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
         : <>
           <FlatLay items={its} />
-          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈7¢)</span></button>
+          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span></button>
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
@@ -78,7 +92,9 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
 }
 
 // One AI answer: headline, palette, looks, what is missing
-function LooksView({ req, eyebrow, drawing, onDraw }: { req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void }) {
+function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
+  req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void; onCollage?: () => void
+}) {
   const { setRequests } = useStore()
   const r = req.result as LooksResult | null
   const patch = async (n: number, p: Partial<LookIdea>) => {
@@ -97,6 +113,9 @@ function LooksView({ req, eyebrow, drawing, onDraw }: { req: AIRequest; eyebrow?
           <Palette colors={r.palette} />
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
+        {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" />
+          : drawing[key(req, 'collage')] === 'busy' ? <div className="look-wait"><p><Icon name="sparkle" /> Drawing all looks on you, about a minute…</p></div>
+          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈15¢)</span></button>)}
         <div className="looks">
           {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={() => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
@@ -106,23 +125,23 @@ function LooksView({ req, eyebrow, drawing, onDraw }: { req: AIRequest; eyebrow?
   )
 }
 
-// Ask for looks, then draw all of them on her right away
-function useLooks() {
+// Ask for looks, then draw them right away: each look apart, or (with an anchor piece) all in one collage
+function useLooks(anchor?: Item) {
   const { setRequests } = useStore()
-  const { drawing, draw } = useDrawing()
+  const { drawing, draw, drawCollage } = useDrawing()
   const [busy, setBusy] = useState(false)
   const ask = async (input: Record<string, unknown>) => {
     setBusy(true)
     try {
       const req = await askAI('looks', input, 'now')
       setRequests(upsert(req)); setBusy(false)
-      await draw(req)
+      await (anchor ? drawCollage(req, anchor) : draw(req))
     } catch (e) {
       const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message)
       setBusy(false)
     }
   }
-  return { busy, ask, drawing, draw }
+  return { busy, ask, drawing, draw, drawCollage }
 }
 
 // --- Feature 1: one item, many looks ---
@@ -130,7 +149,7 @@ function useLooks() {
 export function StyleItem({ item }: { item: Item }) {
   const { requests } = useStore()
   const [wish, setWish] = useState('')
-  const { busy, ask, drawing, draw } = useLooks()
+  const { busy, ask, drawing, draw, drawCollage } = useLooks(item)
   const past = requests.filter(r => r.kind === 'looks' && r.input.item_id === item.id)
   return (
     <div className="screen">
@@ -142,9 +161,10 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, 4 photos: OpenAI ≈27¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, one collage: OpenAI ≈15¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
-      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing} onDraw={n => draw(r, n)} />)}
+      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
+        onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
     </div>
   )
 }
