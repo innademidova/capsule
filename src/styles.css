@@ -496,3 +496,4 @@ details.card .dict-list { margin-top: 12px; }
 .lightbox img { max-width: 100%; max-height: calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); object-fit: contain; border-radius: 12px; cursor: default; }
 .lightbox-bar { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; display: flex; gap: 8px; }
 @keyframes fade { from { opacity: 0; } }
+.collage-save { max-width: 560px; margin: -4px auto 16px; display: flex; }

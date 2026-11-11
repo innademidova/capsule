@@ -357,7 +357,7 @@ export type AIRequest = {
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 // Result of the 'looks' AI task; image_path / outfit_id are added by the app later
 export type LookIdea = { label: string; item_ids: string[]; why: string; scene: string; image_path?: string | null; outfit_id?: string | null }
-export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string; collage_path?: string }
+export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string; collage_path?: string; collage_outfit_id?: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
 export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean

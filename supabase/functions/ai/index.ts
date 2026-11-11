@@ -329,7 +329,9 @@ async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
   const misses = meta.skipped;
   const deadline = Date.now() + GEMINI_BUDGET_MS;
-  for (const model of geminiFor(r.kind)) {
+  // "Style it" (looks around one piece) goes straight to OpenAI: the free Gemini tier is often busy and slow there
+  const gemini = r.kind === "looks" && (r.input as { item_id?: string } | null)?.item_id ? [] : geminiFor(r.kind);
+  for (const model of gemini) {
     const left = deadline - Date.now();
     if (left < 5_000) { misses.push(`${model}: no time left`); continue; }
     try {

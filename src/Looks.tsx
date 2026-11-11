@@ -96,13 +96,32 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
 function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
   req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void; onCollage?: () => void
 }) {
-  const { setRequests } = useStore()
+  const { setRequests, items, setOutfits } = useStore()
   const r = req.result as LooksResult | null
   const patch = async (n: number, p: Partial<LookIdea>) => {
     const result = { ...r!, looks: r!.looks.map((l, i) => i === n ? { ...l, ...p } : l) }
     const { data, error } = await supabase.from('ai_requests').update({ result }).eq('id', req.id).select().single()
     if (error) throw error
     setRequests(upsert(data as AIRequest))
+  }
+  // The collage as an AI outfit: the picture plus the anchor piece, so it shows up under that piece too
+  const [savingCollage, setSavingCollage] = useState(false)
+  const saveCollage = async () => {
+    if (!r?.collage_path) return
+    if (r.collage_outfit_id) return go(`/o/${r.collage_outfit_id}`)
+    setSavingCollage(true)
+    const anchor = String(req.input.item_id ?? '')
+    const kind = items.find(i => i.id === anchor)?.kind || 'piece'
+    const { data, error } = await supabase.from('outfits').insert({
+      name: `One ${kind}, many looks`, layout: anchor ? [{ item_id: anchor, x: 20, y: 20, w: 60, z: 1 }] : [],
+      source: 'ai', notes: r.looks.map(l => l.label).join(' · '), image_path: r.collage_path,
+    }).select().single()
+    if (error) { setSavingCollage(false); return alert(error.message) }
+    setOutfits(upsert(data as Outfit))
+    const result = { ...r, collage_outfit_id: (data as Outfit).id }
+    const { data: saved } = await supabase.from('ai_requests').update({ result }).eq('id', req.id).select().single()
+    if (saved) setRequests(upsert(saved as AIRequest))
+    setSavingCollage(false)
   }
   return (
     <div className="idea-block">
@@ -114,7 +133,12 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
           <Palette colors={r.palette} />
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
-        {onCollage && (r.collage_path ? <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
+        {onCollage && (r.collage_path ? <>
+            <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
+            <button className="btn wide collage-save" onClick={saveCollage} disabled={savingCollage}>
+              <Icon name="heart" filled={!!r.collage_outfit_id} /> {r.collage_outfit_id ? 'Saved to outfits' : 'Save to outfits'}
+            </button>
+          </>
           : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
           : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈17¢)</span></button>)}
         <div className="looks">
@@ -162,7 +186,7 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: Gemini · free, one collage: OpenAI ≈17¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
         onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
