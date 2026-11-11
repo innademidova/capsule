@@ -59,16 +59,6 @@ create table if not exists public.outfits (
   updated_at  timestamptz not null default now()
 );
 
--- What was worn and when
-create table if not exists public.wear_log (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  worn_on     date not null default current_date,
-  outfit_id   uuid references public.outfits(id) on delete set null,
-  item_ids    uuid[] not null default '{}',
-  created_at  timestamptz not null default now()
-);
-
 -- Inspiration: look screenshots and their breakdown
 create table if not exists public.inspirations (
   id          uuid primary key default gen_random_uuid(),
@@ -123,7 +113,7 @@ create trigger outfits_touch before update on public.outfits
   for each row execute function public.touch_updated_at();
 
 do $$ declare t text; begin
-  foreach t in array array['outfits','wear_log','inspirations','style_profile','shopping','ai_requests'] loop
+  foreach t in array array['outfits','inspirations','style_profile','shopping','ai_requests'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "own rows" on public.%I', t);
     execute format('create policy "own rows" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
@@ -249,3 +239,6 @@ language sql security invoker as $$
   update public.ai_requests set result = jsonb_set(result, array['looks', n::text, 'image_path'], to_jsonb(path))
   where id = req and user_id = auth.uid();
 $$;
+
+-- Wear tracking was removed (2026-11-11)
+drop table if exists public.wear_log;

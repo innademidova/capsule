@@ -98,18 +98,13 @@ Short labels (title, name, piece, kind, tags, palette, key_pieces) are in Englis
 type Item = Record<string, unknown> & { id: string };
 
 async function wardrobe(sb: SupabaseClient) {
-  const [{ data: items }, { data: wear }] = await Promise.all([
-    sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,materials,notes,set_id").eq("wishlist", false).order("created_at"),
-    sb.from("wear_log").select("item_ids"),
-  ]);
-  const worn = new Map<string, number>();
-  (wear ?? []).forEach((w: { item_ids: string[] }) => w.item_ids.forEach(id => worn.set(id, (worn.get(id) ?? 0) + 1)));
+  const { data: items } = await sb.from("items").select("id,category,kind,name,colors,seasons,styles,occasions,brand,materials,notes,set_id").eq("wishlist", false).order("created_at");
   const list = (items ?? []) as Item[];
   const text = list.map(i => [i.id, i.category, i.kind ?? "", i.name ?? "", (i.colors as string[]).join("/"),
     (i.seasons as string[]).join("/"), (i.styles as string[]).join("/"), (i.occasions as string[]).join("/"),
     i.brand ?? "", ((i.materials ?? []) as { name: string; pct: number | null }[]).map(m => m.pct != null ? `${m.pct}% ${m.name}` : m.name).join(" + "),
-    i.notes ?? "", i.set_id ? `set ${String(i.set_id).slice(0, 8)}` : "", `worn ${worn.get(i.id) ?? 0}x`].join(" | ")).join("\n");
-  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set | wear count; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up):\n${text || "(empty)"}` };
+    i.notes ?? "", i.set_id ? `set ${String(i.set_id).slice(0, 8)}` : ""].join(" | ")).join("\n");
+  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up):\n${text || "(empty)"}` };
 }
 
 async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.ImageBlockParam> {
@@ -152,7 +147,7 @@ Suggest ${i.count ?? 3} different complete outfits ONLY from her items for this 
 occasion: ${i.occasion || "any"}; weather: ${i.weather || "not given"}; mood/wish: ${i.mood || "not given"}.
 Each outfit: 2–6 item ids that really work together (top+bottom or dress, shoes; outerwear/bag/accessory when they help;
 respect the weather). title: short English name of the look. why: 1–2 sentences on why it works (colors, proportions).
-tip: one styling trick (tuck, roll sleeves, belt…). Prefer items she wears rarely when they fit. If something important is
+tip: one styling trick (tuck, roll sleeves, belt…). If something important is
 missing for this request, say so briefly in note (else empty string).` }] };
     }
     case "inspo": {
@@ -211,7 +206,7 @@ ${task}${i.weather ? ` Weather: ${i.weather}.` : ""}
 Think like a fashion editor making an Instagram carousel: current, polished, wearable street style, not a catalogue.
 Rules for each look:
 - item_ids: 2–7 of her item ids that truly work together: a top + bottom or a dress, then outerwear, bag, belt or other accessories when they lift the look. Respect the season and weather. Use only ids from the lists above.
-- No two looks may be the same combination; vary silhouettes, layers and colour stories. Prefer pieces she wears rarely when they fit.
+- No two looks may be the same combination; vary silhouettes, layers and colour stories.
 - label: 1–3 lowercase English words naming the vibe, e.g. "city chic".
 - why: one short sentence in Ukrainian on why it works (colours, proportions, the styling trick).
 - scene: one English sentence for a photographer: the place, light and pose that suit the vibe and season, e.g. "a cobbled old-town street in soft autumn daylight, walking towards the camera with a coffee". Do not describe the clothes.

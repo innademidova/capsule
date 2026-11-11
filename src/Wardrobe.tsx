@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, type Material, today, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
 import { useStore, upsert } from './store'
-import { logWear } from './Outfits'
 
 // --- List ---
 
@@ -111,15 +110,10 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
 
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
-  const { wear, outfits, items, setWear } = useStore()
-  const worn = wear.filter(w => w.item_ids.includes(item.id))
-  const wornToday = worn.some(w => w.worn_on === today())
+  const { outfits, items } = useStore()
   const home = item.wishlist ? '/wish' : '/'
   const inOutfits = outfits.filter(o => o.layout.some(p => p.item_id === item.id))
   const mates = item.set_id ? items.filter(i => i.set_id === item.set_id && i.id !== item.id) : []
-  const wore = async () => {
-    try { const w = await logWear([item.id], null); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
-  }
 
   const toggleFav = async () => {
     const { data, error } = await supabase.from('items').update({ favorite: !item.favorite }).eq('id', item.id).select().single()
@@ -181,10 +175,8 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             <button className="btn primary" onClick={bought} disabled={busy}><Icon name="check" /> I bought it</button>
           ) : <>
             <div className="row wrap">
-              <button className="btn primary" onClick={wore} disabled={wornToday}><Icon name="check" /> {wornToday ? 'Worn today' : 'Wore it today'}</button>
-              <button className="btn" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> Build outfit</button>
+              <button className="btn primary" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> Build outfit</button>
             </div>
-            <p className="muted small">{worn.length ? `Worn ${worn.length}× · last ${worn[0].worn_on}` : 'Not worn yet'}</p>
           </>}
           {mates.length > 0 && (
             <div className="card">

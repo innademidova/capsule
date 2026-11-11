@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   supabase, CATEGORIES, COLORS, askAI, applyDict, type DictRow,
-  type Item, type Outfit, type Wear, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
+  type Item, type Outfit, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
 } from './lib'
 import { Icon, Header, Swatch } from './ui'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
@@ -100,7 +100,6 @@ function Main({ email }: { email: string }) {
   const [route, setRoute] = useState<Route>(() => parse(location.hash))
   const [allItems, setItemsS] = useState<Item[] | null>(null)
   const [outfits, setOutfits] = useState<Outfit[]>([])
-  const [wear, setWear] = useState<Wear[]>([])
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
   const [profile, setProfile] = useState<StyleProfile | null>(null)
   const [shopping, setShopping] = useState<ShopItem[]>([])
@@ -118,14 +117,14 @@ function Main({ email }: { email: string }) {
   const load = useCallback(async () => {
     setLoadError('')
     const by = (t: string) => supabase.from(t).select('*').order('created_at', { ascending: false })
-    const [it, ou, we, ins, pr, sh, rq, di] = await Promise.all([
-      by('items'), by('outfits'), supabase.from('wear_log').select('*').order('worn_on', { ascending: false }),
+    const [it, ou, ins, pr, sh, rq, di] = await Promise.all([
+      by('items'), by('outfits'),
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
       supabase.from('dict').select('type,category,id,label,hex,sort'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
     applyDict((di.data ?? []) as DictRow[])
-    setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[]); setWear((we.data ?? []) as Wear[])
+    setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
     setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
   }, [])
@@ -150,8 +149,8 @@ function Main({ email }: { email: string }) {
   const wishlist = allItems.filter(i => i.wishlist)
 
   const store: Store = {
-    items, wishlist, outfits, wear, inspirations, profile, shopping, requests,
-    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setWear, setInspirations, setShopping, setRequests, reload: load,
+    items, wishlist, outfits, inspirations, profile, shopping, requests,
+    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setRequests, reload: load,
   }
   const save = (i: Item) => store.setItems(upsert(i))
   const drop = (id: string) => store.setItems(without(id))
@@ -222,7 +221,7 @@ function NotFound() {
 }
 
 function Me({ email }: { email: string }) {
-  const { items, wear, requests, setRequests, profile, reload } = useStore()
+  const { items, requests, setRequests, profile, reload } = useStore()
   const [busy, setBusy] = useState(false)
   const [look, setLook] = useState(profile?.appearance ?? '')
   const [lookSaved, setLookSaved] = useState(true)
@@ -235,11 +234,6 @@ function Me({ email }: { email: string }) {
   const max = Math.max(1, ...CATEGORIES.map(c => items.filter(i => i.category === c.id).length))
   const colorCounts = COLORS.map(c => ({ ...c, n: items.filter(i => i.colors.includes(c.id)).length }))
     .filter(c => c.n > 0).sort((a, b) => b.n - a.n)
-  const worn = new Map<string, number>()
-  wear.forEach(w => w.item_ids.forEach(id => worn.set(id, (worn.get(id) ?? 0) + 1)))
-  const most = items.filter(i => worn.get(i.id)).sort((a, b) => worn.get(b.id)! - worn.get(a.id)!).slice(0, 6)
-  const monthAgo = Date.now() - 30 * 864e5
-  const never = items.filter(i => !worn.get(i.id) && new Date(i.created_at).getTime() < monthAgo)
   const untagged = items.filter(i => !i.colors.length || !i.kind || !i.seasons.length || !i.styles.length || !i.occasions.length)
 
   return (
@@ -247,7 +241,7 @@ function Me({ email }: { email: string }) {
       <Header title="Me" />
       <div className="card">
         <h3 className="card-title">Wardrobe at a glance</h3>
-        <p className="big-num">{items.length}<span className="muted"> items · {wear.length} days logged</span></p>
+        <p className="big-num">{items.length}<span className="muted"> items</span></p>
         <div className="bars">
           {CATEGORIES.map(c => {
             const n = items.filter(i => i.category === c.id).length
@@ -267,14 +261,6 @@ function Me({ email }: { email: string }) {
           <div className="color-list">
             {colorCounts.map(c => <span key={c.id} className="color-tag"><Swatch id={c.id} size={14} />{c.label} · {c.n}</span>)}
           </div>
-        </div>
-      )}
-      {most.length > 0 && <div className="card"><h3 className="card-title">Most worn</h3><MiniItems items={most} /></div>}
-      {never.length > 0 && (
-        <div className="card">
-          <h3 className="card-title">Not worn for a month+</h3>
-          <p className="muted small">Try them in a new outfit, or think about letting them go.</p>
-          <MiniItems items={never} />
         </div>
       )}
       {untagged.length > 0 && (

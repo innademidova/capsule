@@ -28,14 +28,12 @@ async function save(dir, path) {
 
 if (cmd === 'export') {
   const dir = arg ?? 'queue-export'; mkdirSync(dir, { recursive: true })
-  const [q, items, ins, prof, wear] = await Promise.all([
+  const [q, items, ins, prof] = await Promise.all([
     sb.from('ai_requests').select('*').eq('status', 'queued').order('created_at'),
     sb.from('items').select('*').eq('wishlist', false).order('created_at'),
     sb.from('inspirations').select('*').order('created_at'),
     sb.from('style_profile').select('*').maybeSingle(),
-    sb.from('wear_log').select('item_ids'),
   ])
-  const worn = {}; (wear.data ?? []).forEach(w => w.item_ids.forEach(id => { worn[id] = (worn[id] ?? 0) + 1 }))
   const requests = []
   for (const r of q.data ?? []) {
     const x = { ...r, local_image: await save(dir, r.image_path) }
@@ -53,7 +51,7 @@ if (cmd === 'export') {
   }
   const ctx = {
     requests,
-    wardrobe: (items.data ?? []).map(i => ({ ...i, worn: worn[i.id] ?? 0 })),
+    wardrobe: items.data ?? [],
     inspirations: (ins.data ?? []).map(i => ({ id: i.id, note: i.note, analysis: i.analysis })),
     style_profile: prof.data ?? null,
   }

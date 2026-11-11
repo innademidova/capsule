@@ -330,7 +330,6 @@ export type Outfit = {
   id: string; name: string | null; layout: Placement[]; occasions: string[]; seasons: string[]
   notes: string | null; favorite: boolean; source: string; image_path: string | null; created_at: string; updated_at: string
 }
-export type Wear = { id: string; worn_on: string; outfit_id: string | null; item_ids: string[] }
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
@@ -414,7 +413,6 @@ export async function currentWeather(): Promise<string> {
   return `${Math.round(d.current.temperature_2m)}°C (feels ${Math.round(d.current.apparent_temperature)}°C, today ${Math.round(d.daily.temperature_2m_min[0])}…${Math.round(d.daily.temperature_2m_max[0])}°C), ${sky}, wind ${Math.round(d.current.wind_speed_10m)} km/h`
 }
 
-export const today = () => new Date().toLocaleDateString('sv-SE')
 
 // Exact cost as cents with two decimals, e.g. 0.0583 -> "5.83¢"
 export const cents = (usd: number) => `${(usd * 100).toFixed(2)}¢`

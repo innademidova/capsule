@@ -1,13 +1,12 @@
 import { createContext, useContext } from 'react'
-import type { Item, Outfit, Wear, Inspiration, StyleProfile, ShopItem, AIRequest } from './lib'
+import type { Item, Outfit, Inspiration, StyleProfile, ShopItem, AIRequest } from './lib'
 
 // All app data in one place
 export type Store = {
-  items: Item[]; wishlist: Item[]; outfits: Outfit[]; wear: Wear[]; inspirations: Inspiration[]
+  items: Item[]; wishlist: Item[]; outfits: Outfit[]; inspirations: Inspiration[]
   profile: StyleProfile | null; shopping: ShopItem[]; requests: AIRequest[]
   setItems: (f: (x: Item[]) => Item[]) => void
   setOutfits: (f: (x: Outfit[]) => Outfit[]) => void
-  setWear: (f: (x: Wear[]) => Wear[]) => void
   setInspirations: (f: (x: Inspiration[]) => Inspiration[]) => void
   setShopping: (f: (x: ShopItem[]) => ShopItem[]) => void
   setRequests: (f: (x: AIRequest[]) => AIRequest[]) => void

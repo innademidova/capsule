@@ -24,16 +24,15 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 ## Features (all 5 stages built on 2026-10-31; she tests them on the phone)
 
 1. **Digital wardrobe**: items with photo, category, type, colors, season, style, occasion, brand, composition (`materials` jsonb `[{name, pct|null}]`, suggestions from the `materials` table), notes; gallery with
-   category chips, filters, search; favorites; "Wore it today"; "Build outfit" from an item. Background removal: iPhone
+   category chips, filters, search; favorites; "Build outfit" from an item. Background removal: iPhone
    "lift subject" → Copy → **Paste** in the app; transparent edges are auto-trimmed. "Fill in with AI" tags from the photo.
-2. **Outfits**: canvas editor (drag, resize, front, remove; positions in % in `outfits.layout`), save, favorite,
-   "I wore this today" (`wear_log`). `autoLayout()` in lib.ts places items by category.
+2. **Outfits**: canvas editor (drag, resize, front, remove; positions in % in `outfits.layout`), save, favorite, `autoLayout()` in lib.ts places items by category.
 3. **AI stylist** (`#/stylist`): occasion + weather (Open-Meteo by location) + mood → 3 outfit ideas from HER items,
    "Save outfit" turns an idea into an outfit.
 4. **Inspiration**: screenshots → breakdown (formula, pieces have/similar/missing with her item ids, to buy);
    "Find my formulas" across analyzed looks → `style_profile`.
 5. **Shop**: wardrobe check (gaps / too many / strengths → add to shopping list), shopping list, "Before you buy"
-   (photo from a shop → verdict, pairs_with, similar, outfit ideas). Me tab: stats, most worn, not worn for a month+.
+   (photo from a shop → verdict, pairs_with, similar, outfit ideas). Me tab: stats, colors, untagged items.
 
 **Wishlist** (optional shop `link` on items, shown as "Open in shop"; `#/wish`, switch on the Wardrobe screen): same cards, stored in `items` with `wishlist = true`; `store.items` is wardrobe only, so the stylist, outfits, stats and AI never see wishlist pieces. "I bought it" moves a piece to the wardrobe. To add one by script, put `"wishlist":true` in the JSON for `scripts/add-item.mjs`.
 
@@ -67,7 +66,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 
 ## Workflow: process the AI queue (UI removed on 2026-11-11 at her request; kept for old queued rows)
 
-1. `node scripts/ai-queue.mjs export <scratch dir>` → `ctx.json` (queued requests, wardrobe with wear counts,
+1. `node scripts/ai-queue.mjs export <scratch dir>` → `ctx.json` (queued requests, wardrobe,
    inspirations with analyses, style profile) + downloaded photos (`local_image` paths).
 2. For each request, look at the images (Read the local files) and write the result in the exact shape of
    `SCHEMAS[kind]` in the Edge Function, following the same prompt rules as `buildPrompt()` there. Use only real item ids.
@@ -83,7 +82,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 - `src/lib.ts` Supabase client, types, option lists (categories, kinds, colors with hex, seasons, styles, occasions),
   signed URL cache (batched), photo processing (`processPhoto`: stepped high-quality downscale, trims transparent
   margins, WebP with PNG/JPEG fallback), upload/remove, clipboard paste.
-- `src/store.tsx` one context with all data (items, outfits, wear, inspirations, profile, shopping, requests).
+- `src/store.tsx` one context with all data (items, outfits, inspirations, profile, shopping, requests).
 - `src/Wardrobe.tsx` list + filters, item detail, add/edit form. `src/Outfits.tsx` outfits, editor, stylist.
   `src/Inspo.tsx` inspiration + formulas. `src/Shop.tsx` wardrobe check, shopping list, before-you-buy.
 - `src/ui.tsx` icons, chips, swatches, Photo, Header, Collage, AIActions (now/queue buttons), RequestState, Sheet.
@@ -99,8 +98,8 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 
 ## Data (Supabase project "Style", ref `ajbdkvpyhoyzzzlrlttk`, free plan: 1 GB storage)
 
-- `outfits` (layout jsonb `[{item_id,x,y,w,z}]`, occasions, seasons, notes, favorite, source manual|ai), `wear_log`
-  (worn_on, outfit_id, item_ids[]), `inspirations` (image, note, analysis jsonb), `style_profile` (one row),
+- `outfits` (layout jsonb `[{item_id,x,y,w,z}]`, occasions, seasons, notes, favorite, source manual|ai),
+  `inspirations` (image, note, analysis jsonb), `style_profile` (one row),
   `shopping` (name, category, why, priority 1–3, done), `ai_requests` (see AI section). All RLS "own rows".
 - `items`: name, category (`top|bottom|dress|outerwear|shoes|bag|accessory|swim`), kind (lowercase English), colors[],
   seasons[], styles[], occasions[], brand, notes, photo_path, thumb_path, favorite. RLS "own rows only".

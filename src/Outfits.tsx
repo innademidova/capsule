@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
-  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, today, itemTitle, labelOf,
-  type Item, type Outfit, type Placement, type Wear,
+  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, itemTitle, labelOf,
+  type Item, type Outfit, type Placement,
 } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Collage, Chips, Section, Photo, AIActions, RequestState, Sheet } from './ui'
@@ -9,12 +9,6 @@ import { go, back } from './App'
 
 const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
   o.layout.map(p => items.find(i => i.id === p.item_id)).filter((i): i is Item => !!i)
-
-export async function logWear(item_ids: string[], outfit_id: string | null) {
-  const { data, error } = await supabase.from('wear_log').insert({ item_ids, outfit_id, worn_on: today() }).select().single()
-  if (error) throw error
-  return data as Wear
-}
 
 // --- Outfit list ---
 
@@ -57,10 +51,8 @@ export function OutfitList() {
 // --- Outfit card ---
 
 export function OutfitDetail({ outfit }: { outfit: Outfit }) {
-  const { items, wear, setOutfits, setWear } = useStore()
+  const { items, setOutfits } = useStore()
   const list = outfitItems(outfit, items)
-  const worn = wear.filter(w => w.outfit_id === outfit.id)
-  const wornToday = worn.some(w => w.worn_on === today())
 
   const patch = async (p: Partial<Outfit>) => {
     const { data, error } = await supabase.from('outfits').update(p).eq('id', outfit.id).select().single()
@@ -71,9 +63,6 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
     const { error } = await supabase.from('outfits').delete().eq('id', outfit.id)
     if (error) return alert(error.message)
     setOutfits(without(outfit.id)); back('/outfits')
-  }
-  const wore = async () => {
-    try { const w = await logWear(list.map(i => i.id), outfit.id); setWear(x => [w, ...x]) } catch (e) { alert((e as Error).message) }
   }
   // AI photo of a woman wearing these pieces
   const [drawing, setDrawing] = useState(false)
@@ -103,10 +92,6 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="btn" onClick={draw} disabled={drawing || !list.length}>
             <Icon name="sparkle" /> {drawing ? 'Drawing, about a minute…' : outfit.image_path ? 'Draw again' : 'Show on me'}<span className="cost">≈7¢</span>
           </button>
-          <button className="btn primary" onClick={wore} disabled={wornToday}>
-            <Icon name="check" /> {wornToday ? 'Worn today' : 'I wore this today'}
-          </button>
-          {worn.length > 0 && <p className="muted small">Worn {worn.length}× · last {worn[0].worn_on}</p>}
           <div className="card">
             <h3 className="card-title">Pieces</h3>
             <div className="mini-list">
