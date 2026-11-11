@@ -244,7 +244,9 @@ const LITE = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 const GEMINI: Record<string, string[]> = { tag: LITE };
 // Free models are often "high demand" (503): walk down the list, OpenAI only after all of them
 const geminiFor = (kind: string) => Deno.env.get("GEMINI_API_KEY") ? GEMINI[kind] ?? [...SMART, ...LITE] : [];
-const GEMINI_TIMEOUT_MS = 45_000; // the free tier is sometimes very slow; then try the next model
+// The free tier is sometimes very slow. All Gemini attempts share one budget so OpenAI still fits
+// inside the Edge Function wall-clock limit (~150s); otherwise the function dies and the request stays queued.
+const GEMINI_BUDGET_MS = 80_000;
 const GEMINI_NAMES: Record<string, string> = {
   "gemini-3.8-flash": "Gemini 3.8 Flash", "gemini-3.6-flash": "Gemini 3.6 Flash",
   "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite", "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
@@ -253,7 +255,7 @@ const GEMINI_NAMES: Record<string, string> = {
 // A Gemini failure that should move on to the next model (quota, overload, timeout) rather than stop
 class TryNext extends Error {}
 
-async function withGemini(sb: SupabaseClient, kind: string, model: string, schema: unknown, content: unknown, effort: "low" | "medium") {
+async function withGemini(sb: SupabaseClient, kind: string, model: string, schema: unknown, content: unknown, effort: "low" | "medium", timeoutMs: number) {
   const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
   const parts = blocks.map(b => b.type === "text"
     ? { text: b.text }
@@ -262,7 +264,7 @@ async function withGemini(sb: SupabaseClient, kind: string, model: string, schem
   try {
     r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
-      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")!, "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: VOICE }] },
@@ -326,9 +328,12 @@ async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
   const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
   const misses = meta.skipped;
+  const deadline = Date.now() + GEMINI_BUDGET_MS;
   for (const model of geminiFor(r.kind)) {
+    const left = deadline - Date.now();
+    if (left < 5_000) { misses.push(`${model}: no time left`); continue; }
     try {
-      const out = await withGemini(sb, r.kind, model, schema, content, effort);
+      const out = await withGemini(sb, r.kind, model, schema, content, effort, left);
       meta.cost_usd = 0; meta.model = GEMINI_NAMES[model] ?? model;
       return out;
     } catch (e) {
