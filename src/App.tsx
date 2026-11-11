@@ -197,22 +197,20 @@ function Main({ email }: { email: string }) {
     { id: 'shop', label: 'Shop', icon: 'bag', path: '/shop' },
     { id: 'me', label: 'Profile', icon: 'user', path: '/me' },
   ]
-  const showTabs = route.view !== 'item-edit' && route.view !== 'outfit-edit'
+  const editing = route.view === 'item-edit' || route.view === 'outfit-edit'
 
   return (
     <StoreCtx.Provider value={store}>
-      <div className={'app' + (showTabs ? ' with-tabs' : '')}>
+      <div className={'app with-tabs' + (editing ? ' editing' : '')}>
         {screen}
-        {showTabs && (
-          <nav className="tabbar" aria-label="Main">
-            <div className="side-brand">Capsule</div>
-            {tabs.map(t => (
-              <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'page' : undefined} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
-                <Icon name={t.icon} /><span>{t.label}</span>
-              </button>
-            ))}
-          </nav>
-        )}
+        <nav className="tabbar" aria-label="Main">
+          <div className="side-brand">Capsule</div>
+          {tabs.map(t => (
+            <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'page' : undefined} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
+              <Icon name={t.icon} /><span>{t.label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
     </StoreCtx.Provider>
   )

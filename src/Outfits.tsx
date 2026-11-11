@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, itemTitle, labelOf,
   type Item, type Outfit, type Placement,
@@ -15,7 +15,8 @@ const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
 export function OutfitList() {
   const { outfits, items } = useStore()
   const [fav, setFav] = useState(false)
-  const shown = outfits.filter(o => !fav || o.favorite)
+  const [kind, setKind] = useState<'all' | 'ai' | 'mine'>('all')
+  const shown = outfits.filter(o => (!fav || o.favorite) && (kind === 'all' || (kind === 'ai') === isAI(o)))
   return (
     <div className="screen">
       <Header title="Outfits" right={
@@ -25,6 +26,16 @@ export function OutfitList() {
         <span className="cta-icon"><Icon name="sparkle" /></span>
         <span><b>Ask your stylist</b><span className="muted small">Describe what you need: looks from your own clothes, with a photo on you</span></span>
       </button>
+      {outfits.length > 0 && (
+        <div className="seg outfit-filter" role="tablist">
+          {([['all', 'All'], ['ai', 'AI generated'], ['mine', 'Made by me']] as const).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={kind === id} className={kind === id ? 'on' : ''} onClick={() => setKind(id)}>
+              {label} <span className="muted">{outfits.filter(o => id === 'all' || (id === 'ai') === isAI(o)).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {outfits.length > 0 && !shown.length && <p className="muted center pad">Nothing here yet.</p>}
       {outfits.length === 0 ? (
         <div className="empty">
           <Icon name="layers" />
@@ -47,6 +58,12 @@ export function OutfitList() {
     </div>
   )
 }
+
+// An outfit counts as AI generated when the AI drew it (photo of a woman) or the stylist suggested it
+const isAI = (o: Outfit) => !!o.image_path || o.source === 'ai'
+
+// Set by the editor's "Generate with AI": the outfit card starts drawing as soon as it opens
+let drawOnOpen: string | null = null
 
 // --- Outfit card ---
 
@@ -72,6 +89,9 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
     catch (e) { alert((e as Error).message) }
     setDrawing(false)
   }
+  useEffect(() => {
+    if (drawOnOpen === outfit.id) { drawOnOpen = null; draw() }
+  }, [outfit.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="screen">
@@ -155,7 +175,8 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
   }
 
   const byId = new Map(items.map(i => [i.id, i]))
-  const save = async () => {
+  // Save as is (the collage), or save and let the AI draw a woman wearing it in the reference format
+  const save = async (withAI = false) => {
     if (!layout.length) return
     setBusy(true)
     const row = { name: name.trim() || null, layout, occasions, seasons }
@@ -163,6 +184,7 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
     const { data, error } = await q.select().single()
     if (error) { alert(error.message); setBusy(false); return }
     setOutfits(upsert(data as Outfit))
+    if (withAI) drawOnOpen = (data as Outfit).id
     if (outfit) back(`/o/${outfit.id}`); else location.replace(`#/o/${(data as Outfit).id}`)
   }
 
@@ -189,7 +211,13 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
           <Section title="Name"><input placeholder="e.g. Friday office look" value={name} onChange={e => setName(e.target.value)} /></Section>
           <Section title="Occasion"><Chips options={OCCASIONS} value={occasions} onChange={setOccasions} /></Section>
           <Section title="Season"><Chips options={SEASONS} value={seasons} onChange={setSeasons} /></Section>
-          <button className="btn primary wide" onClick={save} disabled={busy || !layout.length}>{busy ? 'Saving…' : 'Save outfit'}</button>
+          <div className="save-row">
+            <button className="btn wide" onClick={() => save()} disabled={busy || !layout.length}><Icon name="check" /> {busy ? 'Saving…' : 'Save outfit'}</button>
+            <button className="btn primary wide" onClick={() => save(true)} disabled={busy || !layout.length}>
+              <Icon name="sparkle" /> Generate with AI<span className="cost">(OpenAI ≈7¢)</span>
+            </button>
+          </div>
+          <p className="hint">“Save outfit” keeps this collage. “Generate with AI” saves it and draws you wearing it, in the look format.</p>
         </div>
       </div>
       {picker && <ItemPicker chosen={layout.map(p => p.item_id)} onToggle={toggleItem} onClose={() => setPicker(false)} />}
