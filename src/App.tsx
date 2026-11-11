@@ -198,9 +198,10 @@ function Main({ email }: { email: string }) {
       <div className={'app' + (showTabs ? ' with-tabs' : '')}>
         {screen}
         {showTabs && (
-          <nav className="tabbar">
+          <nav className="tabbar" aria-label="Main">
+            <div className="side-brand">Capsule</div>
             {tabs.map(t => (
-              <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
+              <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'page' : undefined} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
                 <Icon name={t.icon} /><span>{t.label}</span>
               </button>
             ))}
