@@ -4,7 +4,7 @@
 //            touches my overrides; the default itself stays for everyone else.
 //   'global' the defaults themselves (dict_global, image_templates rows without user_id); admins only.
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, TEMPLATES, processPhoto, renderLook, removePhotos, askAI, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
+import { supabase, CATEGORIES, TEMPLATES, processPhoto, removePhotos, askAI, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
 import { useStore } from './store'
 import { Icon, Photo } from './ui'
 
@@ -249,7 +249,6 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
   const savedText = (scope === 'global' ? def?.prompt : own?.prompt ?? def?.prompt) ?? ''
   const [text, setText] = useState(savedText)
   useEffect(() => setText(savedText), [savedText])
-  const [clean, setClean] = useState(false)
   const [busy, setBusy] = useState('')
   const [newPicture, setNewPicture] = useState(false)
   const [preview, setPreview] = useState('')
@@ -269,14 +268,13 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
     try { await f(); await reload() } catch (e) { alert((e as Error).message) }
     setBusy('')
   }
-  const replace = (file?: File) => file && run(clean ? 'Uploading and cleaning, about a minute…' : 'Uploading…', async () => {
+  const replace = (file?: File) => file && run('Uploading…', async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Please sign in again')
     const p = await processPhoto(file)
     const dir = scope === 'global' ? 'global/reference' : `${user.id}/reference`
-    let path = `${dir}/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
+    const path = `${dir}/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
     fail((await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })).error)
-    if (clean) { const raw = path; path = (await renderLook({ clean_path: raw, global: scope === 'global' })).path; await removePhotos(raw) }
     const old = row?.image_path
     await store({ image_path: path })
     if (old) await removePhotos(old)
@@ -312,10 +310,6 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
       {t.picture && <>
         <p className="section-title small">Picture{scope === 'user' && <span className="muted"> · {own?.image_path ? 'your own' : 'the default'}</span>}</p>
         {picture ? <Photo path={picture} alt={t.label} className="look-post" zoom /> : <p className="muted small">No picture yet.</p>}
-        <label className="check-row">
-          <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
-          <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>
-        </label>
         <label className={'btn wide' + (busy ? ' disabled' : '')}>
           <Icon name="image" /> {scope === 'user' && !own?.image_path ? 'Use my own picture' : 'Replace picture'}
           <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />

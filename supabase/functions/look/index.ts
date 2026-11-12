@@ -7,10 +7,8 @@
 //    With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
 // 2. {many: {anchor_id, title, looks: [{label, item_ids}], palette}, request_id?}: template 'many', one collage with the
 //    piece in the middle and the same woman in each look around it. Written to result.collage_path.
-// 3. {clean_path, global?}: removes text, page numbers and app icons from a screenshot meant to be a template picture.
-//    global: save it to photos/global/reference/ (the storage policy lets only admins write there).
 // preview: true with job 1 or 2 returns {prompt} (the full text the model would get) without drawing anything.
-// Writes to photos/<uid>/looks/ (or reference/) and returns the path.
+// Writes to photos/<uid>/looks/ and returns the path.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
 import { loadTemplate, fill, DEFAULT_APPEARANCE } from "../_shared/templates.ts";
@@ -77,12 +75,6 @@ THE LOOKS (every photo shows image 1 plus the listed pieces, and no other visibl
 ${looks}`;
 }
 
-const CLEAN = `This is a screenshot of an Instagram styling post. Return the same post, cleaned:
-- Remove ALL text: titles, numbers, page counters like "3/12", lists of item names, divider lines under or above text.
-- Remove app interface elements such as the round mute/sound icon, progress dots and bars.
-- Fill the removed areas so they match their surroundings (the photo background or the plain panel colour).
-- Keep everything else exactly as it is: the photo of the woman, the product photos of the clothes, the round colour dots, the layout and proportions. Do not crop, move or redraw them.`;
-
 async function download(sb: SupabaseClient, path: string) {
   const { data, error } = await sb.storage.from("photos").download(path);
   if (error || !data) throw new Error("Could not read a photo");
@@ -134,15 +126,10 @@ Deno.serve(async req => {
     if (!user) return json({ error: "Please sign in again" }, 401);
     const body0 = await req.json() as {
       item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number;
-      clean_path?: string; global?: boolean; many?: Many; preview?: boolean;
+      many?: Many; preview?: boolean;
     };
-    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false, many, preview = false } = body0;
+    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, many, preview = false } = body0;
     if (!preview && !Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
-
-    if (clean_path) {
-      const out = await paint(sb, "reference", CLEAN, [await download(sb, clean_path)], "medium", "auto", `${global ? "global" : user.id}/reference`);
-      return json(out);
-    }
 
     const { data: prof } = await sb.from("style_profile").select("appearance").maybeSingle();
     const appearance = prof?.appearance ?? "";

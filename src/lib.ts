@@ -366,7 +366,7 @@ export type LookIdea = { label: string; item_ids: string[]; why: string; scene: 
 export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string; collage_path?: string; collage_outfit_id?: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
-export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number; clean_path?: string; global?: boolean
+export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number
   many?: { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] }
 }) {
   const res = await supabase.functions.invoke('look', { body })
