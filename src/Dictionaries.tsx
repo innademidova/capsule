@@ -320,7 +320,6 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
           <Icon name="image" /> {scope === 'user' && !own?.image_path ? 'Use my own picture' : 'Replace picture'}
           <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />
         </label>
-        {scope === 'user' && own?.image_path && <button className="btn ghost wide" onClick={() => run('…', () => store({ image_path: null }))} disabled={!!busy}>Use the default picture</button>}
       </>}
 
       <p className="section-title small">Instructions for the AI{scope === 'user' && <span className="muted"> · {own?.prompt ? 'your own' : 'the default'}</span>}</p>
