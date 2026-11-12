@@ -218,7 +218,7 @@ export function Assistant() {
           <input placeholder="Weather (optional), e.g. +15°C, sunny" value={weather} onChange={e => setWeather(e.target.value)} />
           <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
         </div>
-        <AIActions label="Get looks" cost="ideas: Gemini, 3 photos: OpenAI ≈27¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
+        <AIActions label="Get looks" cost="OpenAI ≈29¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>

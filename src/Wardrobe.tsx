@@ -617,7 +617,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
 
         {(photo || item) && !gen && (
           <button type="button" className="btn wide ai-fill" onClick={autoFill} disabled={tagging || processing}>
-            <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">(Gemini · &lt;1¢)</span>
+            <Icon name="sparkle" /> {tagging ? 'Looking at the photo…' : 'Fill in with AI'}<span className="cost">(OpenAI ≈0.4¢)</span>
           </button>
         )}
 

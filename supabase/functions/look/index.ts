@@ -1,21 +1,21 @@
-// Look images: OpenAI gpt-image-2.6-sunburst first (she preferred its look on 2026-11-12: Gemini drew image numbers and
-// hex codes and followed the template less), Gemini Nano Banana Pro at 2K (_shared/gemini-image.ts) as the fallback. Every image copies the layout of a template picture for its purpose:
-// the user's own style_profile.templates[<id>], else the global app_settings 'template:<id>' (ids in src/lib.ts TEMPLATES).
-// Three jobs:
-// 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', a styling post: the woman wearing the outfit on one side, the separate pieces and a palette on the
-//    other, no text. The item photos are the clothing references; her appearance comes from style_profile.appearance.
+// Look images with OpenAI gpt-image-2.6-sunburst (secret OPENAI_API_KEY).
+// The instructions and the layout picture come from the image template for the purpose (table image_templates,
+// _shared/templates.ts): the user's own version, else the default. This code only fills the {placeholders} and appends
+// the technical part: which attached image is which and what each look is made of.
+// Jobs:
+// 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', one outfit on her.
 //    With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
-// 3. {many: {anchor_id, title, looks: [{label, item_ids}], palette}, request_id?}: template 'many', one collage:
-//    the anchor piece in the middle and the same woman in each look around it. Written to result.collage_path.
-// 2. {clean_path, global?}: removes text, page numbers and app icons from a screenshot meant to be the layout reference.
+// 2. {many: {anchor_id, title, looks: [{label, item_ids}], palette}, request_id?}: template 'many', one collage with the
+//    piece in the middle and the same woman in each look around it. Written to result.collage_path.
+// 3. {clean_path, global?}: removes text, page numbers and app icons from a screenshot meant to be a template picture.
 //    global: save it to photos/global/reference/ (the storage policy lets only admins write there).
-// Writes to photos/<uid>/looks/ (or reference/) and returns the path. The key is a Supabase secret (OPENAI_API_KEY).
+// preview: true with job 1 or 2 returns {prompt} (the full text the model would get) without drawing anything.
+// Writes to photos/<uid>/looks/ (or reference/) and returns the path.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
-import { geminiImage, extOf } from "../_shared/gemini-image.ts";
+import { loadTemplate, fill, DEFAULT_APPEARANCE } from "../_shared/templates.ts";
 
 const MODEL = "gpt-image-2.6-sunburst";
-const QUALITY = "medium";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -24,69 +24,57 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 type Piece = { id: string; category: string; kind: string | null; name: string | null; colors: string[]; photo_path: string | null };
+type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
 
 // Outer layers first, so the model reads the outfit from the outside in
 const ORDER = ["outerwear", "dress", "top", "bottom", "swim", "shoes", "bag", "accessory"];
 
-function buildPrompt(pieces: Piece[], appearance: string, scene: string, vibe: string, palette: string[], hasRef: boolean) {
-  const list = pieces.map((p, n) => `- Image ${n + 1}: ${p.name ?? p.kind ?? p.category} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")})`).join("\n");
-  const has = (c: string) => pieces.some(p => p.category === c);
-  return `Create a vertical Instagram styling post (2:3) in exactly the same format as the layout reference${hasRef ? ` (the last image, image ${pieces.length + 1})` : ""}:
-- Left part, about 55% of the width, full height: a photorealistic full-body street-style photo of one woman wearing the outfit.
-- Right part: a plain warm off-white (#f3eee6) panel. At the top a row of ${palette.length || "3–5"} round colour dots${palette.length ? ` in these colours, left to right: ${palette.join(", ")}` : " with the main colours of the outfit"}. Below them, each piece of the outfit as a separate clean product photo (no person, no hanger), neatly arranged like the reference with small even gaps, all fully visible.
-- The same pieces appear in both parts and look identical in both.
-- ${hasRef ? "Copy ONLY the layout, proportions, spacing and mood of the reference. Do not copy its clothes, person, colours or any text." : "Clean, editorial, calm."}
-- No text at all: no titles, numbers (the image numbers below are only for you), hex codes, lists, labels, logos, icons or watermarks.
+const pieceName = (p: Piece) => p.name ?? p.kind ?? p.category;
 
-The outfit is made of exactly these pieces:
+// The technical part after the user's instructions: the attached images in order
+function imagesPart(pieces: Piece[], hasRef: boolean) {
+  const list = pieces.map((p, n) => `- Image ${n + 1}: ${pieceName(p)} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")})`).join("\n");
+  return `ATTACHED IMAGES
 ${list}
-
-THE WOMAN
-${appearance || "A woman in her late twenties with a natural, elegant look."}
-Natural, relaxed and confident; a real person, not a mannequin. Light natural make-up.
-
-THE CLOTHES (most important)
-- Each piece must look exactly like its photo: the same colour and shade, fabric and texture, length, fit and every detail (buttons, collar, neckline, pleats, pockets, hardware, print).
-- She wears every listed piece, styled the way a stylist would${vibe ? ` for a "${vibe}" look` : ""} (tucked, belted, sleeves pushed up, coat on the shoulders and so on, only when it suits).
-- Do not add other visible garments.${has("shoes") ? "" : " She has no shoes in the list: give her simple, current shoes that suit the outfit and do not draw attention."}${has("bag") ? "" : " No bag unless it is in the list."} At most small, simple jewellery.
-
-THE PHOTO OF HER
-- ${scene || "A calm European city street in soft daylight, walking towards the camera."}
-- Full body from head to shoes, camera at about waist height, soft natural light, gentle background blur, true-to-life colours.`;
+${hasRef ? `- Image ${pieces.length + 1}: the layout reference picture.` : "- No layout reference picture is attached: keep the layout calm and editorial."}
+The image numbers are only for you: never draw numbers, file names or colour codes.`;
 }
 
-type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
+function lookPrompt(text: string, pieces: Piece[], appearance: string, scene: string, vibe: string, palette: string[], hasRef: boolean) {
+  const has = (c: string) => pieces.some(p => p.category === c);
+  const filled = fill(text, {
+    vibe: vibe || "everyday",
+    scene: scene || "A calm European city street in soft daylight, walking towards the camera.",
+    palette: palette.length ? palette.join(", ") : "the main colours of the outfit",
+    palette_count: palette.length ? String(palette.length) : "3–5",
+    appearance: appearance || DEFAULT_APPEARANCE,
+  });
+  const notes = [
+    `She wears exactly these pieces: images ${pieces.map((_, n) => n + 1).join(", ")}.`,
+    has("shoes") ? "" : "She has no shoes in the list: give her simple, current shoes that suit the outfit and do not draw attention.",
+    has("bag") ? "" : "No bag unless it is in the list.",
+  ].filter(Boolean).map(l => `- ${l}`).join("\n");
+  return `${filled}\n\n${imagesPart(pieces, hasRef)}\n\nTHE OUTFIT\n${notes}`;
+}
 
-// One collage: the anchor piece in the middle, the same woman wearing each look around it
-function buildManyPrompt(pieces: Piece[], appearance: string, many: Many, hasRef: boolean) {
+function manyPrompt(text: string, pieces: Piece[], appearance: string, many: Many, hasRef: boolean) {
   const num = new Map(pieces.map((p, n) => [p.id, n + 1]));
-  const list = pieces.map((p, n) => `- Image ${n + 1}: ${p.name ?? p.kind ?? p.category} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")})`).join("\n");
-  const looks = many.looks.map((l, k) => {
-    const imgs = l.item_ids.map(id => num.get(id)).filter(Boolean);
-    return `- Photo ${k + 1}, label "${l.label}": she wears images ${imgs.join(", ")}`;
-  }).join("\n");
-  const anchor = pieces[0];
-  return `Create a vertical Pinterest-style styling collage (2:3) in the same format as the layout reference${hasRef ? ` (the last image, image ${pieces.length + 1})` : ""}:
-- In the centre, large: a clean product photo of image 1 (${anchor.name ?? anchor.kind ?? anchor.category}) on its own, exactly as it is.
-- Around it, ${many.looks.length} separate full-body street-style photos of the SAME woman, one per look below, arranged like the photos in the reference (torn-paper edges, small tilt, soft shadow), all fully visible and not overlapping the centre piece.
-- Background: a warm, plain beige paper texture like the reference.
-- Text, in the same elegant fonts and places as the reference, and nothing else: the headline "${many.title.toUpperCase()}" with "many looks" in script under it; next to each photo its short handwritten label with a small arrow; at the bottom a row of ${many.palette.length || 5} round colour dots${many.palette.length ? ` in these colours, left to right: ${many.palette.join(", ")}` : ""}. Spell every word exactly as given. The image numbers below are only for you: never draw numbers, hex codes or any other text.
-- ${hasRef ? "Copy ONLY the layout, proportions, fonts and mood of the reference. Do not copy its clothes, person or colours." : "Calm, editorial, airy."}
+  const filled = fill(text, {
+    title: many.title.toUpperCase(),
+    anchor: pieceName(pieces[0]),
+    looks_count: String(many.looks.length),
+    labels: many.looks.map(l => `"${l.label}"`).join(", "),
+    palette: many.palette.length ? many.palette.join(", ") : "the main colours of the looks",
+    palette_count: String(many.palette.length || 5),
+    appearance: appearance || DEFAULT_APPEARANCE,
+  });
+  const looks = many.looks.map((l, k) =>
+    `- Photo ${k + 1}, label "${l.label}": she wears images ${l.item_ids.map(id => num.get(id)).filter(Boolean).join(", ")}`).join("\n");
+  return `${filled}\n\n${imagesPart(pieces, hasRef)}
+Image 1 is the main piece.
 
-The pieces (product photos):
-${list}
-
-The looks (every photo shows image 1 plus the listed pieces, and no other visible garments; simple shoes if none are listed):
-${looks}
-
-THE WOMAN (the same person in every photo)
-${appearance || "A woman in her late twenties with a natural, elegant look."}
-Natural, relaxed and confident; light natural make-up; different natural poses and city backgrounds per photo.
-
-THE CLOTHES (most important)
-- Each piece must look exactly like its photo: the same colour and shade, fabric and texture, length, fit and details.
-- Image 1 must be identical in the centre and in every look.
-- True-to-life colours, soft daylight.`;
+THE LOOKS (every photo shows image 1 plus the listed pieces, and no other visible garments; simple shoes if none are listed)
+${looks}`;
 }
 
 const CLEAN = `This is a screenshot of an Instagram styling post. Return the same post, cleaned:
@@ -101,54 +89,6 @@ async function download(sb: SupabaseClient, path: string) {
   return data;
 }
 
-async function callImages(form: FormData) {
-  const r = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}` },
-    body: form,
-  });
-  const body = await r.json();
-  if (!r.ok) throw new Error(`OpenAI error ${r.status}: ${body.error?.message ?? "unknown"}`);
-  return { b64: body.data[0].b64_json as string, usage: (body.usage ?? {}) as ImageUsage };
-}
-
-async function save(sb: SupabaseClient, path: string, b64: string, mime: string) {
-  const { error } = await sb.storage.from("photos").upload(path, decodeBase64(b64), { contentType: mime });
-  if (error) throw error;
-}
-
-// Draws one picture and logs its cost. OpenAI first (with these form fields); Gemini if OpenAI fails and there is
-// still time left in the function (~150 s wall clock). images: in the order the prompt numbers them.
-async function paint(sb: SupabaseClient, kind: string, prompt: string, images: Blob[],
-  o: { aspect?: string; size: "1K" | "2K"; openai: Record<string, string> }) {
-  const started = Date.now();
-  let why = "";
-  if (Deno.env.get("OPENAI_API_KEY")) {
-    try {
-      const form = new FormData();
-      form.append("model", MODEL);
-      form.append("prompt", prompt);
-      for (const [k, v] of Object.entries(o.openai)) form.append(k, v);
-      form.append("output_format", "webp");
-      form.append("output_compression", "90");
-      images.forEach((img, n) => form.append("image[]", img, `image-${n + 1}.${img.type.split("/")[1] || "png"}`));
-      const out = await callImages(form);
-      const usage = costOf(out.usage);
-      await sb.from("ai_usage").insert({ kind, model: MODEL, ...usage, raw: out.usage });
-      return { b64: out.b64, mime: "image/webp", model: "OpenAI", cost_usd: usage.cost_usd, skipped: [] as string[] };
-    } catch (e) {
-      why = e instanceof Error ? e.message : String(e);
-      console.warn("openai image failed", why);
-    }
-  }
-  const left = 140_000 - (Date.now() - started);
-  if (left < 30_000) throw new Error(why || "No time left");
-  const g = await geminiImage(prompt, images, { aspect: o.aspect, size: o.size, budgetMs: left });
-  const { text_in, image_in, output, cost_usd } = g;
-  await sb.from("ai_usage").insert({ kind, model: g.model, text_in, image_in, output, cost_usd, raw: g.raw });
-  return { b64: g.b64, mime: g.mime, model: g.model, cost_usd, skipped: why ? [why, ...g.skipped] : g.skipped };
-}
-
 // USD per 1M tokens, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const PRICE = { text_in: 5, image_in: 8, output: 30 };
 type ImageUsage = { input_tokens?: number; output_tokens?: number; input_tokens_details?: { text_tokens?: number; image_tokens?: number } };
@@ -161,6 +101,29 @@ function costOf(u: ImageUsage) {
   return { text_in, image_in, output, cost_usd };
 }
 
+// Draws one picture, saves it as webp under `dir` and logs the cost. images: in the order the prompt numbers them.
+async function paint(sb: SupabaseClient, kind: string, prompt: string, images: Blob[], quality: string, size: string, dir: string) {
+  const form = new FormData();
+  form.append("model", MODEL);
+  form.append("prompt", prompt);
+  form.append("quality", quality);
+  form.append("size", size);
+  form.append("output_format", "webp");
+  form.append("output_compression", "90");
+  images.forEach((img, n) => form.append("image[]", img, `image-${n + 1}.${img.type.split("/")[1] || "png"}`));
+  const r = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST", headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}` }, body: form,
+  });
+  const body = await r.json();
+  if (!r.ok) throw new Error(`OpenAI error ${r.status}: ${body.error?.message ?? "unknown"}`);
+  const path = `${dir}/${crypto.randomUUID()}.webp`;
+  const { error } = await sb.storage.from("photos").upload(path, decodeBase64(body.data[0].b64_json), { contentType: "image/webp" });
+  if (error) throw error;
+  const usage = costOf(body.usage ?? {});
+  await sb.from("ai_usage").insert({ kind, model: MODEL, ...usage, raw: body.usage ?? null });
+  return { path, cost_usd: usage.cost_usd, model: MODEL };
+}
+
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -169,60 +132,51 @@ Deno.serve(async req => {
   try {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
-    if (!Deno.env.get("GEMINI_API_KEY") && !Deno.env.get("OPENAI_API_KEY")) throw new Error("No image AI key is set up yet.");
     const body0 = await req.json() as {
       item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number;
-      clean_path?: string; global?: boolean; many?: Many;
+      clean_path?: string; global?: boolean; many?: Many; preview?: boolean;
     };
-    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false, many } = body0;
+    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false, many, preview = false } = body0;
+    if (!preview && !Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
 
     if (clean_path) {
-      const img = await download(sb, clean_path);
-      const out = await paint(sb, "reference", CLEAN, [img], { size: "2K", openai: { quality: QUALITY, size: "auto" } });
-      const path = `${global ? "global" : user.id}/reference/${crypto.randomUUID()}.${extOf(out.mime)}`;
-      await save(sb, path, out.b64, out.mime);
-      return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
+      const out = await paint(sb, "reference", CLEAN, [await download(sb, clean_path)], "medium", "auto", `${global ? "global" : user.id}/reference`);
+      return json(out);
     }
 
-    const { data: prof } = await sb.from("style_profile").select("appearance,templates").maybeSingle();
-    const template = async (id: string) => {
-      const { data: def } = await sb.from("app_settings").select("value").eq("key", `template:${id}`).maybeSingle();
-      const path: string | null = prof?.templates?.[id] ?? def?.value?.path ?? null;
-      return path ? await download(sb, path).catch(() => null) : null;
-    };
+    const { data: prof } = await sb.from("style_profile").select("appearance").maybeSingle();
+    const appearance = prof?.appearance ?? "";
+    const refOf = async (path: string | null) => path ? await download(sb, path).catch(() => null) : null;
 
     if (many) {
-      // Every piece once: the anchor first, then the rest in the order the looks use them (max 14 + the template)
-      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 13); // Gemini takes at most 14 images: 13 pieces + the template
+      // Every piece once: the anchor first, then the rest in the order the looks use them (14 + the template)
+      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 14);
       const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", ids);
       const pieces = ids.map(id => ((rows ?? []) as Piece[]).find(p => p.id === id)).filter((p): p is Piece => !!p?.photo_path);
       if (!pieces.length || pieces[0].id !== many.anchor_id) throw new Error("The piece has no photo");
-      const ref = await template("many");
+      const t = await loadTemplate(sb, "many");
+      if (preview) return json({ prompt: manyPrompt(t.prompt, pieces, appearance, many, !!t.image_path) });
+      const ref = await refOf(t.image_path);
       const images = await Promise.all(pieces.map(p => download(sb, p.photo_path!)));
       if (ref) images.push(ref);
-      // Many small figures: OpenAI "medium" smeared faces and garment details; "high" cost only ~1c more there
-      const out = await paint(sb, "looks-collage", buildManyPrompt(pieces, prof?.appearance ?? "", many, !!ref), images,
-        { aspect: "2:3", size: "2K", openai: { quality: "high", size: "1024x1536" } });
-      const path = `${user.id}/looks/${crypto.randomUUID()}.${extOf(out.mime)}`;
-      await save(sb, path, out.b64, out.mime);
-      if (request_id) await sb.rpc("set_request_collage", { req: request_id, path });
-      return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
+      // Many small figures: "medium" smeared faces and garment details; "high" cost only ~1c more here
+      const out = await paint(sb, "looks-collage", manyPrompt(t.prompt, pieces, appearance, many, !!ref), images, "high", "1024x1536", `${user.id}/looks`);
+      if (request_id) await sb.rpc("set_request_collage", { req: request_id, path: out.path });
+      return json(out);
     }
 
     const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", item_ids.slice(0, 10));
     const pieces = ((rows ?? []) as Piece[]).filter(p => p.photo_path)
       .sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category)).slice(0, 8);
     if (!pieces.length) throw new Error("No pieces with photos in this outfit");
-    const ref = await template("look");
-
+    const t = await loadTemplate(sb, "look");
+    if (preview) return json({ prompt: lookPrompt(t.prompt, pieces, appearance, scene, vibe, palette.slice(0, 6), !!t.image_path) });
+    const ref = await refOf(t.image_path);
     const images = await Promise.all(pieces.map(p => download(sb, p.photo_path!)));
     if (ref) images.push(ref);
-    const out = await paint(sb, "look", buildPrompt(pieces, prof?.appearance ?? "", scene, vibe, palette.slice(0, 6), !!ref), images,
-      { aspect: "2:3", size: "2K", openai: { quality: QUALITY, size: "1024x1536" } });
-    const path = `${user.id}/looks/${crypto.randomUUID()}.${extOf(out.mime)}`;
-    await save(sb, path, out.b64, out.mime);
-    if (request_id && index != null) await sb.rpc("set_look_image", { req: request_id, n: index, path });
-    return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
+    const out = await paint(sb, "look", lookPrompt(t.prompt, pieces, appearance, scene, vibe, palette.slice(0, 6), !!ref), images, "medium", "1024x1536", `${user.id}/looks`);
+    if (request_id && index != null) await sb.rpc("set_look_image", { req: request_id, n: index, path: out.path });
+    return json(out);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }

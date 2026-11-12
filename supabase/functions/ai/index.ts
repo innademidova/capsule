@@ -1,5 +1,5 @@
-// AI stylist Edge Function: every text task. Gemini first (free key, GEMINI_API_KEY), OpenAI when Gemini is out of quota,
-// slow or failing (OPENAI_API_KEY). Claude (ANTHROPIC_API_KEY) is kept as an option but no key is set.
+// AI stylist Edge Function: every text task runs on OpenAI (OPENAI_API_KEY, model TAG_MODEL).
+// Claude (ANTHROPIC_API_KEY) is kept as an option for when there is no OpenAI key; no Claude key is set.
 // Handles one row from ai_requests: item tagging, outfit ideas, inspiration breakdown,
 // style formulas, wardrobe check, before-you-buy. Writes the result to ai_requests.result,
 // and a database trigger distributes it to the right tables.
@@ -53,6 +53,7 @@ const tagSchema = (o: Options) => obj({
 });
 
 const SCHEMAS: Record<string, unknown> = {
+  template_prompt: obj({ prompt: str }),
   tag: tagSchema({ colors: COLORS, styles: STYLES, occasions: OCCASIONS }),
   outfits: obj({
     outfits: { type: "array", items: obj({ title: str, item_ids: strs, why: str, tip: str }) },
@@ -126,6 +127,27 @@ type Req = { id: string; kind: string; input: Record<string, unknown>; image_pat
 async function buildPrompt(sb: SupabaseClient, r: Req): Promise<{ content: Anthropic.ContentBlockParam[]; effort: "low" | "medium" }> {
   const i = r.input;
   switch (r.kind) {
+    case "template_prompt": {
+      // A new template picture: rewrite the image-model instructions so they describe this picture's layout
+      if (!r.image_path) throw new Error("No template picture");
+      const current = String(i.current ?? ""), marks = ((i.placeholders as string[] | undefined) ?? []).map(p => `{${p}}`).join(", ");
+      return { effort: "medium", content: [await imageBlock(sb, r.image_path), { type: "text", text:
+        `This picture is the new layout template for an AI image model (${i.purpose === "many"
+          ? "one collage: one clothing piece in the middle and several looks with it around it"
+          : "a styling post: one woman wearing one outfit, plus the separate pieces"}). The model gets these instructions,
+the product photos of her clothes and this picture, and must draw a new picture in the same format with HER clothes.
+
+Write the instructions in English for this picture, as a plain text in the same structure as the current ones below:
+- Describe the layout of THIS picture precisely: format and proportions, where each element is and how big, the background,
+  frames or edges, fonts and every kind of text it has (or that it has none), the colour dots, the mood and light.
+- Keep the data placeholders exactly as written, in braces, where the data belongs: ${marks}. Never invent names, colours or text instead of them.
+- Keep the sections about the woman and the clothes and their accuracy rules unless the picture clearly contradicts them.
+- Tell the model to copy only the layout and mood of the picture, never its clothes, person or colours.
+- Do not describe which attached image is which: the app adds that part itself.
+
+CURRENT INSTRUCTIONS (written for the previous picture)
+${current}` }] };
+    }
     case "tag": {
       if (!r.image_path) throw new Error("No photo to tag");
       // Original photos (and close-ups of labels) that the item image was made from
@@ -233,60 +255,7 @@ summary: 2–3 sentences with the main reason.` }] };
   throw new Error("Unknown request kind");
 }
 
-const TAG_MODEL = "gpt-6.1-terra"; // the OpenAI fallback for every task
-
-// Gemini free tier (checked in AI Studio on 2026-11-11, project of the key):
-//   gemini-3.8-flash, gemini-3.6-flash: 5 requests/min, 20/day each (the strongest free models)
-//   gemini-3.5-flash-lite, gemini-3.1-flash-lite: 15/min, 500/day each
-// Gemini 3.7 and 4 are paid only. Free-tier prompts may be used by Google to improve its products.
-const SMART = ["gemini-3.8-flash", "gemini-3.6-flash"];
-const LITE = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
-const GEMINI: Record<string, string[]> = { tag: LITE };
-// Free models are often "high demand" (503): walk down the list, OpenAI only after all of them
-const geminiFor = (kind: string) => Deno.env.get("GEMINI_API_KEY") ? GEMINI[kind] ?? [...SMART, ...LITE] : [];
-// The free tier is sometimes very slow. All Gemini attempts share one budget so OpenAI still fits
-// inside the Edge Function wall-clock limit (~150s); otherwise the function dies and the request stays queued.
-const GEMINI_BUDGET_MS = 80_000;
-const GEMINI_NAMES: Record<string, string> = {
-  "gemini-3.8-flash": "Gemini 3.8 Flash", "gemini-3.6-flash": "Gemini 3.6 Flash",
-  "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite", "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
-};
-
-// A Gemini failure that should move on to the next model (quota, overload, timeout) rather than stop
-class TryNext extends Error {}
-
-async function withGemini(sb: SupabaseClient, kind: string, model: string, schema: unknown, content: unknown, effort: "low" | "medium", timeoutMs: number) {
-  const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
-  const parts = blocks.map(b => b.type === "text"
-    ? { text: b.text }
-    : { inlineData: { mimeType: (b.source as Anthropic.Base64ImageSource).media_type, data: (b.source as Anthropic.Base64ImageSource).data } });
-  let r: Response;
-  try {
-    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      signal: AbortSignal.timeout(timeoutMs),
-      headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")!, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: VOICE }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, thinkingConfig: { thinkingLevel: effort } },
-      }),
-    });
-  } catch (e) {
-    throw new TryNext(`${model}: ${e instanceof Error && e.name === "TimeoutError" ? "too slow" : String(e)}`);
-  }
-  const body = await r.json();
-  if (r.status === 429 || r.status >= 500) throw new TryNext(`${model}: ${r.status} ${body.error?.message ?? ""}`.slice(0, 200));
-  if (!r.ok) throw new TryNext(`${model}: ${r.status} ${body.error?.message ?? "error"}`.slice(0, 200));
-  const cand = body.candidates?.[0];
-  if (!cand || cand.finishReason === "SAFETY" || body.promptFeedback?.blockReason) throw new Error("The AI declined this request");
-  if (cand.finishReason === "MAX_TOKENS") throw new TryNext(`${model}: answer too long`);
-  const text = (cand.content?.parts ?? []).filter((p: { text?: string; thought?: boolean }) => p.text && !p.thought).map((p: { text: string }) => p.text).join("");
-  const u = body.usageMetadata ?? {};
-  await sb.from("ai_usage").insert({ kind, model, text_in: u.promptTokenCount ?? 0, cached_in: u.cachedContentTokenCount ?? 0,
-    output: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0), cost_usd: 0, raw: u });
-  try { return JSON.parse(text); } catch { throw new TryNext(`${model}: not valid JSON`); }
-}
+const TAG_MODEL = "gpt-6.1-terra"; // every text task
 
 // USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
@@ -321,33 +290,17 @@ async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, con
   return JSON.parse(parts.filter((p: { type: string }) => p.type === "output_text").map((p: { text: string }) => p.text).join(""));
 }
 
-// Per-request extras for the response: the cost (0 on Gemini) and which model answered
+// Per-request extras for the response: the cost and which model answered
 type Meta = { cost_usd: number | null; model: string | null; skipped: string[] };
 
 async function run(sb: SupabaseClient, r: Req, meta: Meta) {
   const { content, effort } = await buildPrompt(sb, r);
   const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
-  const misses = meta.skipped;
-  const deadline = Date.now() + GEMINI_BUDGET_MS;
-  // "Style it" (looks around one piece) goes straight to OpenAI: the free Gemini tier is often busy and slow there
-  const gemini = r.kind === "looks" && (r.input as { item_id?: string } | null)?.item_id ? [] : geminiFor(r.kind);
-  for (const model of gemini) {
-    const left = deadline - Date.now();
-    if (left < 5_000) { misses.push(`${model}: no time left`); continue; }
-    try {
-      const out = await withGemini(sb, r.kind, model, schema, content, effort, left);
-      meta.cost_usd = 0; meta.model = GEMINI_NAMES[model] ?? model;
-      return out;
-    } catch (e) {
-      if (!(e instanceof TryNext)) throw e;
-      misses.push(e.message); console.warn("gemini miss", e.message);
-    }
-  }
   if (Deno.env.get("OPENAI_API_KEY")) {
     const out = await withOpenAI(sb, r.kind, schema, content, meta);
-    meta.model = "OpenAI"; return out;
+    meta.model = TAG_MODEL; return out;
   }
-  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new Error(misses.length ? `Gemini is busy, try again in a minute (${misses.join("; ")})` : "AI key is not set up yet.");
+  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet.");
   meta.model = "Claude";
   const res = await anthropic.beta.messages.create({
     model: MODEL,

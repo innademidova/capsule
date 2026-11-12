@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import {
   supabase, applyDict, type DictRow,
   type Item, type Outfit, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
+  type ImageTemplate,
 } from './lib'
 import { Icon, Header } from './ui'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
@@ -106,7 +107,7 @@ function Main({ email }: { email: string }) {
   const [requests, setRequests] = useState<AIRequest[]>([])
   const [role, setRole] = useState<Store['role']>('user')
   const [account, setAccount] = useState<Store['account']>({ display_name: null })
-  const [settings, setSettings] = useState<Store['settings']>({ templates: {} })
+  const [templates, setTemplates] = useState<ImageTemplate[]>([])
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [wishFilters, setWishFilters] = useState<Filters>(emptyFilters)
   const [loadError, setLoadError] = useState('')
@@ -125,14 +126,12 @@ function Main({ email }: { email: string }) {
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
       supabase.from('dict_effective').select('type,category,id,label,hex,sort,is_default,is_own'),
       supabase.from('user_roles').select('role').maybeSingle(), supabase.from('profiles').select('display_name').maybeSingle(),
-      supabase.from('app_settings').select('key,value'),
+      supabase.from('image_templates').select('*'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
     applyDict((di.data ?? []) as DictRow[])
     setRole(ro.data?.role === 'admin' ? 'admin' : 'user'); setAccount({ display_name: ac.data?.display_name ?? null })
-    // template:<id> -> {path}
-    const templates = Object.fromEntries((st.data ?? []).filter(r => r.key.startsWith('template:')).map(r => [r.key.slice(9), r.value?.path]))
-    setSettings({ templates })
+    setTemplates((st.data ?? []) as ImageTemplate[])
     setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
     setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
@@ -158,7 +157,7 @@ function Main({ email }: { email: string }) {
   const wishlist = allItems.filter(i => i.wishlist)
 
   const store: Store = {
-    items, wishlist, outfits, inspirations, profile, shopping, requests, role, account, settings,
+    items, wishlist, outfits, inspirations, profile, shopping, requests, role, account, templates,
     setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setRequests, reload: load,
   }
   const save = (i: Item) => store.setItems(upsert(i))

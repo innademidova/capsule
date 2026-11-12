@@ -2,9 +2,9 @@
 // Two scopes, both enforced by RLS in the database:
 //   'user'   my lists = the admin defaults + my own changes (dict_user). Changing or removing a default only
 //            touches my overrides; the default itself stays for everyone else.
-//   'global' the defaults themselves (dict_global, app_settings); admins only.
+//   'global' the defaults themselves (dict_global, image_templates rows without user_id); admins only.
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, TEMPLATES, processPhoto, renderLook, removePhotos, type Item, type Material, type DictType, type TemplateId } from './lib'
+import { supabase, CATEGORIES, TEMPLATES, processPhoto, renderLook, removePhotos, askAI, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
 import { useStore } from './store'
 import { Icon, Photo } from './ui'
 
@@ -225,82 +225,117 @@ function DictRowEdit({ row, color, busy, badge, onSave, onDelete, onReset }: {
   )
 }
 
-// Layout templates for AI images, one per purpose (TEMPLATES in lib.ts).
-// 'global' edits the defaults for everyone (app_settings 'template:<id>', photos/global/reference/);
-// 'user' edits own pictures (style_profile.templates[<id>]) that win over the defaults.
+// Image templates (TEMPLATES in lib.ts, table image_templates): a layout picture plus the instructions for the image model.
+// 'global' edits the defaults for everyone (rows without user_id, photos/global/reference/);
+// 'user' edits own versions that win over the defaults field by field.
 export function Templates({ scope }: { scope: Scope }) {
   return <>
     {TEMPLATES.map(t => (
       <div key={t.id} className="card template-card">
         <h3 className="card-title"><Icon name="image" /> {t.label}</h3>
-        <TemplateEditor scope={scope} id={t.id} hint={t.hint} />
+        <TemplateEditor scope={scope} id={t.id} />
       </div>
     ))}
   </>
 }
 
-function TemplateEditor({ scope, id, hint }: { scope: Scope; id: TemplateId; hint: string }) {
-  const { profile, settings, reload } = useStore()
+function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
+  const { templates, requests, outfits, reload } = useStore()
+  const t = TEMPLATES.find(x => x.id === id)!
+  const def = templates.find(r => r.purpose === id && !r.user_id) ?? null
+  const own = templates.find(r => r.purpose === id && r.user_id) ?? null
+  const row = scope === 'global' ? def : own
+  const picture = scope === 'global' ? def?.image_path ?? null : own?.image_path ?? def?.image_path ?? null
+  const savedText = (scope === 'global' ? def?.prompt : own?.prompt ?? def?.prompt) ?? ''
+  const [text, setText] = useState(savedText)
+  useEffect(() => setText(savedText), [savedText])
   const [clean, setClean] = useState(false)
   const [busy, setBusy] = useState('')
-  const def = settings.templates[id] ?? null
-  const own = profile?.templates?.[id] ?? null
-  const current = scope === 'global' ? def : own ?? def
+  const [newPicture, setNewPicture] = useState(false)
+  const [preview, setPreview] = useState('')
+  const dirty = text.trim() !== savedText.trim()
 
-  const store = async (path: string | null) => {
+  // Writes some fields of the row for this scope; an own row with nothing left is deleted (= the defaults)
+  const store = async (patch: { image_path?: string | null; prompt?: string | null }) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Please sign in again')
-    if (scope === 'global') {
-      const key = `template:${id}`
-      fail((path
-        ? await supabase.from('app_settings').upsert({ key, value: { path }, updated_at: new Date().toISOString() })
-        : await supabase.from('app_settings').delete().eq('key', key)).error)
-      if (def) await removePhotos(def)
+    const next = { image_path: row?.image_path ?? null, prompt: row?.prompt ?? null, ...patch }
+    if (scope === 'user' && row && !next.image_path && !next.prompt) fail((await supabase.from('image_templates').delete().eq('id', row.id)).error)
+    else if (row) fail((await supabase.from('image_templates').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', row.id)).error)
+    else fail((await supabase.from('image_templates').insert({ user_id: scope === 'global' ? null : user.id, purpose: id, ...patch })).error)
+  }
+  const run = async (label: string, f: () => Promise<void>) => {
+    setBusy(label)
+    try { await f(); await reload() } catch (e) { alert((e as Error).message) }
+    setBusy('')
+  }
+  const replace = (file?: File) => file && run(clean ? 'Uploading and cleaning, about a minute…' : 'Uploading…', async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Please sign in again')
+    const p = await processPhoto(file)
+    const dir = scope === 'global' ? 'global/reference' : `${user.id}/reference`
+    let path = `${dir}/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
+    fail((await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })).error)
+    if (clean) { const raw = path; path = (await renderLook({ clean_path: raw, global: scope === 'global' })).path; await removePhotos(raw) }
+    const old = row?.image_path
+    await store({ image_path: path })
+    if (old) await removePhotos(old)
+    setNewPicture(true)
+  })
+  // The AI looks at the picture and rewrites the instructions for it; the text lands in the editor, not saved yet
+  const describe = () => picture && run('Looking at the picture…', async () => {
+    const req = await askAI('template_prompt', { purpose: id, current: text, placeholders: Object.keys(t.placeholders) }, 'now', picture)
+    setText((req.result as { prompt: string }).prompt)
+    setNewPicture(false)
+  })
+  // The full text the image model gets, with an example from her own data (the saved instructions)
+  const showPrompt = () => run('Building the prompt…', async () => {
+    let res
+    if (id === 'garment') res = await supabase.functions.invoke('garment', { body: { preview: true, piece: 'the main garment in the photo' } })
+    else if (id === 'many') {
+      const r = requests.find(x => x.kind === 'looks' && x.input.item_id && x.status === 'done')
+      if (!r) throw new Error('Try “Style it” on a piece once, then the example uses it.')
+      const lr = r.result as LooksResult
+      res = await supabase.functions.invoke('look', { body: { preview: true, many: { anchor_id: String(r.input.item_id), title: 'One piece', palette: lr.palette, looks: lr.looks.map(l => ({ label: l.label, item_ids: l.item_ids })) } } })
     } else {
-      const templates = { ...(profile?.templates ?? {}) }
-      if (path) templates[id] = path; else delete templates[id]
-      fail((await supabase.from('style_profile').upsert({ user_id: user.id, templates })).error)
-      if (own) await removePhotos(own)
+      const o = outfits.find(x => x.layout.length)
+      if (!o) throw new Error('Save an outfit first, then the example uses it.')
+      res = await supabase.functions.invoke('look', { body: { preview: true, item_ids: o.layout.map(l => l.item_id), vibe: o.name ?? '' } })
     }
-  }
-  const replace = async (file?: File) => {
-    if (!file) return
-    setBusy(clean ? 'Uploading and cleaning, about a minute…' : 'Uploading…')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Please sign in again')
-      const p = await processPhoto(file)
-      const dir = scope === 'global' ? 'global/reference' : `${user.id}/reference`
-      let path = `${dir}/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
-      fail((await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })).error)
-      if (clean) { const raw = path; path = (await renderLook({ clean_path: raw, global: scope === 'global' })).path; await removePhotos(raw) }
-      await store(path)
-      await reload()
-    } catch (e) { alert((e as Error).message) }
-    setBusy('')
-  }
-  const useDefault = async () => {
-    setBusy('…')
-    try { await store(null); await reload() } catch (e) { alert((e as Error).message) }
-    setBusy('')
-  }
+    if (res.error) throw new Error((await (res.error as { context?: Response }).context?.json().catch(() => null))?.error ?? res.error.message)
+    setPreview(res.data.prompt)
+  })
 
   return (
     <div className="form">
-      <p className="hint">
-        {hint} The AI copies its layout, never its clothes or person.
-        {scope === 'global' ? ' Default for every user.' : own ? ' You use your own picture.' : ' You use the default picture.'}
-      </p>
-      {current ? <Photo path={current} alt={hint} className="look-post" zoom /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
-      <label className="check-row">
-        <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
-        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>
-      </label>
-      <label className={'btn wide' + (busy ? ' disabled' : '')}>
-        <Icon name="image" /> {busy || (scope === 'user' && !own ? 'Use my own picture' : 'Replace picture')}
-        <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />
-      </label>
-      {scope === 'user' && own && <button className="btn ghost wide" onClick={useDefault} disabled={!!busy}>Use the default picture</button>}
+      <p className="hint">{t.hint}{scope === 'global' ? ' Default for every user.' : ''}</p>
+      {t.picture && <>
+        <p className="section-title small">Picture{scope === 'user' && <span className="muted"> · {own?.image_path ? 'your own' : 'the default'}</span>}</p>
+        {picture ? <Photo path={picture} alt={t.label} className="look-post" zoom /> : <p className="muted small">No picture yet.</p>}
+        <label className="check-row">
+          <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
+          <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>
+        </label>
+        <label className={'btn wide' + (busy ? ' disabled' : '')}>
+          <Icon name="image" /> {scope === 'user' && !own?.image_path ? 'Use my own picture' : 'Replace picture'}
+          <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
+        {scope === 'user' && own?.image_path && <button className="btn ghost wide" onClick={() => run('…', () => store({ image_path: null }))} disabled={!!busy}>Use the default picture</button>}
+      </>}
+
+      <p className="section-title small">Instructions for the AI{scope === 'user' && <span className="muted"> · {own?.prompt ? 'your own' : 'the default'}</span>}</p>
+      {newPicture && <p className="hint warn">New picture: the instructions still describe the old one. Let the AI rewrite them for this picture, then check and save.</p>}
+      <textarea className="prompt-edit" rows={14} value={text} onChange={e => setText(e.target.value)} disabled={!!busy} spellCheck={false} />
+      <p className="hint">The app fills these in: {Object.entries(t.placeholders).map(([k, v], n) => <span key={k}>{n ? ', ' : ''}<code>{'{' + k + '}'}</code> {v}</span>)}. It also adds which attached photo is which.</p>
+      {t.picture && picture && <button className="btn wide" onClick={describe} disabled={!!busy}><Icon name="sparkle" /> Write them from the picture<span className="cost">(OpenAI ≈1¢)</span></button>}
+      <div className="save-row">
+        <button className="btn primary" onClick={() => run('Saving…', () => store({ prompt: text.trim() || null }))} disabled={!!busy || !dirty || (scope === 'global' && !text.trim())}><Icon name="check" /> Save</button>
+        {dirty && <button className="btn" onClick={() => setText(savedText)} disabled={!!busy}>Undo changes</button>}
+      </div>
+      {scope === 'user' && own?.prompt && <button className="btn ghost wide" onClick={() => run('…', () => store({ prompt: null }))} disabled={!!busy}>Use the default instructions</button>}
+      <button className="btn ghost wide" onClick={showPrompt} disabled={!!busy || dirty} title={dirty ? 'Save first' : ''}><Icon name="eye" /> Show the full prompt (example, free)</button>
+      {busy && <p className="muted small">{busy}</p>}
+      {preview && <div className="prompt-preview"><button className="icon-btn" onClick={() => setPreview('')} aria-label="Close"><Icon name="x" /></button><pre>{preview}</pre></div>}
     </div>
   )
 }

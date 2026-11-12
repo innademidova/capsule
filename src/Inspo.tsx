@@ -164,7 +164,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
                 </div>
               )}
               {insp.note && <p className="muted small">Your note: {insp.note}</p>}
-              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? 'Thinking…' : 'Analyze again (Gemini · <1¢)'}</button>
+              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? 'Thinking…' : 'Analyze again (OpenAI ≈2¢)'}</button>
             </>
           )}
         </div>

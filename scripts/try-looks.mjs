@@ -26,7 +26,10 @@ if (cmd === 'ideas') {
   if (res.error) await fail(res.error)
   const { data } = await sb.storage.from('photos').download(res.data.path)
   writeFileSync(b, Buffer.from(await data.arrayBuffer()))
-  const { error } = await sb.from('style_profile').upsert({ user_id: user.id, templates: { look: res.data.path } })
+  const { data: own } = await sb.from('image_templates').select('id').eq('purpose', 'look').eq('user_id', user.id).maybeSingle()
+  const { error } = own
+    ? await sb.from('image_templates').update({ image_path: res.data.path }).eq('id', own.id)
+    : await sb.from('image_templates').insert({ user_id: user.id, purpose: 'look', image_path: res.data.path })
   if (error) throw error
   console.log(`saved ${b} (${res.data.path}), now the layout reference | cost ${(res.data.cost_usd * 100).toFixed(2)}¢`)
 } else if (cmd === 'photo') {

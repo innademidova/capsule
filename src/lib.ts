@@ -91,13 +91,19 @@ export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 // The lists above and below (colors, kinds, styles, occasions) are only fallbacks. The real lists come from the
 // database view dict_effective (admin defaults + this user's own changes); applyDict() puts them into these arrays.
 // Colors, styles and occasions are stored in items by id; brands, materials and kinds by their text (id = lowercase).
-// Layout templates for AI images, one per purpose. The AI copies the layout of the picture, never its clothes.
-// Global defaults: app_settings 'template:<id>' (admins); own pictures: style_profile.templates[<id>].
+// Image templates (table image_templates), one per purpose: a layout picture plus the instructions for the image model.
+// A row without user_id is the default (admins); a user's own row overrides it field by field (null = the default).
+// placeholders: the {names} the Edge Functions fill in (keep in sync with supabase/functions/_shared/templates.ts).
 export const TEMPLATES = [
-  { id: 'look', label: 'One outfit on me', hint: 'Saved outfits and the stylist’s looks: you wearing one outfit, with the pieces and a palette.' },
-  { id: 'many', label: 'One piece, many looks', hint: '“Style it” on an item: one collage with the piece in the middle and several looks around it.' },
+  { id: 'look', label: 'One outfit on me', picture: true, hint: 'Saved outfits and the stylist’s looks: you wearing one outfit, with the pieces and a palette.',
+    placeholders: { vibe: 'the name of the look', scene: 'where she is and what she does', palette: 'the colours of the dots', palette_count: 'how many dots', appearance: 'your appearance from Preferences' } },
+  { id: 'many', label: 'One piece, many looks', picture: true, hint: '“Style it” on an item: one collage with the piece in the middle and several looks around it.',
+    placeholders: { title: 'the headline, e.g. ONE SWEATER', anchor: 'the main piece', looks_count: 'how many looks', labels: 'the names of the looks', palette: 'the colours of the dots', palette_count: 'how many dots', appearance: 'your appearance from Preferences' } },
+  { id: 'garment', label: 'Item photos', picture: false, hint: 'Enhance with AI: a clean product photo of a piece from a photo of you wearing it.',
+    placeholders: { piece: 'which piece to draw' } },
 ] as const
 export type TemplateId = typeof TEMPLATES[number]['id']
+export type ImageTemplate = { id: string; user_id: string | null; purpose: TemplateId; image_path: string | null; prompt: string | null; updated_at: string }
 
 export type DictType = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion'
 export type DictRow = { type: DictType; category: string; id: string; label: string; hex: string | null; sort: number; is_default?: boolean; is_own?: boolean }
@@ -347,12 +353,12 @@ export type Outfit = {
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
 export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
-export type StyleProfile = { appearance: string | null; templates: Partial<Record<TemplateId, string>>; /* own template pictures; a missing id = the global default */ summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
+export type StyleProfile = { appearance: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
   status: 'queued' | 'done' | 'error'; result: any; error: string | null; created_at: string; done_at: string | null
-  cost_usd?: number | null; model?: string | null // which model answered, e.g. "Gemini 3.8 Flash"
+  cost_usd?: number | null; model?: string | null // which model answered, e.g. "gpt-6.1-terra"
 }
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 // Result of the 'looks' AI task; image_path / outfit_id are added by the app later

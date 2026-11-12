@@ -428,7 +428,6 @@ grant execute on function public.admin_list_users(), public.admin_set_role(uuid,
 
 -- ===== Global settings =====
 -- key/value, readable by everyone signed in, written by admins. Keys:
---   template:<id>: {"path": "global/reference/<file>"}  default template picture for AI images (ids in src/lib.ts)
 create table if not exists public.app_settings (
   key        text primary key,
   value      jsonb not null,
@@ -454,11 +453,31 @@ create policy "admins write global photos" on storage.objects for all to authent
 -- Which model answered an AI request (e.g. "Gemini 3.8 Flash", "OpenAI")
 alter table public.ai_requests add column if not exists model text;
 
--- Image templates per purpose (supabase/migrations/20261111b_image_templates.sql): own pictures {"<id>": path};
--- global defaults in app_settings 'template:<id>'
-alter table public.style_profile add column if not exists templates jsonb not null default '{}';
 create or replace function public.set_request_collage(req uuid, path text) returns void
 language sql security invoker as $$
   update public.ai_requests set result = jsonb_set(result, '{collage_path}', to_jsonb(path))
   where id = req and user_id = auth.uid();
 $$;
+
+-- Image templates: layout picture + instructions per purpose (supabase/migrations/20261112_image_templates_with_prompts.sql
+-- also seeds the default rows with their instruction texts)
+create table if not exists public.image_templates (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users on delete cascade,
+  purpose    text not null check (purpose in ('look', 'many', 'garment')),
+  image_path text,
+  prompt     text,
+  updated_at timestamptz not null default now(),
+  unique nulls not distinct (user_id, purpose)
+);
+alter table public.image_templates enable row level security;
+drop policy if exists "read defaults and own" on public.image_templates;
+create policy "read defaults and own" on public.image_templates for select
+  using (user_id is null or user_id = auth.uid());
+drop policy if exists "write own" on public.image_templates;
+create policy "write own" on public.image_templates for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "admins write defaults" on public.image_templates;
+create policy "admins write defaults" on public.image_templates for all
+  using (user_id is null and public.is_admin()) with check (user_id is null and public.is_admin());
+
