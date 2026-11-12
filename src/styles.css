@@ -506,3 +506,4 @@ details.card .dict-list { margin-top: 12px; }
 .prompt-preview { position: relative; background: var(--card, #fff); border: 1px solid var(--line, rgba(0,0,0,.08)); border-radius: 12px; padding: 12px; }
 .prompt-preview pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 420px; overflow: auto; }
 .prompt-preview .icon-btn { position: absolute; top: 6px; right: 6px; }
+.seg.looks-count { margin: 0; width: 100%; }

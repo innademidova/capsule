@@ -174,6 +174,9 @@ function useLooks(anchor?: Item) {
 export function StyleItem({ item }: { item: Item }) {
   const { requests } = useStore()
   const [wish, setWish] = useState('')
+  // How many looks around the piece; the last choice is remembered on this device
+  const [count, setCount] = useState(() => { try { return Number(localStorage.getItem('style-it-count')) || 4 } catch { return 4 } })
+  const chooseCount = (n: number) => { setCount(n); try { localStorage.setItem('style-it-count', String(n)) } catch { /* private mode */ } }
   const { busy, ask, drawing, draw, drawCollage } = useLooks(item)
   const past = requests.filter(r => r.kind === 'looks' && r.input.item_id === item.id)
   return (
@@ -186,7 +189,10 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <div className="seg looks-count" role="radiogroup" aria-label="Number of looks">
+          {[3, 4, 5, 6].map(n => <button key={n} type="button" role="radio" aria-checked={count === n} className={count === n ? 'on' : ''} onClick={() => chooseCount(n)} disabled={busy}>{n} looks</button>)}
+        </div>
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
         onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
