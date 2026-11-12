@@ -1,8 +1,10 @@
-// Creates a photo of a single garment from a photo of a person (OpenAI gpt-image-2.6-sunburst).
+// Creates a photo of a single garment from a photo of a person: Gemini Nano Banana 2 first (_shared/gemini-image.ts),
+// OpenAI gpt-image-2.6-sunburst as the fallback. Gemini has no transparent output: it draws on white, which the app removes.
 // The result is a draft in storage: the item reaches the app only after approval.
 // The key is a Supabase secret (OPENAI_API_KEY).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
+import { geminiImage, extOf } from "../_shared/gemini-image.ts";
 
 const MODEL = "gpt-image-2.6-sunburst";
 const QUALITY = "medium"; // high = more detail, but roughly four times the cost and longer
@@ -96,7 +98,7 @@ Deno.serve(async req => {
   try {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
-    if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
+    if (!Deno.env.get("GEMINI_API_KEY") && !Deno.env.get("OPENAI_API_KEY")) throw new Error("No image AI key is set up yet.");
     const { source_path, ref_paths = [], previous_path, piece, corrections = [], set = false } = await req.json() as {
       source_path: string; ref_paths?: string[]; previous_path?: string; set?: boolean; piece: string; corrections?: string[];
     };
@@ -105,6 +107,22 @@ Deno.serve(async req => {
     for (const r of refs) images.push(await download(sb, r));
     if (previous_path) images.push(await download(sb, previous_path));
     const prompt = buildPrompt(piece, corrections, refs.length, !!previous_path, !!set);
+
+    const started = Date.now();
+    let why = "";
+    try {
+      const g = await geminiImage(prompt, images, { size: "1K", budgetMs: 75_000, flashFirst: true });
+      const path = `${user.id}/drafts/${crypto.randomUUID()}.${extOf(g.mime)}`;
+      const { error } = await sb.storage.from("photos").upload(path, decodeBase64(g.b64), { contentType: g.mime });
+      if (error) throw error;
+      const { text_in, image_in, output, cost_usd } = g;
+      await sb.from("ai_usage").insert({ kind: "garment", model: g.model, text_in, image_in, output, cost_usd, raw: g.raw });
+      return json({ path, text_in, image_in, output, cost_usd, model: g.model, skipped: g.skipped });
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+      console.warn("gemini garment failed", why);
+      if (Date.now() - started > 80_000) throw e;
+    }
 
     let r = await callOpenAI(images, prompt, "transparent");
     // If a transparent background is refused, use white; the app removes it
@@ -117,7 +135,7 @@ Deno.serve(async req => {
     if (error) throw error;
     const usage = costOf(body.usage ?? {});
     await sb.from("ai_usage").insert({ kind: "garment", model: MODEL, ...usage, raw: body.usage ?? null });
-    return json({ path, ...usage });
+    return json({ path, ...usage, model: "OpenAI", skipped: [why] });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }

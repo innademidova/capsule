@@ -178,7 +178,7 @@ export function Collage({ layout, items, className, children }: {
 
 // The button for a paid AI action (the free queue was removed at the owner's request on 2026-11-11)
 // Text tasks run on Gemini (free; OpenAI only steps in when Gemini is out of quota), images on OpenAI
-export function AIActions({ onRun, busy, label, cost = 'Gemini · free', disabled }: {
+export function AIActions({ onRun, busy, label, cost = 'Gemini · <1¢', disabled }: {
   onRun: (mode: 'now') => void; busy?: boolean; label: string; cost?: string; disabled?: boolean
 }) {
   return (

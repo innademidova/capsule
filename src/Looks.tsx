@@ -83,7 +83,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
         : <>
           <FlatLay items={its} />
-          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span></button>}
+          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(Nano Banana ≈14¢)</span></button>}
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
@@ -140,7 +140,7 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
             </button>
           </>
           : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
-          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈17¢)</span></button>)}
+          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(Nano Banana ≈14¢)</span></button>)}
         <div className="looks">
           {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={onCollage ? undefined : () => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
@@ -186,7 +186,7 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="ideas: OpenAI, collage: Nano Banana ≈16¢" onRun={() => { ask({ item_id: item.id, count: 4, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
         onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
@@ -218,7 +218,7 @@ export function Assistant() {
           <input placeholder="Weather (optional), e.g. +15°C, sunny" value={weather} onChange={e => setWeather(e.target.value)} />
           <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
         </div>
-        <AIActions label="Get looks" cost="ideas: Gemini · free, 3 photos: OpenAI ≈20¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
+        <AIActions label="Get looks" cost="ideas: Gemini, 3 photos: Nano Banana ≈41¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>

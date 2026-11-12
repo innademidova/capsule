@@ -294,7 +294,7 @@ function TemplateEditor({ scope, id, hint }: { scope: Scope; id: TemplateId; hin
       {current ? <Photo path={current} alt={hint} className="look-post" zoom /> : <p className="muted small">No picture yet: the AI uses a built-in description of the layout.</p>}
       <label className="check-row">
         <input type="checkbox" checked={clean} onChange={e => setClean(e.target.checked)} disabled={!!busy} />
-        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (OpenAI ≈5¢)</span>
+        <span><b>Clean it with AI</b>: removes text, page numbers and app icons from a screenshot (Nano Banana ≈14¢)</span>
       </label>
       <label className={'btn wide' + (busy ? ' disabled' : '')}>
         <Icon name="image" /> {busy || (scope === 'user' && !own ? 'Use my own picture' : 'Replace picture')}

@@ -1,4 +1,4 @@
-// Look images (OpenAI gpt-image-2.6-sunburst). Every image copies the layout of a template picture for its purpose:
+// Look images: Gemini Nano Banana Pro at 2K first (_shared/gemini-image.ts), OpenAI gpt-image-2.6-sunburst as the fallback. Every image copies the layout of a template picture for its purpose:
 // the user's own style_profile.templates[<id>], else the global app_settings 'template:<id>' (ids in src/lib.ts TEMPLATES).
 // Three jobs:
 // 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', a styling post: the woman wearing the outfit on one side, the separate pieces and a palette on the
@@ -11,6 +11,7 @@
 // Writes to photos/<uid>/looks/ (or reference/) and returns the path. The key is a Supabase secret (OPENAI_API_KEY).
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
+import { geminiImage, extOf } from "../_shared/gemini-image.ts";
 
 const MODEL = "gpt-image-2.6-sunburst";
 const QUALITY = "medium";
@@ -110,9 +111,37 @@ async function callImages(form: FormData) {
   return { b64: body.data[0].b64_json as string, usage: (body.usage ?? {}) as ImageUsage };
 }
 
-async function save(sb: SupabaseClient, path: string, b64: string) {
-  const { error } = await sb.storage.from("photos").upload(path, decodeBase64(b64), { contentType: "image/webp" });
+async function save(sb: SupabaseClient, path: string, b64: string, mime: string) {
+  const { error } = await sb.storage.from("photos").upload(path, decodeBase64(b64), { contentType: mime });
   if (error) throw error;
+}
+
+// Draws one picture and logs its cost. Gemini first; OpenAI (with these form fields) if Gemini fails and there is
+// still time left in the function (~150 s wall clock). images: in the order the prompt numbers them.
+async function paint(sb: SupabaseClient, kind: string, prompt: string, images: Blob[],
+  o: { aspect?: string; size: "1K" | "2K"; openai: Record<string, string> }) {
+  const started = Date.now();
+  try {
+    const g = await geminiImage(prompt, images, { aspect: o.aspect, size: o.size, budgetMs: 75_000 });
+    const { text_in, image_in, output, cost_usd } = g;
+    await sb.from("ai_usage").insert({ kind, model: g.model, text_in, image_in, output, cost_usd, raw: g.raw });
+    return { b64: g.b64, mime: g.mime, model: g.model, cost_usd, skipped: g.skipped };
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    console.warn("gemini image failed", why);
+    if (Date.now() - started > 80_000) throw e;
+    const form = new FormData();
+    form.append("model", MODEL);
+    form.append("prompt", prompt);
+    for (const [k, v] of Object.entries(o.openai)) form.append(k, v);
+    form.append("output_format", "webp");
+    form.append("output_compression", "90");
+    images.forEach((img, n) => form.append("image[]", img, `image-${n + 1}.${img.type.split("/")[1] || "png"}`));
+    const out = await callImages(form);
+    const usage = costOf(out.usage);
+    await sb.from("ai_usage").insert({ kind, model: MODEL, ...usage, raw: out.usage });
+    return { b64: out.b64, mime: "image/webp", model: "OpenAI", cost_usd: usage.cost_usd, skipped: [why] };
+  }
 }
 
 // USD per 1M tokens, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
@@ -135,7 +164,7 @@ Deno.serve(async req => {
   try {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Please sign in again" }, 401);
-    if (!Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
+    if (!Deno.env.get("GEMINI_API_KEY") && !Deno.env.get("OPENAI_API_KEY")) throw new Error("No image AI key is set up yet.");
     const body0 = await req.json() as {
       item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number;
       clean_path?: string; global?: boolean; many?: Many;
@@ -143,21 +172,11 @@ Deno.serve(async req => {
     const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, clean_path, global = false, many } = body0;
 
     if (clean_path) {
-      const form = new FormData();
-      form.append("model", MODEL);
-      form.append("prompt", CLEAN);
-      form.append("quality", QUALITY);
-      form.append("size", "auto");
-      form.append("output_format", "webp");
-      form.append("output_compression", "90");
       const img = await download(sb, clean_path);
-      form.append("image[]", img, `reference.${img.type.split("/")[1] || "png"}`);
-      const out = await callImages(form);
-      const path = `${global ? "global" : user.id}/reference/${crypto.randomUUID()}.webp`;
-      await save(sb, path, out.b64);
-      const usage = costOf(out.usage);
-      await sb.from("ai_usage").insert({ kind: "reference", model: MODEL, ...usage, raw: out.usage });
-      return json({ path, ...usage });
+      const out = await paint(sb, "reference", CLEAN, [img], { size: "2K", openai: { quality: QUALITY, size: "auto" } });
+      const path = `${global ? "global" : user.id}/reference/${crypto.randomUUID()}.${extOf(out.mime)}`;
+      await save(sb, path, out.b64, out.mime);
+      return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
     }
 
     const { data: prof } = await sb.from("style_profile").select("appearance,templates").maybeSingle();
@@ -169,31 +188,20 @@ Deno.serve(async req => {
 
     if (many) {
       // Every piece once: the anchor first, then the rest in the order the looks use them (max 14 + the template)
-      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 14);
+      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 13); // Gemini takes at most 14 images: 13 pieces + the template
       const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", ids);
       const pieces = ids.map(id => ((rows ?? []) as Piece[]).find(p => p.id === id)).filter((p): p is Piece => !!p?.photo_path);
       if (!pieces.length || pieces[0].id !== many.anchor_id) throw new Error("The piece has no photo");
       const ref = await template("many");
-      const form = new FormData();
-      form.append("model", MODEL);
-      form.append("prompt", buildManyPrompt(pieces, prof?.appearance ?? "", many, !!ref));
-      // Many small figures: "medium" smears faces and garment details; "high" costs only ~1c more here
-      form.append("quality", "high");
-      form.append("size", "1024x1536");
-      form.append("output_format", "webp");
-      form.append("output_compression", "90");
-      for (const [n, p] of pieces.entries()) {
-        const img = await download(sb, p.photo_path!);
-        form.append("image[]", img, `image-${n}.${img.type.split("/")[1] || "webp"}`);
-      }
-      if (ref) form.append("image[]", ref, `layout.${ref.type.split("/")[1] || "webp"}`);
-      const out = await callImages(form);
-      const path = `${user.id}/looks/${crypto.randomUUID()}.webp`;
-      await save(sb, path, out.b64);
-      const usage = costOf(out.usage);
-      await sb.from("ai_usage").insert({ kind: "looks-collage", model: MODEL, ...usage, raw: out.usage });
+      const images = await Promise.all(pieces.map(p => download(sb, p.photo_path!)));
+      if (ref) images.push(ref);
+      // Many small figures: OpenAI "medium" smeared faces and garment details; "high" cost only ~1c more there
+      const out = await paint(sb, "looks-collage", buildManyPrompt(pieces, prof?.appearance ?? "", many, !!ref), images,
+        { aspect: "2:3", size: "2K", openai: { quality: "high", size: "1024x1536" } });
+      const path = `${user.id}/looks/${crypto.randomUUID()}.${extOf(out.mime)}`;
+      await save(sb, path, out.b64, out.mime);
       if (request_id) await sb.rpc("set_request_collage", { req: request_id, path });
-      return json({ path, ...usage });
+      return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
     }
 
     const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", item_ids.slice(0, 10));
@@ -202,26 +210,14 @@ Deno.serve(async req => {
     if (!pieces.length) throw new Error("No pieces with photos in this outfit");
     const ref = await template("look");
 
-    const form = new FormData();
-    form.append("model", MODEL);
-    form.append("prompt", buildPrompt(pieces, prof?.appearance ?? "", scene, vibe, palette.slice(0, 6), !!ref));
-    form.append("quality", QUALITY);
-    form.append("size", "1024x1536");
-    form.append("output_format", "webp");
-    form.append("output_compression", "90");
-    for (const [n, p] of pieces.entries()) {
-      const img = await download(sb, p.photo_path!);
-      form.append("image[]", img, `image-${n}.${img.type.split("/")[1] || "webp"}`);
-    }
-    if (ref) form.append("image[]", ref, `layout.${ref.type.split("/")[1] || "webp"}`);
-    const out = await callImages(form);
-
-    const path = `${user.id}/looks/${crypto.randomUUID()}.webp`;
-    await save(sb, path, out.b64);
-    const usage = costOf(out.usage);
-    await sb.from("ai_usage").insert({ kind: "look", model: MODEL, ...usage, raw: out.usage });
+    const images = await Promise.all(pieces.map(p => download(sb, p.photo_path!)));
+    if (ref) images.push(ref);
+    const out = await paint(sb, "look", buildPrompt(pieces, prof?.appearance ?? "", scene, vibe, palette.slice(0, 6), !!ref), images,
+      { aspect: "2:3", size: "2K", openai: { quality: QUALITY, size: "1024x1536" } });
+    const path = `${user.id}/looks/${crypto.randomUUID()}.${extOf(out.mime)}`;
+    await save(sb, path, out.b64, out.mime);
     if (request_id && index != null) await sb.rpc("set_look_image", { req: request_id, n: index, path });
-    return json({ path, ...usage });
+    return json({ path, cost_usd: out.cost_usd, model: out.model, skipped: out.skipped });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);
   }
