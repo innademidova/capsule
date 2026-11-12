@@ -428,7 +428,14 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .dict-list { display: grid; gap: 6px; }
 .dict-row { display: flex; gap: 8px; align-items: center; }
 .dict-row > input:not([type=color]) { flex: 1; min-width: 0; }
-.dict-row input[type=color] { width: 40px; height: 40px; padding: 2px; border-radius: 10px; flex: none; }
+.dict-row input[type=color] {
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; flex: none; margin: 0 4px;
+  background: none; cursor: pointer; overflow: hidden; -webkit-appearance: none; appearance: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.dict-row input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.dict-row input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.dict-row input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }
 .dict-row .uses { width: 28px; text-align: right; flex: none; }
 
 /* Corner handles to resize a piece on the outfit board */
@@ -467,7 +474,7 @@ input:disabled { opacity: 0.7; }
 .seg button { flex: 1; white-space: nowrap; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
 .dict-badge { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--soft); padding: 3px 7px; border-radius: 999px; }
-.dict-swatch { width: 40px; height: 40px; border-radius: 10px; flex: none; border: 1px solid var(--line); }
+.dict-swatch { width: 32px; height: 32px; border-radius: 50%; flex: none; margin: 0 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.12); }
 details.card summary { cursor: pointer; }
 details.card .dict-list { margin-top: 12px; }
 .user-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
