@@ -1,4 +1,5 @@
-// Look images: Gemini Nano Banana Pro at 2K first (_shared/gemini-image.ts), OpenAI gpt-image-2.6-sunburst as the fallback. Every image copies the layout of a template picture for its purpose:
+// Look images: OpenAI gpt-image-2.6-sunburst first (she preferred its look on 2026-11-12: Gemini drew image numbers and
+// hex codes and followed the template less), Gemini Nano Banana Pro at 2K (_shared/gemini-image.ts) as the fallback. Every image copies the layout of a template picture for its purpose:
 // the user's own style_profile.templates[<id>], else the global app_settings 'template:<id>' (ids in src/lib.ts TEMPLATES).
 // Three jobs:
 // 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', a styling post: the woman wearing the outfit on one side, the separate pieces and a palette on the
@@ -35,7 +36,7 @@ function buildPrompt(pieces: Piece[], appearance: string, scene: string, vibe: s
 - Right part: a plain warm off-white (#f3eee6) panel. At the top a row of ${palette.length || "3–5"} round colour dots${palette.length ? ` in these colours, left to right: ${palette.join(", ")}` : " with the main colours of the outfit"}. Below them, each piece of the outfit as a separate clean product photo (no person, no hanger), neatly arranged like the reference with small even gaps, all fully visible.
 - The same pieces appear in both parts and look identical in both.
 - ${hasRef ? "Copy ONLY the layout, proportions, spacing and mood of the reference. Do not copy its clothes, person, colours or any text." : "Clean, editorial, calm."}
-- No text at all: no titles, numbers, lists, labels, logos, icons or watermarks.
+- No text at all: no titles, numbers (the image numbers below are only for you), hex codes, lists, labels, logos, icons or watermarks.
 
 The outfit is made of exactly these pieces:
 ${list}
@@ -69,7 +70,7 @@ function buildManyPrompt(pieces: Piece[], appearance: string, many: Many, hasRef
 - In the centre, large: a clean product photo of image 1 (${anchor.name ?? anchor.kind ?? anchor.category}) on its own, exactly as it is.
 - Around it, ${many.looks.length} separate full-body street-style photos of the SAME woman, one per look below, arranged like the photos in the reference (torn-paper edges, small tilt, soft shadow), all fully visible and not overlapping the centre piece.
 - Background: a warm, plain beige paper texture like the reference.
-- Text, in the same elegant fonts and places as the reference, and nothing else: the headline "${many.title.toUpperCase()}" with "many looks" in script under it; next to each photo its short handwritten label with a small arrow; at the bottom a row of ${many.palette.length || 5} round colour dots${many.palette.length ? ` in these colours, left to right: ${many.palette.join(", ")}` : ""}. Spell every word exactly as given.
+- Text, in the same elegant fonts and places as the reference, and nothing else: the headline "${many.title.toUpperCase()}" with "many looks" in script under it; next to each photo its short handwritten label with a small arrow; at the bottom a row of ${many.palette.length || 5} round colour dots${many.palette.length ? ` in these colours, left to right: ${many.palette.join(", ")}` : ""}. Spell every word exactly as given. The image numbers below are only for you: never draw numbers, hex codes or any other text.
 - ${hasRef ? "Copy ONLY the layout, proportions, fonts and mood of the reference. Do not copy its clothes, person or colours." : "Calm, editorial, airy."}
 
 The pieces (product photos):
@@ -116,32 +117,36 @@ async function save(sb: SupabaseClient, path: string, b64: string, mime: string)
   if (error) throw error;
 }
 
-// Draws one picture and logs its cost. Gemini first; OpenAI (with these form fields) if Gemini fails and there is
+// Draws one picture and logs its cost. OpenAI first (with these form fields); Gemini if OpenAI fails and there is
 // still time left in the function (~150 s wall clock). images: in the order the prompt numbers them.
 async function paint(sb: SupabaseClient, kind: string, prompt: string, images: Blob[],
   o: { aspect?: string; size: "1K" | "2K"; openai: Record<string, string> }) {
   const started = Date.now();
-  try {
-    const g = await geminiImage(prompt, images, { aspect: o.aspect, size: o.size, budgetMs: 75_000 });
-    const { text_in, image_in, output, cost_usd } = g;
-    await sb.from("ai_usage").insert({ kind, model: g.model, text_in, image_in, output, cost_usd, raw: g.raw });
-    return { b64: g.b64, mime: g.mime, model: g.model, cost_usd, skipped: g.skipped };
-  } catch (e) {
-    const why = e instanceof Error ? e.message : String(e);
-    console.warn("gemini image failed", why);
-    if (Date.now() - started > 80_000) throw e;
-    const form = new FormData();
-    form.append("model", MODEL);
-    form.append("prompt", prompt);
-    for (const [k, v] of Object.entries(o.openai)) form.append(k, v);
-    form.append("output_format", "webp");
-    form.append("output_compression", "90");
-    images.forEach((img, n) => form.append("image[]", img, `image-${n + 1}.${img.type.split("/")[1] || "png"}`));
-    const out = await callImages(form);
-    const usage = costOf(out.usage);
-    await sb.from("ai_usage").insert({ kind, model: MODEL, ...usage, raw: out.usage });
-    return { b64: out.b64, mime: "image/webp", model: "OpenAI", cost_usd: usage.cost_usd, skipped: [why] };
+  let why = "";
+  if (Deno.env.get("OPENAI_API_KEY")) {
+    try {
+      const form = new FormData();
+      form.append("model", MODEL);
+      form.append("prompt", prompt);
+      for (const [k, v] of Object.entries(o.openai)) form.append(k, v);
+      form.append("output_format", "webp");
+      form.append("output_compression", "90");
+      images.forEach((img, n) => form.append("image[]", img, `image-${n + 1}.${img.type.split("/")[1] || "png"}`));
+      const out = await callImages(form);
+      const usage = costOf(out.usage);
+      await sb.from("ai_usage").insert({ kind, model: MODEL, ...usage, raw: out.usage });
+      return { b64: out.b64, mime: "image/webp", model: "OpenAI", cost_usd: usage.cost_usd, skipped: [] as string[] };
+    } catch (e) {
+      why = e instanceof Error ? e.message : String(e);
+      console.warn("openai image failed", why);
+    }
   }
+  const left = 140_000 - (Date.now() - started);
+  if (left < 30_000) throw new Error(why || "No time left");
+  const g = await geminiImage(prompt, images, { aspect: o.aspect, size: o.size, budgetMs: left });
+  const { text_in, image_in, output, cost_usd } = g;
+  await sb.from("ai_usage").insert({ kind, model: g.model, text_in, image_in, output, cost_usd, raw: g.raw });
+  return { b64: g.b64, mime: g.mime, model: g.model, cost_usd, skipped: why ? [why, ...g.skipped] : g.skipped };
 }
 
 // USD per 1M tokens, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
