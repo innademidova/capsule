@@ -436,7 +436,6 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .dict-row input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
 .dict-row input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
 .dict-row input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }
-.dict-row .uses { width: 28px; text-align: right; flex: none; }
 
 /* Corner handles to resize a piece on the outfit board */
 .board-item .handle { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--ink);

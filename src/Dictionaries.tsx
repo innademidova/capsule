@@ -214,7 +214,6 @@ function DictRowEdit({ row, color, busy, badge, onSave, onDelete, onReset }: {
         : <span className="dict-swatch" style={{ background: row.hex }} />)}
       <input value={label} onChange={e => setLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && changed && onSave(row, label, hex)} />
       {badge && <span className="dict-badge">{badge}</span>}
-      <span className="muted small uses" title="Your items using it">{row.uses || ''}</span>
       {changed
         ? <button className="icon-btn" onClick={() => onSave(row, label, hex)} disabled={busy} aria-label="Save"><Icon name="check" /></button>
         : <>
