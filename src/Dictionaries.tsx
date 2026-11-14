@@ -4,15 +4,13 @@
 //            touches my overrides; the default itself stays for everyone else.
 //   'global' the defaults themselves (dict_global, image_templates rows without user_id); admins only.
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, TEMPLATES, processPhoto, removePhotos, askAI, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
+import { supabase, CATEGORIES, TEMPLATES, processPhoto, removePhotos, askAI, dictLabel, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
+import { t, formatDate } from './i18n'
 import { useStore } from './store'
 import { Icon, Photo } from './ui'
 
 export type Scope = 'user' | 'global'
-const TYPES: { id: DictType; label: string }[] = [
-  { id: 'brand', label: 'Brands' }, { id: 'material', label: 'Materials' }, { id: 'color', label: 'Colors' },
-  { id: 'kind', label: 'Types' }, { id: 'style', label: 'Styles' }, { id: 'occasion', label: 'Occasions' },
-]
+const TYPES: DictType[] = ['brand', 'material', 'color', 'kind', 'style', 'occasion']
 // Items keep colors, styles and occasions by id (renaming changes only the label);
 // brands, materials and kinds by their text (renaming changes the id and the items)
 const BY_ID: DictType[] = ['color', 'style', 'occasion']
@@ -55,12 +53,13 @@ export function DictEditor({ scope }: { scope: Scope }) {
   // The same merge as the dict_effective view, plus what is hidden (so it can be brought back)
   const g = glob.filter(here), u = mine.filter(here)
   const over = new Map(u.map(r => [r.id, r]))
+  // Admins edit the defaults as stored (English); users see untouched defaults in the interface language
   const rows: Row[] = scope === 'global'
     ? g.map(r => ({ id: r.id, label: r.label, hex: r.hex, source: 'default' as const, uses: usesOf(r.id) }))
     : [
       ...g.filter(r => !over.get(r.id)?.hidden).map(r => {
         const o = over.get(r.id)
-        return { id: r.id, label: o?.label ?? r.label, hex: o?.hex ?? r.hex, source: o ? 'edited' as const : 'default' as const, uses: usesOf(r.id), sort: o?.sort ?? r.sort }
+        return { id: r.id, label: o?.label ?? dictLabel(type, r.id, r.label), hex: o?.hex ?? r.hex, source: o ? 'edited' as const : 'default' as const, uses: usesOf(r.id), sort: o?.sort ?? r.sort }
       }),
       ...u.filter(r => !r.hidden && !g.some(x => x.id === r.id)).map(r => ({ id: r.id, label: r.label ?? r.id, hex: r.hex, source: 'own' as const, uses: usesOf(r.id), sort: r.sort ?? 1000 })),
     ].sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label))
@@ -101,7 +100,7 @@ export function DictEditor({ scope }: { scope: Scope }) {
   const add = (label: string, hex: string) => run(async () => {
     const id = idFor(label), name = labelFor(label)
     if (!id) return
-    if (rows.some(r => r.id === id)) throw new Error('Already in the list')
+    if (rows.some(r => r.id === id)) throw new Error(t('dict.exists'))
     const sort = rows.length
     if (scope === 'global') return fail((await supabase.from('dict_global').insert({ ...key, id, label: name, hex: type === 'color' ? hex : null, sort })).error)
     if (hiddenDefaults.some(r => r.id === id)) return dropMineRow(id) // it was a hidden default: bring it back
@@ -117,7 +116,7 @@ export function DictEditor({ scope }: { scope: Scope }) {
     }
     if (BY_ID.includes(type)) return setMineRow(r.id, { label: name, hex: type === 'color' ? hex : null, sort: null })
     const id = idFor(name)
-    if (id !== r.id && rows.some(x => x.id === id)) throw new Error('Already in the list')
+    if (id !== r.id && rows.some(x => x.id === id)) throw new Error(t('dict.exists'))
     if (id === r.id) await setMineRow(r.id, { label: name })
     else {
       // A default can not be renamed for me only: hide it and add my own entry with the new name
@@ -129,11 +128,11 @@ export function DictEditor({ scope }: { scope: Scope }) {
 
   const del = (r: Row) => {
     const strip = BY_ID.includes(type) && r.uses > 0
-    const msg = scope === 'global'
-      ? `Delete “${r.label}” from the defaults for everyone? Users whose items use it keep it in their own list.`
-      : strip ? `“${r.label}” is used by ${r.uses} of your item(s). Remove it from your list and from them?`
-      : r.uses ? `Remove “${r.label}” from your list? Your ${r.uses} item(s) keep it, it just stops being suggested.`
-      : `Remove “${r.label}” from your list?`
+    const v = { name: r.label, count: r.uses }
+    const msg = scope === 'global' ? t('dict.deleteGlobal', v)
+      : strip ? t('dict.deleteUsed', v)
+      : r.uses ? t('dict.deleteKept', v)
+      : t('dict.delete', v)
     if (!confirm(msg)) return
     run(async () => {
       if (scope === 'global') return fail((await supabase.rpc('admin_delete_dict', { p_type: type, p_category: category, p_id: r.id })).error)
@@ -143,16 +142,13 @@ export function DictEditor({ scope }: { scope: Scope }) {
   }
   const reset = (r: Row) => run(() => dropMineRow(r.id)) // an edited default goes back to the default
 
-  const typeLabel = TYPES.find(t => t.id === type)!.label
   return (
     <div className="form">
       <p className="hint">
-        {scope === 'global'
-          ? 'Defaults for every user. Users can change, add or hide entries for themselves; that never changes these.'
-          : 'Your own lists: the defaults plus your changes. Removing a default hides it only for you.'}
+        {scope === 'global' ? t('dict.globalHint') : t('dict.userHint')}
       </p>
       <div className="cat-row">
-        {TYPES.map(t => <button key={t.id} className={'cat' + (type === t.id ? ' on' : '')} onClick={() => { setType(t.id); setQ('') }}>{t.label}</button>)}
+        {TYPES.map(x => <button key={x} className={'cat' + (type === x ? ' on' : '')} onClick={() => { setType(x); setQ('') }}>{t(`dict.types.${x}`)}</button>)}
       </div>
       {type === 'kind' && (
         <div className="cat-row">
@@ -160,29 +156,29 @@ export function DictEditor({ scope }: { scope: Scope }) {
         </div>
       )}
       <AddRow key={scope + type + cat} color={type === 'color'} busy={busy} onAdd={add}
-        placeholder={type === 'kind' ? `New type for ${CATEGORIES.find(c => c.id === cat)?.label.toLowerCase()}` : `New ${typeLabel.toLowerCase().replace(/s$/, '')}`} />
-      {rows.length > 8 && <input placeholder="Search" value={q} onChange={e => setQ(e.target.value)} />}
+        placeholder={type === 'kind' ? t('dict.newKind', { category: CATEGORIES.find(c => c.id === cat)?.label.toLowerCase() ?? '' }) : t(`dict.new.${type}`)} />
+      {rows.length > 8 && <input placeholder={t('common.search')} value={q} onChange={e => setQ(e.target.value)} />}
       <div className="dict-list">
         {shown.map(r => <DictRowEdit key={scope + type + cat + r.id + r.label + r.hex} row={r} color={type === 'color'} busy={busy}
-          badge={scope === 'user' && r.source !== 'default' ? (r.source === 'own' ? 'mine' : 'edited') : ''}
+          badge={scope === 'user' && r.source !== 'default' ? t(`dict.badge.${r.source}`) : ''}
           onSave={save} onDelete={del} onReset={r.source === 'edited' ? () => reset(r) : undefined} />)}
-        {!shown.length && <p className="muted small">Nothing here yet.</p>}
+        {!shown.length && <p className="muted small">{t('common.nothingYet')}</p>}
       </div>
       {hiddenDefaults.length > 0 && (
         <details className="card">
-          <summary className="small"><b>Hidden defaults</b> <span className="muted">({hiddenDefaults.length})</span></summary>
+          <summary className="small"><b>{t('dict.hidden')}</b> <span className="muted">({hiddenDefaults.length})</span></summary>
           <div className="dict-list">
             {hiddenDefaults.map(r => (
               <div key={r.id} className="dict-row">
                 {type === 'color' && <span className="dict-swatch" style={{ background: r.hex ?? '#ccc' }} />}
-                <span className="grow">{r.label}</span>
-                <button className="btn sm" onClick={() => run(() => dropMineRow(r.id))} disabled={busy}>Bring back</button>
+                <span className="grow">{dictLabel(type, r.id, r.label)}</span>
+                <button className="btn sm" onClick={() => run(() => dropMineRow(r.id))} disabled={busy}>{t('dict.bringBack')}</button>
               </div>
             ))}
           </div>
         </details>
       )}
-      <p className="hint">{scope === 'global' ? 'Renaming a brand, material or type also renames it on every user’s items.' : 'Renaming updates your items that use it. Changes reach the AI right away.'}</p>
+      <p className="hint">{scope === 'global' ? t('dict.globalRename') : t('dict.userRename')}</p>
     </div>
   )
 }
@@ -193,9 +189,9 @@ function AddRow({ color, busy, placeholder, onAdd }: { color: boolean; busy: boo
   const submit = async () => { if (!label.trim()) return; await onAdd(label, hex); setLabel('') }
   return (
     <div className="dict-row add">
-      {color && <input type="color" value={hex} onChange={e => setHex(e.target.value)} aria-label="Colour" />}
+      {color && <input type="color" value={hex} onChange={e => setHex(e.target.value)} aria-label={t('dict.colour')} />}
       <input placeholder={placeholder} value={label} onChange={e => setLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
-      <button className="btn sm primary" onClick={submit} disabled={busy || !label.trim()}><Icon name="plus" /> Add</button>
+      <button className="btn sm primary" onClick={submit} disabled={busy || !label.trim()}><Icon name="plus" /> {t('common.add')}</button>
     </div>
   )
 }
@@ -210,15 +206,15 @@ function DictRowEdit({ row, color, busy, badge, onSave, onDelete, onReset }: {
   return (
     <div className="dict-row">
       {color && (row.hex?.startsWith('#') || !row.hex
-        ? <input type="color" value={hex} onChange={e => setHex(e.target.value)} aria-label="Colour" />
+        ? <input type="color" value={hex} onChange={e => setHex(e.target.value)} aria-label={t('dict.colour')} />
         : <span className="dict-swatch" style={{ background: row.hex }} />)}
       <input value={label} onChange={e => setLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && changed && onSave(row, label, hex)} />
       {badge && <span className="dict-badge">{badge}</span>}
       {changed
-        ? <button className="icon-btn" onClick={() => onSave(row, label, hex)} disabled={busy} aria-label="Save"><Icon name="check" /></button>
+        ? <button className="icon-btn" onClick={() => onSave(row, label, hex)} disabled={busy} aria-label={t('common.save')}><Icon name="check" /></button>
         : <>
-          {onReset && <button className="icon-btn" onClick={onReset} disabled={busy} aria-label="Back to default" title="Back to default"><Icon name="back" /></button>}
-          <button className="icon-btn" onClick={() => onDelete(row)} disabled={busy} aria-label="Delete"><Icon name="trash" /></button>
+          {onReset && <button className="icon-btn" onClick={onReset} disabled={busy} aria-label={t('dict.toDefault')} title={t('dict.toDefault')}><Icon name="back" /></button>}
+          <button className="icon-btn" onClick={() => onDelete(row)} disabled={busy} aria-label={t('common.delete')}><Icon name="trash" /></button>
         </>}
     </div>
   )
@@ -229,10 +225,10 @@ function DictRowEdit({ row, color, busy, badge, onSave, onDelete, onReset }: {
 // 'user' edits own versions that win over the defaults field by field.
 export function Templates({ scope }: { scope: Scope }) {
   return <>
-    {TEMPLATES.map(t => (
-      <div key={t.id} className="card template-card">
-        <h3 className="card-title"><Icon name="image" /> {t.label}</h3>
-        <TemplateEditor scope={scope} id={t.id} />
+    {TEMPLATES.map(x => (
+      <div key={x.id} className="card template-card">
+        <h3 className="card-title"><Icon name="image" /> {t(`templates.${x.id}.label`)}</h3>
+        <TemplateEditor scope={scope} id={x.id} />
       </div>
     ))}
   </>
@@ -240,7 +236,7 @@ export function Templates({ scope }: { scope: Scope }) {
 
 function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
   const { templates, requests, outfits, reload } = useStore()
-  const t = TEMPLATES.find(x => x.id === id)!
+  const tpl = TEMPLATES.find(x => x.id === id)!
   const def = templates.find(r => r.purpose === id && !r.user_id) ?? null
   const own = templates.find(r => r.purpose === id && r.user_id) ?? null
   const row = scope === 'global' ? def : own
@@ -256,7 +252,7 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
   // Writes some fields of the row for this scope; an own row with nothing left is deleted (= the defaults)
   const store = async (patch: { image_path?: string | null; prompt?: string | null }) => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Please sign in again')
+    if (!user) throw new Error(t('error.signIn'))
     const next = { image_path: row?.image_path ?? null, prompt: row?.prompt ?? null, ...patch }
     if (scope === 'user' && row && !next.image_path && !next.prompt) fail((await supabase.from('image_templates').delete().eq('id', row.id)).error)
     else if (row) fail((await supabase.from('image_templates').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', row.id)).error)
@@ -267,9 +263,9 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
     try { await f(); await reload() } catch (e) { alert((e as Error).message) }
     setBusy('')
   }
-  const replace = (file?: File) => file && run('Uploading…', async () => {
+  const replace = (file?: File) => file && run(t('common.uploading'), async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Please sign in again')
+    if (!user) throw new Error(t('error.signIn'))
     const p = await processPhoto(file)
     const dir = scope === 'global' ? 'global/reference' : `${user.id}/reference`
     const path = `${dir}/${crypto.randomUUID()}.${p.full.type.split('/')[1]}`
@@ -280,23 +276,23 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
     setNewPicture(true)
   })
   // The AI looks at the picture and rewrites the instructions for it; the text lands in the editor, not saved yet
-  const describe = () => picture && run('Looking at the picture…', async () => {
-    const req = await askAI('template_prompt', { purpose: id, current: text, placeholders: Object.keys(t.placeholders) }, 'now', picture)
+  const describe = () => picture && run(t('templates.looking'), async () => {
+    const req = await askAI('template_prompt', { purpose: id, current: text, placeholders: tpl.placeholders }, 'now', picture)
     setText((req.result as { prompt: string }).prompt)
     setNewPicture(false)
   })
   // The full text the image model gets, with an example from her own data (the saved instructions)
-  const showPrompt = () => run('Building the prompt…', async () => {
+  const showPrompt = () => run(t('templates.building'), async () => {
     let res
     if (id === 'garment') res = await supabase.functions.invoke('garment', { body: { preview: true, piece: 'the main garment in the photo' } })
     else if (id === 'many') {
       const r = requests.find(x => x.kind === 'looks' && x.input.item_id && x.status === 'done')
-      if (!r) throw new Error('Try “Style it” on a piece once, then the example uses it.')
+      if (!r) throw new Error(t('templates.needStyleIt'))
       const lr = r.result as LooksResult
       res = await supabase.functions.invoke('look', { body: { preview: true, many: { anchor_id: String(r.input.item_id), title: 'One piece', palette: lr.palette, looks: lr.looks.map(l => ({ label: l.label, item_ids: l.item_ids })) } } })
     } else {
       const o = outfits.find(x => x.layout.length)
-      if (!o) throw new Error('Save an outfit first, then the example uses it.')
+      if (!o) throw new Error(t('templates.needOutfit'))
       res = await supabase.functions.invoke('look', { body: { preview: true, item_ids: o.layout.map(l => l.item_id), vibe: o.name ?? '' } })
     }
     if (res.error) throw new Error((await (res.error as { context?: Response }).context?.json().catch(() => null))?.error ?? res.error.message)
@@ -305,29 +301,29 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
 
   return (
     <div className="form">
-      <p className="hint">{t.hint}{scope === 'global' ? ' Default for every user.' : ''}</p>
-      {t.picture && <>
-        <p className="section-title small">Picture{scope === 'user' && <span className="muted"> · {own?.image_path ? 'your own' : 'the default'}</span>}</p>
-        {picture ? <Photo path={picture} alt={t.label} className="look-post" zoom /> : <p className="muted small">No picture yet.</p>}
+      <p className="hint">{t(`templates.${id}.hint`)}{scope === 'global' ? ` ${t('templates.forEveryone')}` : ''}</p>
+      {tpl.picture && <>
+        <p className="section-title small">{t('templates.picture')}{scope === 'user' && <span className="muted"> · {own?.image_path ? t('templates.yourOwn') : t('templates.theDefault')}</span>}</p>
+        {picture ? <Photo path={picture} alt={t(`templates.${id}.label`)} className="look-post" zoom /> : <p className="muted small">{t('templates.noPicture')}</p>}
         <label className={'btn wide' + (busy ? ' disabled' : '')}>
-          <Icon name="image" /> {scope === 'user' && !own?.image_path ? 'Use my own picture' : 'Replace picture'}
+          <Icon name="image" /> {scope === 'user' && !own?.image_path ? t('templates.useOwn') : t('templates.replace')}
           <input type="file" accept="image/*" hidden disabled={!!busy} onChange={e => { replace(e.target.files?.[0]); e.target.value = '' }} />
         </label>
       </>}
 
-      <p className="section-title small">Instructions for the AI{scope === 'user' && <span className="muted"> · {own?.prompt ? 'your own' : 'the default'}</span>}</p>
-      {newPicture && <p className="hint warn">New picture: the instructions still describe the old one. Let the AI rewrite them for this picture, then check and save.</p>}
+      <p className="section-title small">{t('templates.instructions')}{scope === 'user' && <span className="muted"> · {own?.prompt ? t('templates.yourOwn') : t('templates.theDefault')}</span>}</p>
+      {newPicture && <p className="hint warn">{t('templates.newPicture')}</p>}
       <textarea className="prompt-edit" rows={14} value={text} onChange={e => setText(e.target.value)} disabled={!!busy} spellCheck={false} />
-      <p className="hint">The app fills these in: {Object.entries(t.placeholders).map(([k, v], n) => <span key={k}>{n ? ', ' : ''}<code>{'{' + k + '}'}</code> {v}</span>)}. It also adds which attached photo is which.</p>
-      {t.picture && picture && <button className="btn wide" onClick={describe} disabled={!!busy}><Icon name="sparkle" /> Write them from the picture<span className="cost">(OpenAI ≈1¢)</span></button>}
+      <p className="hint">{t('templates.fills')} {tpl.placeholders.map((k, n) => <span key={k}>{n ? ', ' : ''}<code>{'{' + k + '}'}</code> {t(`templates.placeholder.${k}`)}</span>)}. {t('templates.fillsAlso')}</p>
+      {tpl.picture && picture && <button className="btn wide" onClick={describe} disabled={!!busy}><Icon name="sparkle" /> {t('templates.write')}<span className="cost">(OpenAI ≈1¢)</span></button>}
       <div className="save-row">
-        <button className="btn primary" onClick={() => run('Saving…', () => store({ prompt: text.trim() || null }))} disabled={!!busy || !dirty || (scope === 'global' && !text.trim())}><Icon name="check" /> Save</button>
-        {dirty && <button className="btn" onClick={() => setText(savedText)} disabled={!!busy}>Undo changes</button>}
+        <button className="btn primary" onClick={() => run(t('common.saving'), () => store({ prompt: text.trim() || null }))} disabled={!!busy || !dirty || (scope === 'global' && !text.trim())}><Icon name="check" /> {t('common.save')}</button>
+        {dirty && <button className="btn" onClick={() => setText(savedText)} disabled={!!busy}>{t('templates.undo')}</button>}
       </div>
-      {scope === 'user' && own?.prompt && <button className="btn ghost wide" onClick={() => run('…', () => store({ prompt: null }))} disabled={!!busy}>Use the default instructions</button>}
-      <button className="btn ghost wide" onClick={showPrompt} disabled={!!busy || dirty} title={dirty ? 'Save first' : ''}><Icon name="eye" /> Show the full prompt (example, free)</button>
+      {scope === 'user' && own?.prompt && <button className="btn ghost wide" onClick={() => run('…', () => store({ prompt: null }))} disabled={!!busy}>{t('templates.useDefault')}</button>}
+      <button className="btn ghost wide" onClick={showPrompt} disabled={!!busy || dirty} title={dirty ? t('templates.saveFirst') : ''}><Icon name="eye" /> {t('templates.show')}</button>
       {busy && <p className="muted small">{busy}</p>}
-      {preview && <div className="prompt-preview"><button className="icon-btn" onClick={() => setPreview('')} aria-label="Close"><Icon name="x" /></button><pre>{preview}</pre></div>}
+      {preview && <div className="prompt-preview"><button className="icon-btn" onClick={() => setPreview('')} aria-label={t('common.close')}><Icon name="x" /></button><pre>{preview}</pre></div>}
     </div>
   )
 }
@@ -350,14 +346,14 @@ export function Users() {
   }
   return (
     <div className="form">
-      <p className="hint">Admins manage the defaults on this Settings tab. Users only change their own lists.</p>
+      <p className="hint">{t('users.hint')}</p>
       <div className="dict-list">
         {users.map(u => (
           <div key={u.user_id} className="dict-row user-row">
             <span className="grow"><b>{u.display_name || u.email}</b>{u.display_name && <span className="muted small"> · {u.email}</span>}
-              <span className="muted small"><br />Last seen {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : 'never'}</span></span>
-            <select value={u.role} disabled={busy} onChange={e => setRole(u, e.target.value)} aria-label="Role">
-              <option value="user">User</option><option value="admin">Admin</option>
+              <span className="muted small"><br />{t('users.lastSeen', { date: u.last_sign_in_at ? formatDate(u.last_sign_in_at) : t('users.never') })}</span></span>
+            <select value={u.role} disabled={busy} onChange={e => setRole(u, e.target.value)} aria-label={t('account.role')}>
+              <option value="user">{t('account.roles.user')}</option><option value="admin">{t('account.roles.admin')}</option>
             </select>
           </div>
         ))}

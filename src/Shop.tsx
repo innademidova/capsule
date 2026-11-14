@@ -6,8 +6,9 @@ import {
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, AIActions, RequestState, Chips, Section } from './ui'
 import { go, back } from './App'
+import { t, formatDate } from './i18n'
 
-const PRIORITY: Record<number, string> = { 1: 'Must-have', 2: 'Good to have', 3: 'Someday' }
+const priority = (p: number) => [1, 2, 3].includes(p) ? t(`shop.priority.${p}`) : ''
 
 type Gap = { name: string; category: string; why: string; priority: number }
 
@@ -44,36 +45,36 @@ export function Shop() {
 
   return (
     <div className="screen">
-      <Header title="Shopping" />
+      <Header title={t('shop.title')} />
 
       <button className="card stylist-cta" onClick={() => go('/buy')}>
         <span className="cta-icon"><Icon name="bag" /></span>
-        <span><b>Before you buy</b><span className="muted small">Snap the item in the shop: does it really fit your wardrobe?</span></span>
+        <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
       </button>
 
       <div className="card">
-        <h3 className="card-title"><Icon name="sparkle" /> Wardrobe check</h3>
+        <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
         {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
-          : <p className="muted">The stylist looks at your whole wardrobe and tells you what's missing, what you have too much of, and what to buy first.</p>}
+          : <p className="muted">{t('shop.checkHint')}</p>}
         {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
-        <AIActions label={lastGaps ? 'Check again' : 'Check my wardrobe'} onRun={analyze} busy={busy}  />
+        <AIActions label={lastGaps ? t('shop.checkAgain') : t('shop.checkMine')} onRun={analyze} busy={busy}  />
       </div>
 
       <div className="card">
-        <div className="row"><h3 className="card-title grow">Shopping list</h3>
-          <button className="icon-btn sm" onClick={() => setAdding(a => !a)} aria-label="Add"><Icon name={adding ? 'x' : 'plus'} /></button></div>
+        <div className="row"><h3 className="card-title grow">{t('shop.list')}</h3>
+          <button className="icon-btn sm" onClick={() => setAdding(a => !a)} aria-label={t('common.add')}><Icon name={adding ? 'x' : 'plus'} /></button></div>
         {adding && (
           <div className="add-shop">
-            <input placeholder="e.g. Black ankle boots" value={name} onChange={e => setName(e.target.value)} />
+            <input placeholder={t('shop.namePlaceholder')} value={name} onChange={e => setName(e.target.value)} />
             <Chips options={CATEGORIES} value={cat} onChange={setCat} multi={false} />
             <button className="btn primary sm" disabled={!name.trim()} onClick={async () => {
               await addItem({ name: name.trim(), category: cat[0] ?? null, priority: 2 }); setName(''); setCat([]); setAdding(false)
-            }}>Add</button>
+            }}>{t('common.add')}</button>
           </div>
         )}
-        {!todo.length && !adding && <p className="muted small">Nothing yet. Add things from the wardrobe check or saved looks.</p>}
+        {!todo.length && !adding && <p className="muted small">{t('shop.empty')}</p>}
         {todo.map(s => <ShopRow key={s.id} s={s} onToggle={toggle} onRemove={remove} />)}
-        {done.length > 0 && <details className="done-list"><summary className="muted small">Bought ({done.length})</summary>
+        {done.length > 0 && <details className="done-list"><summary className="muted small">{t('shop.bought', { count: done.length })}</summary>
           {done.map(s => <ShopRow key={s.id} s={s} onToggle={toggle} onRemove={remove} />)}</details>}
       </div>
     </div>
@@ -83,13 +84,13 @@ export function Shop() {
 function ShopRow({ s, onToggle, onRemove }: { s: ShopItem; onToggle: (s: ShopItem) => void; onRemove: (s: ShopItem) => void }) {
   return (
     <div className={'shop-row' + (s.done ? ' done' : '')}>
-      <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)} aria-label="Bought"><Icon name="check" /></button>
+      <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)} aria-label={t('shop.markBought')}><Icon name="check" /></button>
       <div className="grow">
         <b>{s.name}</b>
-        <span className="muted small">{[s.category && categoryLabel(s.category), PRIORITY[s.priority]].filter(Boolean).join(' · ')}</span>
+        <span className="muted small">{[s.category && categoryLabel(s.category), priority(s.priority)].filter(Boolean).join(' · ')}</span>
         {s.why && <span className="small">{s.why}</span>}
       </div>
-      <button className="icon-btn sm" onClick={() => onRemove(s)} aria-label="Remove"><Icon name="x" /></button>
+      <button className="icon-btn sm" onClick={() => onRemove(s)} aria-label={t('common.remove')}><Icon name="x" /></button>
     </div>
   )
 }
@@ -99,23 +100,22 @@ function Gaps({ r, onAdd, inList }: { r: AIRequest; onAdd: (g: Gap) => void; inL
   return (
     <div className="gaps">
       <p>{res.summary}</p>
-      {res.gaps.length > 0 && <h4>What's missing</h4>}
+      {res.gaps.length > 0 && <h4>{t('shop.missing')}</h4>}
       {[...res.gaps].sort((a, b) => a.priority - b.priority).map((g, n) => (
         <div key={n} className="gap">
-          <div className="grow"><b>{g.name}</b> <span className={'pill p' + g.priority}>{PRIORITY[g.priority] ?? ''}</span><span className="small">{g.why}</span></div>
-          <button className="btn sm" disabled={inList(g.name)} onClick={() => onAdd(g)}>{inList(g.name) ? <Icon name="check" /> : <><Icon name="plus" /> List</>}</button>
+          <div className="grow"><b>{g.name}</b> <span className={'pill p' + g.priority}>{priority(g.priority)}</span><span className="small">{g.why}</span></div>
+          <button className="btn sm" disabled={inList(g.name)} onClick={() => onAdd(g)}>{inList(g.name) ? <Icon name="check" /> : <><Icon name="plus" /> {t('shop.toList')}</>}</button>
         </div>
       ))}
-      {res.too_many.length > 0 && <><h4>You have enough of</h4>{res.too_many.map((t, n) => <p key={n} className="small"><b>{t.what}</b> · {t.why}</p>)}</>}
-      {res.strengths.length > 0 && <><h4>What already works</h4><ul className="small">{res.strengths.map((s, n) => <li key={n}>{s}</li>)}</ul></>}
-      <p className="muted small">Checked {new Date(r.done_at ?? r.created_at).toLocaleDateString()}</p>
+      {res.too_many.length > 0 && <><h4>{t('shop.tooMany')}</h4>{res.too_many.map((x, n) => <p key={n} className="small"><b>{x.what}</b> · {x.why}</p>)}</>}
+      {res.strengths.length > 0 && <><h4>{t('shop.strengths')}</h4><ul className="small">{res.strengths.map((s, n) => <li key={n}>{s}</li>)}</ul></>}
+      <p className="muted small">{t('shop.checked', { date: formatDate(r.done_at ?? r.created_at) })}</p>
     </div>
   )
 }
 
 // --- Before you buy ---
 
-const VERDICT = { buy: 'Worth buying', maybe: 'Think it over', skip: 'Better skip' }
 
 export function BeforeBuy() {
   const { items, requests, setRequests } = useStore()
@@ -143,16 +143,16 @@ export function BeforeBuy() {
 
   return (
     <div className="screen">
-      <Header title="Before you buy" left={<button className="icon-btn" onClick={() => back('/shop')} aria-label="Back"><Icon name="back" /></button>} />
+      <Header title={t('shop.beforeBuy')} left={<button className="icon-btn" onClick={() => back('/shop')} aria-label={t('common.back')}><Icon name="back" /></button>} />
       <div className="form">
         <div className="picker">
-          <div className="photo big">{photo ? <img src={photo.preview} alt="" /> : <span className="photo-empty">{busy ? 'Uploading…' : <Icon name="camera" />}</span>}</div>
-          <div className="picker-btns"><button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="camera" /> {photo ? 'Change photo' : 'Photo of the item'}</button></div>
+          <div className="photo big">{photo ? <img src={photo.preview} alt="" /> : <span className="photo-empty">{busy ? t('common.uploading') : <Icon name="camera" />}</span>}</div>
+          <div className="picker-btns"><button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="camera" /> {photo ? t('form.changePhoto') : t('shop.photo')}</button></div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { pick(e.target.files?.[0]); e.target.value = '' }} />
         </div>
-        <Section title="Note"><input placeholder="e.g. wool, oversized, for the office" value={note} onChange={e => setNote(e.target.value)} /></Section>
-        <Section title="Price"><input placeholder="e.g. 2500 ₴" value={price} onChange={e => setPrice(e.target.value)} /></Section>
-        <AIActions label="Check" onRun={run} busy={busy} disabled={!photo} />
+        <Section title={t('shop.note')}><input placeholder={t('shop.notePlaceholder')} value={note} onChange={e => setNote(e.target.value)} /></Section>
+        <Section title={t('shop.price')}><input placeholder={t('shop.pricePlaceholder')} value={price} onChange={e => setPrice(e.target.value)} /></Section>
+        <AIActions label={t('shop.checkItem')} onRun={run} busy={busy} disabled={!photo} />
       </div>
 
       {past.map(r => {
@@ -163,7 +163,7 @@ export function BeforeBuy() {
             <div className="row">
               {r.image_path && <Photo path={r.image_path} alt="" className="buy-thumb" />}
               <div className="grow">
-                {res ? <span className={'verdict ' + res.verdict}>{VERDICT[res.verdict]}</span> : <span className="muted small">Waiting…</span>}
+                {res ? <span className={'verdict ' + res.verdict}>{t(`shop.verdict.${res.verdict}`)}</span> : <span className="muted small">{t('shop.waiting')}</span>}
                 {(r.input.note || r.input.price) ? <p className="muted small">{[r.input.note, r.input.price].filter(Boolean).join(' · ') as string}</p> : null}
               </div>
             </div>
@@ -171,9 +171,9 @@ export function BeforeBuy() {
             {res && (
               <>
                 <p>{res.summary}</p>
-                {res.pairs_with.length > 0 && <><h4>Goes with {res.pairs_with.length} of your items</h4><MiniItems items={find(res.pairs_with)} /></>}
-                {res.similar.length > 0 && <><h4>You already have similar</h4><MiniItems items={find(res.similar)} /></>}
-                {res.outfit_ideas.length > 0 && <><h4>Outfit ideas</h4><ul className="small">{res.outfit_ideas.map((o, n) => <li key={n}>{o}</li>)}</ul></>}
+                {res.pairs_with.length > 0 && <><h4>{t('shop.pairsWith', { count: res.pairs_with.length })}</h4><MiniItems items={find(res.pairs_with)} /></>}
+                {res.similar.length > 0 && <><h4>{t('shop.similar')}</h4><MiniItems items={find(res.similar)} /></>}
+                {res.outfit_ideas.length > 0 && <><h4>{t('shop.ideas')}</h4><ul className="small">{res.outfit_ideas.map((o, n) => <li key={n}>{o}</li>)}</ul></>}
               </>
             )}
           </div>

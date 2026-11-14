@@ -91,10 +91,14 @@ const SCHEMAS: Record<string, unknown> = {
   }),
 };
 
-const VOICE = `You are a warm, honest personal stylist for one woman. Her goal: dress stylishly with a small, well-combined
+// The account's interface language (profiles.language); the AI writes everything she reads in it.
+// Stored values (kind, materials) and what the image model draws (look labels, titles, scenes) stay English.
+const LANGUAGE: Record<string, string> = { uk: "Ukrainian", en: "English" };
+
+const voice = (L: string) => `You are a warm, honest personal stylist for one woman. Her goal: dress stylishly with a small, well-combined
 capsule wardrobe instead of buying more. All prose fields (summary, why, tip, note, recipe, formula, outfit_ideas, to_buy,
-strengths, what) must be in Ukrainian, addressing her informally (second person singular), short and concrete. Never write Russian.
-Short labels (title, name, piece, kind, tags, palette, key_pieces) are in English. When you refer to her items, use their ids exactly as given.`;
+strengths, what) must be in ${L}${L === "Ukrainian" ? ", addressing her informally (second person singular)" : ""}, short and concrete. Never write Russian.
+Short labels she reads (title, name, piece, tags, palette, key_pieces) are in ${L} too; kind is always lowercase English. When you refer to her items, use their ids exactly as given.`;
 
 // ---------- The owner's data ----------
 
@@ -124,7 +128,7 @@ async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.I
 
 type Req = { id: string; kind: string; input: Record<string, unknown>; image_path: string | null };
 
-async function buildPrompt(sb: SupabaseClient, r: Req): Promise<{ content: Anthropic.ContentBlockParam[]; effort: "low" | "medium" }> {
+async function buildPrompt(sb: SupabaseClient, r: Req, L: string): Promise<{ content: Anthropic.ContentBlockParam[]; effort: "low" | "medium" }> {
   const i = r.input;
   switch (r.kind) {
     case "template_prompt": {
@@ -158,7 +162,7 @@ ${current}` }] };
       const known = (mats ?? []).map((m: { label: string }) => m.label).join(", ");
       return { effort: "low", content: [...images, { type: "text", text:
         `Describe this clothing item for her digital wardrobe. kind: a short lowercase type like "sweater", "straight jeans",
-"ankle boots". name: a short English product-style name, e.g. "Cream cable-knit sweater". Pick only fitting colors
+"ankle boots". name: a short ${L} product-style name, like "Cream cable-knit sweater". Pick only fitting colors
 (main colors first), seasons, styles and occasions. A body-hugging one-piece is a bodysuit (category "top"), not a swimsuit, unless she says the category is "swim".${i.category ? ` She says the category is "${i.category}".` : ""}
 ${extra.length ? `Image 1 is the item. The other ${extra.length} image(s) are the original photos it was made from; they may show a logo or a care label.\n` : ""}${i.notes ? `Her notes about this item: ${i.notes}\n` : ""}brand: only if she names it or a brand name is clearly readable on a logo or label in the images; otherwise "". Never guess a brand from the style.
 materials: the composition only if she gives it or a care/composition label is clearly readable in the images, e.g. [{"name":"Cotton","pct":95},{"name":"Elastane","pct":5}]; pct is null when the label shows no percent. Otherwise []. Never guess the fabric from looks. Use these names when they fit: ${known}.` }] };
@@ -170,7 +174,7 @@ materials: the composition only if she gives it or a care/composition label is c
 Suggest ${i.count ?? 3} different complete outfits ONLY from her items for this request:
 occasion: ${i.occasion || "any"}; weather: ${i.weather || "not given"}; mood/wish: ${i.mood || "not given"}.
 Each outfit: 2–6 item ids that really work together (top+bottom or dress, shoes; outerwear/bag/accessory when they help;
-respect the weather). title: short English name of the look. why: 1–2 sentences on why it works (colors, proportions).
+respect the weather). title: short ${L} name of the look. why: 1–2 sentences on why it works (colors, proportions).
 tip: one styling trick (tuck, roll sleeves, belt…). If something important is
 missing for this request, say so briefly in note (else empty string).` }] };
     }
@@ -182,9 +186,9 @@ missing for this request, say so briefly in note (else empty string).` }] };
 
 This is a look she saved because she likes it${ins.note ? ` (her note: "${ins.note}")` : ""}. Break it down:
 summary: what makes this look work (2–3 sentences). formula: the reusable recipe in one line (e.g. "light knit +
-straight dark denim + loafers + structured bag", written in Ukrainian). pieces: every visible piece; status "have" if she owns essentially the same
+straight dark denim + loafers + structured bag", written in ${L}). pieces: every visible piece; status "have" if she owns essentially the same
 item, "similar" if she owns something that can replace it (say how in note), "missing" if not; item_ids = her matching items.
-to_buy: only the missing pieces that would unlock the most outfits for her. tags: 2–5 English style tags.` }] };
+to_buy: only the missing pieces that would unlock the most outfits for her. tags: 2–5 ${L} style tags.` }] };
     }
     case "formulas": {
       const { data: ins } = await sb.from("inspirations").select("note,analysis").not("analysis", "is", null);
@@ -194,8 +198,8 @@ to_buy: only the missing pieces that would unlock the most outfits for her. tags
       return { effort: "medium", content: [{ type: "text", text: `Breakdowns of the looks she saved:\n${looks}
 
 Find HER recurring style patterns across these looks. summary: 2–3 short paragraphs about her style DNA. formulas: 3–6
-reusable outfit formulas (title in English, recipe in Ukrainian). palette: her recurring colors (English). key_pieces:
-the pieces that appear again and again (English).` }] };
+reusable outfit formulas (title and recipe in ${L}). palette: her recurring colors (${L}). key_pieces:
+the pieces that appear again and again (${L}).` }] };
     }
     case "gaps": {
       const w = await wardrobe(sb);
@@ -204,7 +208,7 @@ the pieces that appear again and again (English).` }] };
 ${prof ? `\nHER STYLE PROFILE: ${prof.summary}\nFormulas: ${JSON.stringify(prof.formulas)}` : ""}
 
 Analyze her wardrobe as a capsule. summary: 2–3 sentences, honest. gaps: missing basics or pieces that would create the
-most new outfits (priority 1 = must-have, 2 = good to have, 3 = someday), name in English. too_many: categories/colors
+most new outfits (priority 1 = must-have, 2 = good to have, 3 = someday), name in ${L}. too_many: categories/colors
 she has more than she needs (empty array if none). strengths: what already works well.` }] };
     }
     case "looks": {
@@ -231,13 +235,13 @@ Think like a fashion editor making an Instagram carousel: current, polished, wea
 Rules for each look:
 - item_ids: 2–7 of her item ids that truly work together: a top + bottom or a dress, then outerwear, bag, belt or other accessories when they lift the look. Respect the season and weather. Use only ids from the lists above.
 - No two looks may be the same combination; vary silhouettes, layers and colour stories.
-- label: 1–3 lowercase English words naming the vibe, e.g. "city chic".
-- why: one short sentence in Ukrainian on why it works (colours, proportions, the styling trick).
+- label: 1–3 lowercase English words naming the vibe (it is drawn on the picture, so always English), e.g. "city chic".
+- why: one short sentence in ${L} on why it works (colours, proportions, the styling trick).
 - scene: one English sentence for a photographer: the place, light and pose that suit the vibe and season, e.g. "a cobbled old-town street in soft autumn daylight, walking towards the camera with a coffee". Do not describe the clothes.
-title: a short English headline for the whole set, e.g. "one sweater, many looks" or "soft autumn layers".
+title: a short English headline for the whole set (drawn on the picture, so always English), e.g. "one sweater, many looks" or "soft autumn layers".
 palette: 3–6 hex colours that sum up the looks, main colour first.
-missing: up to 3 short English names of pieces she does not have that would make these looks better (e.g. "white leather sneakers"), [] if nothing. Shoes count: she may have few in the app.
-note: one short sentence in Ukrainian if something important is missing for this request, else "".` });
+missing: up to 3 short ${L} names of pieces she does not have that would make these looks better (e.g. "white leather sneakers"), [] if nothing. Shoes count: she may have few in the app.
+note: one short sentence in ${L} if something important is missing for this request, else "".` });
       return { effort: "medium", content: blocks };
     }
     case "buy": {
@@ -247,7 +251,7 @@ note: one short sentence in Ukrainian if something important is missing for this
 
 She is thinking of buying the item in this photo${i.note ? ` (her note: "${i.note}")` : ""}${i.price ? `, price ${i.price}` : ""}.
 Be honest: does it fit her wardrobe? pairs_with: ids of her items it combines well with. similar: ids of items she already has
-that do the same job. outfit_ideas: 2–3 concrete outfits with it from her items (Ukrainian). verdict: "buy" if it creates
+that do the same job. outfit_ideas: 2–3 concrete outfits with it from her items (${L}). verdict: "buy" if it creates
 many new outfits and fills a gap, "skip" if it duplicates what she has or combines with little, otherwise "maybe".
 summary: 2–3 sentences with the main reason.` }] };
     }
@@ -260,7 +264,7 @@ const TAG_MODEL = "gpt-6.1-terra"; // every text task
 // USD per 1M tokens for TAG_MODEL, standard tier (developers.openai.com/api/docs/pricing, 2026-11-10)
 const TAG_PRICE = { input: 1, cached: 0.05, cache_write: 1.25, output: 5 };
 
-async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, content: unknown, meta: Meta) {
+async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, content: unknown, meta: Meta, L: string) {
   const blocks = content as ({ type: "text"; text: string } | Anthropic.ImageBlockParam)[];
   const input = blocks.map(b => b.type === "text"
     ? { type: "input_text", text: b.text }
@@ -270,7 +274,7 @@ async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, con
     headers: { Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: TAG_MODEL,
-      input: [{ role: "system", content: VOICE }, { role: "user", content: input }],
+      input: [{ role: "system", content: voice(L) }, { role: "user", content: input }],
       text: { format: { type: "json_schema", name: kind, schema, strict: true } },
     }),
   });
@@ -294,10 +298,12 @@ async function withOpenAI(sb: SupabaseClient, kind: string, schema: unknown, con
 type Meta = { cost_usd: number | null; model: string | null; skipped: string[] };
 
 async function run(sb: SupabaseClient, r: Req, meta: Meta) {
-  const { content, effort } = await buildPrompt(sb, r);
+  const { data: prof } = await sb.from("profiles").select("language").maybeSingle();
+  const L = LANGUAGE[prof?.language ?? ""] ?? "Ukrainian";
+  const { content, effort } = await buildPrompt(sb, r, L);
   const schema = r.kind === "tag" ? tagSchema(await options(sb)) : SCHEMAS[r.kind];
   if (Deno.env.get("OPENAI_API_KEY")) {
-    const out = await withOpenAI(sb, r.kind, schema, content, meta);
+    const out = await withOpenAI(sb, r.kind, schema, content, meta, L);
     meta.model = TAG_MODEL; return out;
   }
   if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new Error("AI key is not set up yet.");
@@ -307,7 +313,7 @@ async function run(sb: SupabaseClient, r: Req, meta: Meta) {
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    system: VOICE,
+    system: voice(L),
     output_config: { effort, format: { type: "json_schema", schema } },
     messages: [{ role: "user", content }],
   } as never) as Anthropic.Beta.BetaMessage;

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
+import { t } from './i18n'
 
 const PATHS: Record<string, string> = {
   hanger: 'M9.8 6.6a2.2 2.2 0 1 1 2.9 2.1c-.4.1-.7.5-.7.9v.6l-8.3 5.5A1.3 1.3 0 0 0 4.4 18h15.2a1.3 1.3 0 0 0 .7-2.3L12 10.2',
@@ -30,6 +31,7 @@ const PATHS: Record<string, string> = {
   lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
   logout: 'M15 4h4v16h-4M10 17l5-5-5-5M15 12H4',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
 }
 
@@ -114,8 +116,8 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
   return createPortal(
     <div className="lightbox" onClick={e => { e.stopPropagation(); onClose() }}>
       <div className="lightbox-bar" onClick={e => e.stopPropagation()}>
-        <button className="icon-btn" onClick={download} disabled={saving} aria-label="Download"><Icon name="download" /></button>
-        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
+        <button className="icon-btn" onClick={download} disabled={saving} aria-label={t('common.download')}><Icon name="download" /></button>
+        <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button>
       </div>
       <img src={url} alt={alt} onClick={e => e.stopPropagation()} />
     </div>, document.body)
@@ -128,7 +130,7 @@ export function PasswordInput({ value, onChange, placeholder, autoComplete }: { 
     <div className="pw-wrap">
       <input type={show ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
         autoComplete={autoComplete} autoCapitalize="none" autoCorrect="off" />
-      <button type="button" className="pw-eye" onClick={() => setShow(v => !v)} aria-label={show ? 'Hide password' : 'Show password'}>
+      <button type="button" className="pw-eye" onClick={() => setShow(v => !v)} aria-label={show ? t('login.hidePassword') : t('login.showPassword')}>
         <Icon name={show ? 'eye-off' : 'eye'} />
       </button>
     </div>
@@ -184,14 +186,14 @@ export function AIActions({ onRun, busy, label, cost = 'OpenAI ≈1¢', disabled
   return (
     <div className="ai-actions">
       <button type="button" className="btn primary" disabled={busy || disabled} onClick={() => onRun('now')}>
-        <Icon name="sparkle" /> {busy ? 'Thinking…' : label}<span className="cost">({cost})</span>
+        <Icon name="sparkle" /> {busy ? t('common.thinking') : label}<span className="cost">({cost})</span>
       </button>
     </div>
   )
 }
 
 export function RequestState({ req, hideModel }: { req?: AIRequest; hideModel?: boolean }) {
-  if (req?.status === 'done' && req.model && !hideModel) return <p className="by-model">by {req.model}</p>
+  if (req?.status === 'done' && req.model && !hideModel) return <p className="by-model">{t('common.byModel', { model: req.model })}</p>
   if (req?.status !== 'error') return null
   return <div className="queued err"><span>{req.error}</span></div>
 }
@@ -200,7 +202,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   return (
     <div className="sheet-bg" onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
-        <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
+        <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
         {children}
       </div>
     </div>

@@ -6,6 +6,7 @@ import {
   type ImageTemplate,
 } from './lib'
 import { Icon, Header } from './ui'
+import { t, lang, remember } from './i18n'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
 import { OutfitList, OutfitDetail, OutfitEditor } from './Outfits'
@@ -73,7 +74,7 @@ function Login() {
     e.preventDefault()
     setBusy(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    if (error) setError(error.message.includes('Invalid') ? 'Wrong email or password' : error.message)
+    if (error) setError(error.message.includes('Invalid') ? t('login.wrong') : error.message)
     setBusy(false)
   }
   return (
@@ -81,17 +82,17 @@ function Login() {
       <form onSubmit={submit} className="login-card">
         <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="login-logo" />
         <h1>Capsule</h1>
-        <p className="muted">Fewer clothes, more outfits</p>
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" required />
+        <p className="muted">{t('login.tagline')}</p>
+        <input type="email" placeholder={t('login.email')} value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" required />
         <div className="pw-wrap">
-          <input type={showPw ? 'text' : 'password'} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
+          <input type={showPw ? 'text' : 'password'} placeholder={t('login.password')} value={password} onChange={e => setPassword(e.target.value)}
             autoComplete="current-password" autoCapitalize="none" autoCorrect="off" required />
-          <button type="button" className="pw-eye" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'}>
+          <button type="button" className="pw-eye" onClick={() => setShowPw(v => !v)} aria-label={showPw ? t('login.hidePassword') : t('login.showPassword')}>
             <Icon name={showPw ? 'eye-off' : 'eye'} />
           </button>
         </div>
         {error && <p className="error">{error}</p>}
-        <button className="btn primary wide" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <button className="btn primary wide" disabled={busy}>{busy ? t('login.signingIn') : t('login.signIn')}</button>
       </form>
     </div>
   )
@@ -125,10 +126,14 @@ function Main({ email }: { email: string }) {
       by('items'), by('outfits'),
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
       supabase.from('dict_effective').select('type,category,id,label,hex,sort,is_default,is_own'),
-      supabase.from('user_roles').select('role').maybeSingle(), supabase.from('profiles').select('display_name').maybeSingle(),
+      supabase.from('user_roles').select('role').maybeSingle(), supabase.from('profiles').select('display_name,language').maybeSingle(),
       supabase.from('image_templates').select('*'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
+    // The account's language wins over the device's guess (a new phone, a cleared browser)
+    if (remember(ac.data?.language)) { location.reload(); return }
+    // First visit with no saved choice: keep the device's language in the account, so the AI uses it too
+    if (ac.data && !ac.data.language) supabase.from('profiles').update({ language: lang }).eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '').then(() => {})
     applyDict((di.data ?? []) as DictRow[])
     setRole(ro.data?.role === 'admin' ? 'admin' : 'user'); setAccount({ display_name: ac.data?.display_name ?? null })
     setTemplates((st.data ?? []) as ImageTemplate[])
@@ -146,9 +151,9 @@ function Main({ email }: { email: string }) {
 
   if (loadError) return (
     <div className="splash">
-      <p>Couldn't load the wardrobe</p>
+      <p>{t('app.loadError')}</p>
       <p className="muted small">{loadError}</p>
-      <button className="btn" onClick={load}>Try again</button>
+      <button className="btn" onClick={load}>{t('common.tryAgain')}</button>
     </div>
   )
   if (!allItems) return <Splash />
@@ -191,11 +196,11 @@ function Main({ email }: { email: string }) {
   const tab = route.view.startsWith('item') || route.view === 'wishlist' || route.view === 'style' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
     : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
   const tabs = [
-    { id: 'wardrobe', label: 'Wardrobe', icon: 'hanger', path: '/' },
-    { id: 'outfits', label: 'Outfits', icon: 'layers', path: '/outfits' },
-    { id: 'inspo', label: 'Inspo', icon: 'image', path: '/inspo' },
-    { id: 'shop', label: 'Shop', icon: 'bag', path: '/shop' },
-    { id: 'me', label: 'Profile', icon: 'user', path: '/me' },
+    { id: 'wardrobe', icon: 'hanger', path: '/' },
+    { id: 'outfits', icon: 'layers', path: '/outfits' },
+    { id: 'inspo', icon: 'image', path: '/inspo' },
+    { id: 'shop', icon: 'bag', path: '/shop' },
+    { id: 'me', icon: 'user', path: '/me' },
   ]
   const editing = route.view === 'item-edit' || route.view === 'outfit-edit'
 
@@ -203,11 +208,11 @@ function Main({ email }: { email: string }) {
     <StoreCtx.Provider value={store}>
       <div className={'app with-tabs' + (editing ? ' editing' : '')}>
         {screen}
-        <nav className="tabbar" aria-label="Main">
+        <nav className="tabbar" aria-label={t('nav.main')}>
           <div className="side-brand">Capsule</div>
-          {tabs.map(t => (
-            <button key={t.id} className={'tab' + (tab === t.id ? ' on' : '')} aria-current={tab === t.id ? 'page' : undefined} onClick={() => tab !== t.id && location.replace('#' + t.path)}>
-              <Icon name={t.icon} /><span>{t.label}</span>
+          {tabs.map(x => (
+            <button key={x.id} className={'tab' + (tab === x.id ? ' on' : '')} aria-current={tab === x.id ? 'page' : undefined} onClick={() => tab !== x.id && location.replace('#' + x.path)}>
+              <Icon name={x.icon} /><span>{t(`nav.${x.id}`)}</span>
             </button>
           ))}
         </nav>
@@ -219,8 +224,8 @@ function Main({ email }: { email: string }) {
 function NotFound() {
   return (
     <div className="screen">
-      <Header title="" left={<button className="icon-btn" onClick={() => back('/')} aria-label="Back"><Icon name="back" /></button>} />
-      <p className="muted center pad">This item no longer exists.</p>
+      <Header title="" left={<button className="icon-btn" onClick={() => back('/')} aria-label={t('common.back')}><Icon name="back" /></button>} />
+      <p className="muted center pad">{t('app.notFound')}</p>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { labelPieces } from './pieces'
+import { t, has } from './i18n'
 
 // Publishable key: data is protected by database access rules (RLS) and password login
 export const supabase = createClient(
@@ -33,20 +34,12 @@ export type Option = { id: string; label: string }
 
 // One line of the composition label; pct is optional (unknown share)
 export type Material = { name: string; pct: number | null }
-// "95% Cotton · 5% Elastane", largest share first
+// "95% Cotton · 5% Elastane", largest share first (in the interface language)
 export const compositionText = (m: Material[]) =>
-  [...m].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)).map(x => x.pct != null ? `${x.pct}% ${x.name}` : x.name).join(' · ')
+  [...m].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)).map(x => x.pct != null ? `${x.pct}% ${materialLabel(x.name)}` : materialLabel(x.name)).join(' · ')
 
-export const CATEGORIES: Option[] = [
-  { id: 'top', label: 'Tops' },
-  { id: 'bottom', label: 'Bottoms' },
-  { id: 'dress', label: 'Dresses' },
-  { id: 'outerwear', label: 'Outerwear' },
-  { id: 'shoes', label: 'Shoes' },
-  { id: 'bag', label: 'Bags' },
-  { id: 'accessory', label: 'Accessories' },
-  { id: 'swim', label: 'Swimwear' },
-]
+export const CATEGORIES: Option[] = ['top', 'bottom', 'dress', 'outerwear', 'shoes', 'bag', 'accessory', 'swim']
+  .map(id => ({ id, label: t(`category.${id}`) }))
 export const categoryLabel = (id: string) => CATEGORIES.find(c => c.id === id)?.label ?? id
 
 // Suggestions for the "type" field, by category
@@ -62,29 +55,29 @@ export const KINDS: Record<string, string[]> = {
 }
 
 export const COLORS: (Option & { hex: string })[] = [
-  { id: 'black', label: 'Black', hex: '#141414' },
-  { id: 'white', label: 'White', hex: '#ffffff' },
-  { id: 'cream', label: 'Cream', hex: '#f1e8d6' },
-  { id: 'beige', label: 'Beige', hex: '#d8c3a3' },
-  { id: 'camel', label: 'Camel', hex: '#b88a5a' },
-  { id: 'brown', label: 'Brown', hex: '#6b4a33' },
-  { id: 'grey', label: 'Grey', hex: '#9a9ca1' },
-  { id: 'navy', label: 'Navy', hex: '#1f2a48' },
-  { id: 'blue', label: 'Blue', hex: '#3567c8' },
-  { id: 'light-blue', label: 'Light blue', hex: '#a8c7ec' },
-  { id: 'denim', label: 'Denim', hex: '#56789f' },
-  { id: 'green', label: 'Green', hex: '#3d7a4c' },
-  { id: 'olive', label: 'Olive', hex: '#6d6b3b' },
-  { id: 'red', label: 'Red', hex: '#c42b2b' },
-  { id: 'burgundy', label: 'Burgundy', hex: '#6b1c2c' },
-  { id: 'pink', label: 'Pink', hex: '#f1a7c0' },
-  { id: 'purple', label: 'Purple', hex: '#7b58bf' },
-  { id: 'butter-yellow', label: 'Butter yellow', hex: '#f3e3a0' },
-  { id: 'yellow', label: 'Yellow', hex: '#f0c74a' },
-  { id: 'orange', label: 'Orange', hex: '#e27b2a' },
-  { id: 'silver', label: 'Silver', hex: '#c4c6ca' },
-  { id: 'gold', label: 'Gold', hex: '#cfa94a' },
-  { id: 'print', label: 'Print', hex: 'conic-gradient(#e27b2a, #f0c74a, #3d7a4c, #3567c8, #7b58bf, #e27b2a)' },
+  { id: 'black', label: t('color.black'), hex: '#141414' },
+  { id: 'white', label: t('color.white'), hex: '#ffffff' },
+  { id: 'cream', label: t('color.cream'), hex: '#f1e8d6' },
+  { id: 'beige', label: t('color.beige'), hex: '#d8c3a3' },
+  { id: 'camel', label: t('color.camel'), hex: '#b88a5a' },
+  { id: 'brown', label: t('color.brown'), hex: '#6b4a33' },
+  { id: 'grey', label: t('color.grey'), hex: '#9a9ca1' },
+  { id: 'navy', label: t('color.navy'), hex: '#1f2a48' },
+  { id: 'blue', label: t('color.blue'), hex: '#3567c8' },
+  { id: 'light-blue', label: t('color.light-blue'), hex: '#a8c7ec' },
+  { id: 'denim', label: t('color.denim'), hex: '#56789f' },
+  { id: 'green', label: t('color.green'), hex: '#3d7a4c' },
+  { id: 'olive', label: t('color.olive'), hex: '#6d6b3b' },
+  { id: 'red', label: t('color.red'), hex: '#c42b2b' },
+  { id: 'burgundy', label: t('color.burgundy'), hex: '#6b1c2c' },
+  { id: 'pink', label: t('color.pink'), hex: '#f1a7c0' },
+  { id: 'purple', label: t('color.purple'), hex: '#7b58bf' },
+  { id: 'butter-yellow', label: t('color.butter-yellow'), hex: '#f3e3a0' },
+  { id: 'yellow', label: t('color.yellow'), hex: '#f0c74a' },
+  { id: 'orange', label: t('color.orange'), hex: '#e27b2a' },
+  { id: 'silver', label: t('color.silver'), hex: '#c4c6ca' },
+  { id: 'gold', label: t('color.gold'), hex: '#cfa94a' },
+  { id: 'print', label: t('color.print'), hex: 'conic-gradient(#e27b2a, #f0c74a, #3d7a4c, #3567c8, #7b58bf, #e27b2a)' },
 ]
 export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 
@@ -94,53 +87,60 @@ export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 // Image templates (table image_templates), one per purpose: a layout picture plus the instructions for the image model.
 // A row without user_id is the default (admins); a user's own row overrides it field by field (null = the default).
 // placeholders: the {names} the Edge Functions fill in (keep in sync with supabase/functions/_shared/templates.ts).
+// Names, hints and placeholder descriptions are in the locale files: templates.<id>.label / .hint, templates.placeholder.<name>
 export const TEMPLATES = [
-  { id: 'look', label: 'One outfit on me', picture: true, hint: 'Saved outfits and the stylist’s looks: you wearing one outfit, with the pieces and a palette.',
-    placeholders: { vibe: 'the name of the look', scene: 'where she is and what she does', palette: 'the colours of the dots', palette_count: 'how many dots', appearance: 'your appearance from Preferences' } },
-  { id: 'many', label: 'One piece, many looks', picture: true, hint: '“Style it” on an item: one collage with the piece in the middle and several looks around it.',
-    placeholders: { title: 'the headline, e.g. ONE SWEATER', anchor: 'the main piece', looks_count: 'how many looks', labels: 'the names of the looks', palette: 'the colours of the dots', palette_count: 'how many dots', appearance: 'your appearance from Preferences' } },
-  { id: 'garment', label: 'Item photos', picture: false, hint: 'Enhance with AI: a clean product photo of a piece from a photo of you wearing it.',
-    placeholders: { piece: 'which piece to draw' } },
+  { id: 'look', picture: true, placeholders: ['vibe', 'scene', 'palette', 'palette_count', 'appearance'] },
+  { id: 'many', picture: true, placeholders: ['title', 'anchor', 'looks_count', 'labels', 'palette', 'palette_count', 'appearance'] },
+  { id: 'garment', picture: false, placeholders: ['piece'] },
 ] as const
 export type TemplateId = typeof TEMPLATES[number]['id']
 export type ImageTemplate = { id: string; user_id: string | null; purpose: TemplateId; image_path: string | null; prompt: string | null; updated_at: string }
 
 export type DictType = 'brand' | 'material' | 'color' | 'kind' | 'style' | 'occasion'
-export type DictRow = { type: DictType; category: string; id: string; label: string; hex: string | null; sort: number; is_default?: boolean; is_own?: boolean }
+export type DictRow = { type: DictType; category: string; id: string; label: string; hex: string | null; sort: number; is_default?: boolean; is_own?: boolean; renamed?: boolean }
+
+// The label to show for a dictionary entry: a default the user did not rename is translated (color.black,
+// kind.sweater, material.cotton); her own entries and renames are shown as she typed them. Brands are never translated.
+export const dictLabel = (type: DictType, id: string, label: string, renamed = false) =>
+  !renamed && type !== 'brand' && has(`${type}.${id}`) ? t(`${type}.${id}`) : label
+
+// Kinds and materials are stored in items as text (the English default or her own word), shown translated.
+// These maps turn what is shown back into what is stored, so a typed translation of "sweater" is saved as "sweater".
+const KIND_LABELS = new Map<string, string>(), KIND_IDS = new Map<string, string>()
+const MATERIAL_LABELS = new Map<string, string>(), MATERIAL_NAMES = new Map<string, string>()
+export const kindLabel = (kind: string) => KIND_LABELS.get(kind) ?? dictLabel('kind', kind, kind)
+export const kindId = (text: string) => KIND_IDS.get(text.trim().toLowerCase()) ?? text.trim().toLowerCase()
+export const materialLabel = (name: string) => MATERIAL_LABELS.get(name.trim().toLowerCase()) ?? dictLabel('material', name.trim().toLowerCase(), name)
+export const materialName = (text: string) => MATERIAL_NAMES.get(text.trim().toLowerCase()) ?? text.trim()
+
 export const BRANDS: string[] = []
-export const MATERIALS: string[] = []
+export const MATERIALS: string[] = [] // shown labels
 export function applyDict(rows: DictRow[]) {
-  const of = (t: DictType) => rows.filter(r => r.type === t).sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label))
+  const of = (t: DictType) => rows.filter(r => r.type === t)
+    .map(r => ({ ...r, shown: dictLabel(t, r.id, r.label, r.renamed) }))
+    .sort((a, b) => a.sort - b.sort || a.shown.localeCompare(b.shown))
   const put = <T,>(arr: T[], v: T[]) => { if (v.length) arr.splice(0, arr.length, ...v) }
   BRANDS.splice(0, BRANDS.length, ...of('brand').map(r => r.label))
-  MATERIALS.splice(0, MATERIALS.length, ...of('material').map(r => r.label))
-  put(COLORS, of('color').map(r => ({ id: r.id, label: r.label, hex: r.hex || '#cccccc' })))
-  put(STYLES, of('style').map(r => ({ id: r.id, label: r.label })))
-  put(OCCASIONS, of('occasion').map(r => ({ id: r.id, label: r.label })))
+  const mats = of('material')
+  MATERIALS.splice(0, MATERIALS.length, ...mats.map(r => r.shown))
+  for (const r of mats) { MATERIAL_LABELS.set(r.id, r.shown); MATERIAL_NAMES.set(r.shown.toLowerCase(), r.label) }
+  put(COLORS, of('color').map(r => ({ id: r.id, label: r.shown, hex: r.hex || '#cccccc' })))
+  put(STYLES, of('style').map(r => ({ id: r.id, label: r.shown })))
+  put(OCCASIONS, of('occasion').map(r => ({ id: r.id, label: r.shown })))
   const kinds = of('kind')
   if (kinds.length) {
     for (const k of Object.keys(KINDS)) delete KINDS[k]
-    for (const r of kinds) (KINDS[r.category] ??= []).push(r.id)
+    for (const r of kinds) { (KINDS[r.category] ??= []).push(r.id); KIND_LABELS.set(r.id, r.shown); KIND_IDS.set(r.shown.toLowerCase(), r.id) }
   }
 }
 
-export const SEASONS: Option[] = [
-  { id: 'spring', label: 'Spring' }, { id: 'summer', label: 'Summer' },
-  { id: 'autumn', label: 'Autumn' }, { id: 'winter', label: 'Winter' },
-]
-export const STYLES: Option[] = [
-  { id: 'casual', label: 'Casual' }, { id: 'classic', label: 'Classic' }, { id: 'minimal', label: 'Minimal' },
-  { id: 'elegant', label: 'Elegant' }, { id: 'business', label: 'Business' }, { id: 'sporty', label: 'Sporty' },
-  { id: 'romantic', label: 'Romantic' }, { id: 'edgy', label: 'Edgy' }, { id: 'boho', label: 'Boho' },
-]
-export const OCCASIONS: Option[] = [
-  { id: 'everyday', label: 'Everyday' }, { id: 'work', label: 'Work' }, { id: 'evening', label: 'Evening' },
-  { id: 'party', label: 'Party' }, { id: 'date', label: 'Date' }, { id: 'travel', label: 'Travel' },
-  { id: 'sport', label: 'Sport' }, { id: 'home', label: 'Home' },
-]
+const options = (type: string, ids: string[]): Option[] => ids.map(id => ({ id, label: t(`${type}.${id}`) }))
+export const SEASONS = options('season', ['spring', 'summer', 'autumn', 'winter'])
+export const STYLES = options('style', ['casual', 'classic', 'minimal', 'elegant', 'business', 'sporty', 'romantic', 'edgy', 'boho'])
+export const OCCASIONS = options('occasion', ['everyday', 'work', 'evening', 'party', 'date', 'travel', 'sport', 'home'])
 export const labelOf = (list: Option[], id: string) => list.find(o => o.id === id)?.label ?? id
 
-export const itemTitle = (i: Item) => i.name || i.kind || categoryLabel(i.category)
+export const itemTitle = (i: Item) => i.name || (i.kind ? kindLabel(i.kind) : '') || categoryLabel(i.category)
 
 // --- Photos: signed URLs (the bucket is private) ---
 
@@ -217,7 +217,7 @@ function opaqueBounds(c: HTMLCanvasElement) {
 }
 
 function toBlob(c: HTMLCanvasElement, type: string, q?: number) {
-  return new Promise<Blob>((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error('Could not process the photo'))), type, q))
+  return new Promise<Blob>((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error(t('error.photo')))), type, q))
 }
 
 async function encode(c: HTMLCanvasElement, alpha: boolean) {
@@ -248,7 +248,7 @@ const extOf = (b: Blob) => (b.type === 'image/webp' ? 'webp' : b.type === 'image
 
 export async function uploadPhoto(p: Processed) {
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Please sign in again')
+  if (!user) throw new Error(t('error.signIn'))
   const id = crypto.randomUUID()
   const photo_path = `${user.id}/${id}.${extOf(p.full)}`
   const thumb_path = `${user.id}/${id}_thumb.${extOf(p.thumb)}`
@@ -298,7 +298,7 @@ export async function whiteToAlpha(file: Blob): Promise<Blob> {
     if (p < (H - 1) * W) push(p + W)
   }
   ctx.putImageData(img, 0, 0)
-  return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Could not process the image')), 'image/png'))
+  return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error(t('error.image'))), 'image/png'))
 }
 
 // Cut an AI image of a set into one transparent PNG per piece, left to right.
@@ -326,7 +326,7 @@ export async function splitSet(file: Blob): Promise<Blob[]> {
     }
     const c = canvasOf(img.width, img.height)
     c.getContext('2d')!.putImageData(img, 0, 0)
-    out.push(await new Promise<Blob>((res, rej) => c.toBlob(x => x ? res(x) : rej(new Error('Could not process the image')), 'image/png')))
+    out.push(await new Promise<Blob>((res, rej) => c.toBlob(x => x ? res(x) : rej(new Error(t('error.image'))), 'image/png')))
   }
   return out
 }
@@ -432,7 +432,9 @@ export async function currentWeather(): Promise<string> {
   const d = await r.json()
   const code = d.current.weather_code as number
   const sky = code === 0 ? 'clear' : code <= 3 ? 'cloudy' : code <= 48 ? 'fog' : code <= 67 ? 'rain' : code <= 77 ? 'snow' : code <= 82 ? 'showers' : 'storm'
-  return `${Math.round(d.current.temperature_2m)}°C (feels ${Math.round(d.current.apparent_temperature)}°C, today ${Math.round(d.daily.temperature_2m_min[0])}…${Math.round(d.daily.temperature_2m_max[0])}°C), ${sky}, wind ${Math.round(d.current.wind_speed_10m)} km/h`
+  const n = (x: number) => Math.round(x)
+  return t('weather.text', { now: n(d.current.temperature_2m), feels: n(d.current.apparent_temperature), min: n(d.daily.temperature_2m_min[0]),
+    max: n(d.daily.temperature_2m_max[0]), sky: t(`weather.${sky}`), wind: n(d.current.wind_speed_10m) })
 }
 
 

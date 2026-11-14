@@ -1,10 +1,11 @@
 // Fashion looks: ideas around one item ("one sweater, many looks"), the stylist assistant (free request),
 // and AI photos of a woman wearing a look, shown next to the real item photos.
 import { useState } from 'react'
-import { supabase, autoLayout, askAI, renderLook, currentWeather, itemTitle, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
+import { supabase, autoLayout, askAI, renderLook, currentWeather, itemTitle, kindLabel, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
 import { go, back } from './App'
+import { t } from './i18n'
 
 const pick = (ids: string[], items: Item[]) => ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
 
@@ -80,14 +81,14 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
   return (
     <div className="card look">
       {look.image_path ? <Photo path={look.image_path} alt={look.label} className="look-post" zoom />
-        : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> Dressing you up, about a minute…</p></div>
+        : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> {t('looks.dressing')}</p></div>
         : <>
           <FlatLay items={its} />
-          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? 'Could not draw it. Try again' : 'Show on me'}<span className="cost">(OpenAI ≈9¢)</span></button>}
+          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? t('looks.drawError') : t('outfits.showOnMe')}<span className="cost">(OpenAI ≈9¢)</span></button>}
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
-      <button className="btn sm" onClick={save} disabled={busy}><Icon name="heart" filled={!!look.outfit_id} /> {look.outfit_id ? 'Saved' : 'Save outfit'}</button>
+      <button className="btn sm" onClick={save} disabled={busy}><Icon name="heart" filled={!!look.outfit_id} /> {look.outfit_id ? t('common.saved') : t('outfits.save')}</button>
     </div>
   )
 }
@@ -111,9 +112,9 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
     if (r.collage_outfit_id) return go(`/o/${r.collage_outfit_id}`)
     setSavingCollage(true)
     const anchor = String(req.input.item_id ?? '')
-    const kind = items.find(i => i.id === anchor)?.kind || 'piece'
+    const kind = items.find(i => i.id === anchor)?.kind
     const { data, error } = await supabase.from('outfits').insert({
-      name: `One ${kind}, many looks`, layout: anchor ? [{ item_id: anchor, x: 20, y: 20, w: 60, z: 1 }] : [],
+      name: t('looks.collageName', { piece: kind ? kindLabel(kind) : t('looks.piece') }), layout: anchor ? [{ item_id: anchor, x: 20, y: 20, w: 60, z: 1 }] : [],
       source: 'ai', notes: r.looks.map(l => l.label).join(' · '), image_path: r.collage_path,
     }).select().single()
     if (error) { setSavingCollage(false); return alert(error.message) }
@@ -136,15 +137,15 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
         {onCollage && (r.collage_path ? <>
             <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
             <button className="btn wide collage-save" onClick={saveCollage} disabled={savingCollage}>
-              <Icon name="heart" filled={!!r.collage_outfit_id} /> {r.collage_outfit_id ? 'Saved to outfits' : 'Save to outfits'}
+              <Icon name="heart" filled={!!r.collage_outfit_id} /> {r.collage_outfit_id ? t('looks.savedToOutfits') : t('looks.saveToOutfits')}
             </button>
           </>
-          : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> Drawing all looks on you in one picture, about a minute…</p></div>
-          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? 'Could not draw the collage. Try again' : 'Draw all looks in one picture'}<span className="cost">(OpenAI ≈17¢)</span></button>)}
+          : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> {t('looks.drawingCollage')}</p></div>
+          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? t('looks.collageError') : t('looks.drawCollage')}<span className="cost">(OpenAI ≈17¢)</span></button>)}
         <div className="looks">
           {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={onCollage ? undefined : () => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
-        {r.missing.length > 0 && <p className="muted small">Would make these looks even better: {r.missing.join(', ')}</p>}
+        {r.missing.length > 0 && <p className="muted small">{t('looks.missing', { list: r.missing.join(', ') })}</p>}
       </>}
     </div>
   )
@@ -181,18 +182,18 @@ export function StyleItem({ item }: { item: Item }) {
   const past = requests.filter(r => r.kind === 'looks' && r.input.item_id === item.id)
   return (
     <div className="screen">
-      <Header title="" left={<button className="icon-btn" onClick={() => back(`/i/${item.id}`)} aria-label="Back"><Icon name="back" /></button>} />
+      <Header title="" left={<button className="icon-btn" onClick={() => back(`/i/${item.id}`)} aria-label={t('common.back')}><Icon name="back" /></button>} />
       <div className="style-hero">
-        <p className="eyebrow">One {item.kind || 'piece'}</p>
-        <h2 className="looks-title big">many looks</h2>
+        <p className="eyebrow">{t('looks.one', { piece: item.kind ? kindLabel(item.kind) : t('looks.piece') })}</p>
+        <h2 className="looks-title big">{t('looks.many')}</h2>
         <Photo path={item.photo_path} alt={itemTitle(item)} className="big" />
       </div>
       <div className="form">
-        <input placeholder="Wish (optional): e.g. for autumn, more relaxed" value={wish} onChange={e => setWish(e.target.value)} />
-        <div className="seg looks-count" role="radiogroup" aria-label="Number of looks">
-          {[3, 4, 5, 6].map(n => <button key={n} type="button" role="radio" aria-checked={count === n} className={count === n ? 'on' : ''} onClick={() => chooseCount(n)} disabled={busy}>{n} looks</button>)}
+        <input placeholder={t('looks.wishPlaceholder')} value={wish} onChange={e => setWish(e.target.value)} />
+        <div className="seg looks-count" role="radiogroup" aria-label={t('looks.count')}>
+          {[3, 4, 5, 6].map(n => <button key={n} type="button" role="radio" aria-checked={count === n} className={count === n ? 'on' : ''} onClick={() => chooseCount(n)} disabled={busy}>{t('looks.nLooks', { count: n })}</button>)}
         </div>
-        <AIActions label={past.length ? 'New looks' : 'Get looks'} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? t('looks.newLooks') : t('looks.getLooks')} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count, request: wish.trim() || null }); setWish('') }} busy={busy} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
         onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
@@ -211,20 +212,20 @@ export function Assistant() {
   const past = requests.filter(r => r.kind === 'looks' && !r.input.item_id)
   const getWeather = async () => {
     setWBusy(true)
-    try { setWeather(await currentWeather()) } catch { alert('Could not get the weather. Allow location access or type it in.') }
+    try { setWeather(await currentWeather()) } catch { alert(t('looks.weatherError')) }
     setWBusy(false)
   }
   return (
     <div className="screen">
-      <Header title="Stylist" left={<button className="icon-btn" onClick={() => back('/outfits')} aria-label="Back"><Icon name="back" /></button>} />
+      <Header title={t('looks.stylist')} left={<button className="icon-btn" onClick={() => back('/outfits')} aria-label={t('common.back')}><Icon name="back" /></button>} />
       <div className="form">
-        {items.length < 3 && <p className="queued err">Add at least a few items to your wardrobe first.</p>}
-        <textarea rows={3} placeholder="What do you need? e.g. soft looks for autumn, +15, in pastel shades" value={request} onChange={e => setRequest(e.target.value)} />
+        {items.length < 3 && <p className="queued err">{t('looks.needItems')}</p>}
+        <textarea rows={3} placeholder={t('looks.requestPlaceholder')} value={request} onChange={e => setRequest(e.target.value)} />
         <div className="row">
-          <input placeholder="Weather (optional), e.g. +15°C, sunny" value={weather} onChange={e => setWeather(e.target.value)} />
-          <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : 'Now'}</button>
+          <input placeholder={t('looks.weatherPlaceholder')} value={weather} onChange={e => setWeather(e.target.value)} />
+          <button className="btn sm" onClick={getWeather} disabled={wBusy}><Icon name="sun" /> {wBusy ? '…' : t('looks.now')}</button>
         </div>
-        <AIActions label="Get looks" cost="OpenAI ≈29¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
+        <AIActions label={t('looks.getLooks')} cost="OpenAI ≈29¢" onRun={() => ask({ request: request.trim(), weather: weather.trim() || null, count: 3 })} busy={busy} disabled={items.length < 3 || !request.trim()} />
       </div>
       {past.map(r => <LooksView key={r.id} req={r} eyebrow={[r.input.request, r.input.weather].filter(Boolean).join(' · ')} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>

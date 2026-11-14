@@ -6,6 +6,7 @@ import {
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
 import { go, back } from './App'
+import { t } from './i18n'
 
 export function InspoList() {
   const { inspirations, profile, requests, setInspirations, setRequests, reload } = useStore()
@@ -39,36 +40,36 @@ export function InspoList() {
 
   return (
     <div className="screen">
-      <Header title="Inspiration" right={
-        <button className="icon-btn" onClick={() => fileRef.current?.click()} aria-label="Add looks"><Icon name="plus" /></button>
+      <Header title={t('inspo.title')} right={
+        <button className="icon-btn" onClick={() => fileRef.current?.click()} aria-label={t('inspo.add')}><Icon name="plus" /></button>
       } />
       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { add(e.target.files); e.target.value = '' }} />
 
       <div className="card formulas">
-        <h3 className="card-title"><Icon name="wand" /> My style formulas</h3>
+        <h3 className="card-title"><Icon name="wand" /> {t('inspo.formulas')}</h3>
         {profile?.summary ? (
           <>
             <p className="pre">{profile.summary}</p>
             <div className="formula-list">
               {profile.formulas.map((f, n) => <div key={n} className="formula"><b>{f.title}</b><span>{f.recipe}</span></div>)}
             </div>
-            {profile.palette.length > 0 && <p className="muted small">Palette: {profile.palette.join(', ')}</p>}
-            {profile.key_pieces.length > 0 && <p className="muted small">Key pieces: {profile.key_pieces.join(', ')}</p>}
-            <p className="muted small">Based on {profile.based_on} looks.</p>
+            {profile.palette.length > 0 && <p className="muted small">{t('inspo.palette', { list: profile.palette.join(', ') })}</p>}
+            {profile.key_pieces.length > 0 && <p className="muted small">{t('inspo.keyPieces', { list: profile.key_pieces.join(', ') })}</p>}
+            <p className="muted small">{t('inspo.basedOn', { count: profile.based_on })}</p>
           </>
-        ) : <p className="muted">Save looks you love and analyze them. When you have a few, find the patterns behind your taste.</p>}
+        ) : <p className="muted">{t('inspo.formulasHint')}</p>}
         {formulaReq?.status !== 'done' && <RequestState req={formulaReq} />}
-        <AIActions label={profile?.summary ? 'Update formulas' : 'Find my formulas'} onRun={findFormulas} busy={fBusy}
+        <AIActions label={profile?.summary ? t('inspo.updateFormulas') : t('inspo.findFormulas')} onRun={findFormulas} busy={fBusy}
           disabled={analyzed < 2} />
-        {analyzed < 2 && <p className="hint">Analyze at least 2 looks first ({analyzed} so far).</p>}
+        {analyzed < 2 && <p className="hint">{t('inspo.needTwo', { count: analyzed })}</p>}
       </div>
 
       {inspirations.length === 0 ? (
         <div className="empty">
           <Icon name="image" />
-          <h2>No looks saved yet</h2>
-          <p className="muted">Add screenshots of outfits you love from Instagram or Pinterest. You can pick several at once.</p>
-          <button className="btn primary" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="plus" /> {busy ? 'Uploading…' : 'Add looks'}</button>
+          <h2>{t('inspo.empty')}</h2>
+          <p className="muted">{t('inspo.emptyHint')}</p>
+          <button className="btn primary" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="plus" /> {busy ? t('common.uploading') : t('inspo.add')}</button>
         </div>
       ) : (
         <div className="grid inspo-grid">
@@ -81,12 +82,11 @@ export function InspoList() {
           ))}
         </div>
       )}
-      {busy && <p className="hint">Uploading…</p>}
+      {busy && <p className="hint">{t('common.uploading')}</p>}
     </div>
   )
 }
 
-const STATUS = { have: 'You have it', similar: 'Similar in your wardrobe', missing: 'Missing' }
 
 export function InspoDetail({ insp }: { insp: Inspiration }) {
   const { items, requests, setInspirations, setRequests, setShopping } = useStore()
@@ -106,44 +106,44 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
     setBusy(false)
   }
   const del = async () => {
-    if (!confirm('Delete this look?')) return
+    if (!confirm(t('inspo.confirmDelete'))) return
     await supabase.from('inspirations').delete().eq('id', insp.id)
     await removePhotos(insp.image_path, insp.thumb_path)
     setInspirations(without(insp.id)); back('/inspo')
   }
   const toList = async (name: string) => {
-    const { data, error } = await supabase.from('shopping').insert({ name, why: `From a saved look: ${a?.formula ?? ''}`, priority: 2 }).select().single()
+    const { data, error } = await supabase.from('shopping').insert({ name, why: t('inspo.fromLook', { formula: a?.formula ?? '' }), priority: 2 }).select().single()
     if (error) return alert(error.message)
-    setShopping(upsert(data as ShopItem)); alert(`Added “${name}” to your shopping list`)
+    setShopping(upsert(data as ShopItem)); alert(t('inspo.added', { name }))
   }
 
   return (
     <div className="screen">
-      <Header title="" left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label="Back"><Icon name="back" /></button>}
-        right={<button className="icon-btn" onClick={del} aria-label="Delete"><Icon name="trash" /></button>} />
+      <Header title="" left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label={t('common.back')}><Icon name="back" /></button>}
+        right={<button className="icon-btn" onClick={del} aria-label={t('common.delete')}><Icon name="trash" /></button>} />
       <div className="detail">
         <Photo path={insp.image_path} alt="" className="big cover-big" />
         <div className="detail-info">
           {!a && (
             <>
-              <textarea rows={2} placeholder="What do you like about it? (optional)" value={note} onChange={e => setNote(e.target.value)} />
-              <AIActions label="Analyze" onRun={run} busy={busy} />
+              <textarea rows={2} placeholder={t('inspo.notePlaceholder')} value={note} onChange={e => setNote(e.target.value)} />
+              <AIActions label={t('inspo.analyze')} onRun={run} busy={busy} />
               <RequestState req={req} />
             </>
           )}
           {a && (
             <>
               <p className="eyebrow">{a.tags.join(' · ')}</p>
-              <div className="card formula-big"><span className="muted small">Formula</span><b>{a.formula}</b></div>
+              <div className="card formula-big"><span className="muted small">{t('inspo.formula')}</span><b>{a.formula}</b></div>
               <p>{a.summary}</p>
               <div className="card">
-                <h3 className="card-title">Pieces</h3>
+                <h3 className="card-title">{t('outfits.pieces')}</h3>
                 <div className="pieces">
                   {a.pieces.map((p, n) => {
                     const own = p.item_ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
                     return (
                       <div key={n} className={'piece ' + p.status}>
-                        <div className="piece-head"><b>{p.piece}</b><span className={'pill ' + p.status}>{STATUS[p.status]}</span></div>
+                        <div className="piece-head"><b>{p.piece}</b><span className={'pill ' + p.status}>{t(`inspo.status.${p.status}`)}</span></div>
                         <span className="muted small">{categoryLabel(p.category)}{p.note ? ` · ${p.note}` : ''}</span>
                         {own.length > 0 && (
                           <div className="mini-list">
@@ -157,14 +157,14 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
               </div>
               {a.to_buy.length > 0 && (
                 <div className="card">
-                  <h3 className="card-title">Worth buying</h3>
-                  {a.to_buy.map((t, n) => (
-                    <div key={n} className="row buy-row"><span className="grow">{t}</span><button className="btn sm" onClick={() => toList(t)}><Icon name="plus" /> List</button></div>
+                  <h3 className="card-title">{t('inspo.worthBuying')}</h3>
+                  {a.to_buy.map((x, n) => (
+                    <div key={n} className="row buy-row"><span className="grow">{x}</span><button className="btn sm" onClick={() => toList(x)}><Icon name="plus" /> {t('shop.toList')}</button></div>
                   ))}
                 </div>
               )}
-              {insp.note && <p className="muted small">Your note: {insp.note}</p>}
-              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? 'Thinking…' : 'Analyze again (OpenAI ≈2¢)'}</button>
+              {insp.note && <p className="muted small">{t('inspo.yourNote', { note: insp.note })}</p>}
+              <button className="btn ghost sm" onClick={() => run('now')} disabled={busy}>{busy ? t('common.thinking') : `${t('inspo.analyzeAgain')} (OpenAI ≈2¢)`}</button>
             </>
           )}
         </div>

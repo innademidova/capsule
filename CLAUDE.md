@@ -12,7 +12,8 @@ AI queue processed by Claude Code for free, Edge Function with Claude API, scrip
 
 ## Hard rules from the owner
 
-- **Everything in the repo is English: app UI, code comments, README, docs and commit messages. No Cyrillic in code at all** (owner's request, 2026-11-09). AI prose results shown in the app stay Ukrainian. Chat replies to the owner: in her language, plain and non-technical.
+- **Everything in the repo is English: code comments, README, docs and commit messages. No Cyrillic in code at all** (owner's request, 2026-11-09). The only place for Ukrainian text is the translation file `src/locales/uk.json` (approved 2026-11-14). Chat replies to the owner: in her language, plain and non-technical.
+- **Interface languages: Ukrainian and English** (2026-11-14). Code never contains UI text, only keys: `t('section.key')` from `src/i18n.ts` (own tiny module, i18next-compatible JSON: nested keys, `{{var}}`, plural suffixes `_one/_few/_many/_other`). Every new text goes into BOTH `src/locales/en.json` and `uk.json`. The choice is in Profile → Account → Language, stored in `profiles.language` and localStorage; switching reloads the page. Dictionary defaults (colors, kinds, materials, styles, occasions, categories, seasons) are translated by id (`color.black`, `kind.sweater`, `material.cotton`); items keep storing the English ids/words, `kindLabel/kindId` and `materialLabel/materialName` in `lib.ts` convert. Her own entries and renames (`dict_effective.renamed`) are shown as typed. The `ai` function writes prose in the account language; look labels/titles/scenes (drawn on images) and `kind` stay English.
 - Hosting must stay free (GitHub Pages + Supabase free tier). Ask before anything that costs money.
 - She is often on limited mobile internet (2 GB): avoid unnecessary downloads, install packages with
   `npm install --prefer-offline`, warn before anything large.
@@ -59,7 +60,7 @@ Photo tagging (`tag`, "Fill in with AI") runs on OpenAI (`gpt-6.1-terra`, secret
 - A DB trigger (`apply_ai_result`) copies finished results where they belong: `inspo` → `inspirations.analysis`,
   `formulas` → `style_profile`, bulk `tag` → fills empty item fields. `outfits`, `gaps`, `buy`, single-photo `tag`
   results are read straight from `ai_requests.result`.
-- Result shapes = `SCHEMAS` in the Edge Function. Prose fields in **Ukrainian addressing her informally (second person singular)**, labels in English.
+- Result shapes = `SCHEMAS` in the Edge Function. Prose and the labels she reads are in the account language (`profiles.language`, default Ukrainian, informal second person); kind, look labels and titles stay English.
 
 Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoyzzzlrlttk --use-api`
 (the CLI is in the npx cache; `npx` may download it otherwise). Set the key: `npx supabase secrets set ANTHROPIC_API_KEY=… --project-ref ajbdkvpyhoyzzzlrlttk`.
