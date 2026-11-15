@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode, type UIEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
 import { t } from './i18n'
@@ -205,6 +205,28 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
         <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
         {children}
       </div>
+    </div>
+  )
+}
+
+// Several photos of one item: swipe sideways, dots show where you are; each photo opens full screen
+export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: string; onRemove?: (path: string) => void }) {
+  const [at, setAt] = useState(0)
+  const onScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    setAt(Math.round(el.scrollLeft / el.clientWidth))
+  }
+  return (
+    <div className="carousel">
+      <div className="carousel-track" onScroll={onScroll}>
+        {paths.map((p, n) => (
+          <div key={p} className="carousel-slide">
+            <Photo path={p} alt={alt} className="big" zoom />
+            {onRemove && n > 0 && <button className="icon-btn sm carousel-del" onClick={() => onRemove(p)} aria-label={t('common.delete')}><Icon name="trash" /></button>}
+          </div>
+        ))}
+      </div>
+      {paths.length > 1 && <div className="carousel-dots">{paths.map((p, n) => <span key={p} className={n === at ? 'on' : ''} />)}</div>}
     </div>
   )
 }

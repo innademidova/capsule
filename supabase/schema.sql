@@ -505,3 +505,6 @@ where not coalesce(u.hidden, false);
 
 -- 2026-11-15: wishlist pieces linked to looks
 alter table public.inspirations add column if not exists item_ids uuid[] not null default '{}';
+
+-- 2026-11-15: more photos per item (carousel)
+alter table public.items add column if not exists more_photos text[] not null default '{}';

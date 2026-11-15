@@ -85,7 +85,9 @@
     "inspiredBy_one": "Inspired by {{count}} look",
     "inspiredBy_other": "Inspired by {{count}} looks",
     "inspiredByNone": "Inspired by",
-    "linkLooks": "Link looks"
+    "linkLooks": "Link looks",
+    "addPhotos": "Add photos",
+    "confirmDeletePhoto": "Delete this photo?"
   },
   "form": {
     "materialPlaceholder": "e.g. Cotton",

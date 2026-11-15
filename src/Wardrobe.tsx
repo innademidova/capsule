@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle, kindLabel, kindId, materialLabel, materialName,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
-import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
+import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel } from './ui'
 import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
@@ -118,6 +118,8 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
   const { outfits, items } = useStore()
+  const moreRef = useRef<HTMLInputElement>(null)
+  const more = item.more_photos ?? []
   const home = item.wishlist ? '/wish' : '/'
   const inOutfits = outfits.filter(o => o.layout.some(p => p.item_id === item.id))
   const mates = item.set_id ? items.filter(i => i.set_id === item.set_id && i.id !== item.id) : []
@@ -133,12 +135,29 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
     if (error) alert(error.message); else onChange(data as Item)
     setBusy(false)
   }
+  // Extra photos (back, details): added and removed right here, the first photo is changed in the edit form
+  const setMore = async (next: string[]) => {
+    const { data, error } = await supabase.from('items').update({ more_photos: next }).eq('id', item.id).select().single()
+    if (error) throw error
+    onChange(data as Item)
+  }
+  const addMore = async (files: FileList | null) => {
+    if (!files?.length) return
+    setBusy(true)
+    try { const added: string[] = []; for (const f of [...files]) added.push(await uploadExtraPhoto(f)); await setMore([...more, ...added]) }
+    catch (e) { alert((e as Error).message) }
+    setBusy(false)
+  }
+  const removeMore = async (path: string) => {
+    if (!confirm(t('item.confirmDeletePhoto'))) return
+    try { await setMore(more.filter(p => p !== path)); await removePhotos(path) } catch (e) { alert((e as Error).message) }
+  }
   const del = async () => {
     if (!confirm(t('item.confirmDelete', { name: itemTitle(item) }))) return
     setBusy(true)
     const { error } = await supabase.from('items').delete().eq('id', item.id)
     if (error) { alert(error.message); setBusy(false); return }
-    await removePhotos(item.photo_path, item.thumb_path)
+    await removePhotos(item.photo_path, item.thumb_path, ...more)
     onDelete(item.id)
     back(home)
   }
@@ -156,7 +175,13 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
           <button className="icon-btn" onClick={() => go(`/i/${item.id}/edit`)} aria-label={t('common.edit')}><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        <Photo path={item.photo_path} alt={itemTitle(item)} className="big" />
+        <div className="carousel">
+          {more.length > 0 && item.photo_path
+            ? <Carousel paths={[item.photo_path, ...more]} alt={itemTitle(item)} onRemove={removeMore} />
+            : <Photo path={item.photo_path} alt={itemTitle(item)} className="big" zoom />}
+          <input ref={moreRef} type="file" accept="image/*" multiple hidden onChange={e => { addMore(e.target.files); e.target.value = '' }} />
+          <button className="btn ghost sm" onClick={() => moreRef.current?.click()} disabled={busy}><Icon name="plus" /> {busy ? t('common.uploading') : t('item.addPhotos')}</button>
+        </div>
         <div className="detail-info">
           <p className="eyebrow">{categoryLabel(item.category)}{item.kind && item.name ? ` · ${kindLabel(item.kind)}` : ''}</p>
           <h2 className="title">{itemTitle(item)}</h2>
@@ -212,7 +237,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
 
 // --- Add / edit ---
 
-type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path' | 'set_id'>
+type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path' | 'set_id' | 'more_photos'>
 // One piece cut out of an AI image of a set; tags come from AI per piece
 type Part = { path: string; url: string; blob: Blob; tags: Draft | null }
 

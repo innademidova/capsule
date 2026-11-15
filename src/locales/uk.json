@@ -89,7 +89,9 @@
     "inspiredBy_many": "Натхнення: {{count}} образів",
     "inspiredBy_other": "Натхнення: {{count}} образу",
     "inspiredByNone": "Натхнення",
-    "linkLooks": "Привʼязати образи"
+    "linkLooks": "Привʼязати образи",
+    "addPhotos": "Додати фото",
+    "confirmDeletePhoto": "Видалити це фото?"
   },
   "form": {
     "materialPlaceholder": "напр. Бавовна",

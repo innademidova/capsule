@@ -523,3 +523,14 @@ details.card .dict-list { margin-top: 12px; }
 .mini.owned { opacity: .55; }
 .tile-need { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px 2px 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; }
 .tile-need .icon { width: 13px; height: 13px; }
+
+/* Item photo carousel */
+.carousel { display: grid; gap: 8px; min-width: 0; }
+.carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 22px; }
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; padding: 0 1px; }
+.carousel-slide .photo.big { box-shadow: none; border: 1px solid var(--line); }
+.carousel-del { position: absolute; top: 10px; right: 10px; background: var(--card); box-shadow: var(--shadow); }
+.carousel-dots { display: flex; justify-content: center; gap: 6px; }
+.carousel-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .15s; }
+.carousel-dots span.on { background: var(--ink); }

@@ -21,6 +21,7 @@ export type Item = {
   notes: string | null
   link: string | null
   materials: Material[]
+  more_photos: string[] // extra photos (back, details), shown as a carousel on the item page
   photo_path: string | null
   thumb_path: string | null
   favorite: boolean
@@ -257,6 +258,17 @@ export async function uploadPhoto(p: Processed) {
     if (error) throw error
   }
   return { photo_path, thumb_path }
+}
+
+// Extra photo of an item: full size only (the gallery uses the first photo's thumbnail)
+export async function uploadExtraPhoto(file: Blob) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error(t('error.signIn'))
+  const p = await processPhoto(file)
+  const path = `${user.id}/${crypto.randomUUID()}.${extOf(p.full)}`
+  const { error } = await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })
+  if (error) throw error
+  return path
 }
 
 export async function removePhotos(...paths: (string | null)[]) {
