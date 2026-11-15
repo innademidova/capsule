@@ -268,7 +268,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .collage { position: relative; aspect-ratio: 3 / 4; background: var(--collage-bg); border-radius: 12px; overflow: hidden; }
 .collage img { position: absolute; height: auto; display: block; pointer-events: none; }
 .collage.big { border-radius: 22px; box-shadow: var(--shadow); }
-.grid.outfits .tile .collage { aspect-ratio: 3 / 4; }
+.grid.outfits .tile .collage { aspect-ratio: 2 / 3; }
 .board { touch-action: none; user-select: none; -webkit-user-select: none; }
 .board-item { position: absolute; cursor: grab; touch-action: none; border-radius: 8px; }
 .board-item.on { outline: 2px dashed var(--ink); outline-offset: 2px; }
@@ -423,7 +423,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .look-pieces .photo { height: 100%; border-radius: 12px; }
 .look-pieces .photo img { padding: 6%; }
 .detail > .look-pair { margin-bottom: 4px; }
-.tile .photo.look-thumb { aspect-ratio: 3 / 4; }
+.tile .photo.look-thumb { aspect-ratio: 2 / 3; } /* AI images are 1024x1536: whole picture, head included */
 
 /* Admin: dictionaries */
 .dict-list { display: grid; gap: 6px; }
