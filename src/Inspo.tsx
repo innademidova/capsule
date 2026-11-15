@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import {
-  supabase, processPhoto, uploadPhoto, removePhotos, askAI, categoryLabel, itemTitle,
+  supabase, processPhoto, uploadPhoto, removePhotos, askAI, categoryLabel, itemTitle, linkInspo, looksFor,
   type Inspiration, type AIRequest, type ShopItem, type Item,
 } from './lib'
 import { useStore, upsert, without } from './store'
@@ -124,6 +124,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
       <div className="detail">
         <Photo path={insp.image_path} alt="" className="big cover-big" />
         <div className="detail-info">
+          <LinkedItems insp={insp} />
           {!a && (
             <>
               <textarea rows={2} placeholder={t('inspo.notePlaceholder')} value={note} onChange={e => setNote(e.target.value)} />
@@ -169,6 +170,81 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Wishlist pieces this look needs: linked by hand, shown on the look and counted on each piece
+function LinkedItems({ insp }: { insp: Inspiration }) {
+  const { items, wishlist, setInspirations } = useStore()
+  const [open, setOpen] = useState(false)
+  const all = [...wishlist, ...items]
+  const linked = (insp.item_ids ?? []).map(id => all.find(i => i.id === id)).filter((i): i is Item => !!i)
+  const toggle = async (id: string, on: boolean) => {
+    try { setInspirations(upsert(await linkInspo(insp, id, on))) } catch (e) { alert((e as Error).message) }
+  }
+  return (
+    <div className="card">
+      <h3 className="card-title"><Icon name="bag" /> {t('inspo.wishTitle')}</h3>
+      {linked.length > 0 ? (
+        <div className="mini-list">
+          {linked.map(i => (
+            <button key={i.id} className={'mini' + (i.wishlist ? '' : ' owned')} onClick={() => go(`/i/${i.id}`)}>
+              <Photo path={i.thumb_path ?? i.photo_path} alt="" />
+              <span>{i.wishlist ? itemTitle(i) : t('inspo.alreadyMine')}</span>
+            </button>
+          ))}
+        </div>
+      ) : <p className="muted small">{t('inspo.wishEmpty')}</p>}
+      <button className="btn sm" onClick={() => setOpen(o => !o)}><Icon name={open ? 'check' : 'link'} /> {open ? t('common.done') : t('inspo.linkWish')}</button>
+      {open && (wishlist.length ? (
+        <div className="pick-grid">
+          {wishlist.map(i => {
+            const on = (insp.item_ids ?? []).includes(i.id)
+            return (
+              <button key={i.id} className={'pick' + (on ? ' on' : '')} onClick={() => toggle(i.id, !on)} aria-pressed={on}>
+                <Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} />
+                {on && <span className="badge"><Icon name="check" /></span>}
+              </button>
+            )
+          })}
+        </div>
+      ) : <p className="muted small">{t('inspo.noWish')}</p>)}
+    </div>
+  )
+}
+
+// On an item: the saved looks it is linked to, and a picker to link more
+export function InspiredBy({ item }: { item: Item }) {
+  const { inspirations, setInspirations } = useStore()
+  const [open, setOpen] = useState(false)
+  const linked = looksFor(item.id, inspirations)
+  if (!item.wishlist && !linked.length) return null
+  const toggle = async (insp: Inspiration, on: boolean) => {
+    try { setInspirations(upsert(await linkInspo(insp, item.id, on))) } catch (e) { alert((e as Error).message) }
+  }
+  return (
+    <div className="card">
+      <h3 className="card-title"><Icon name="image" /> {linked.length ? t('item.inspiredBy', { count: linked.length }) : t('item.inspiredByNone')}</h3>
+      {linked.length > 0 && (
+        <div className="pick-grid">
+          {linked.map(i => <button key={i.id} className="pick look" onClick={() => go(`/n/${i.id}`)}><Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" /></button>)}
+        </div>
+      )}
+      {inspirations.length > 0 && <button className="btn sm" onClick={() => setOpen(o => !o)}><Icon name={open ? 'check' : 'link'} /> {open ? t('common.done') : t('item.linkLooks')}</button>}
+      {open && (
+        <div className="pick-grid">
+          {inspirations.map(i => {
+            const on = (i.item_ids ?? []).includes(item.id)
+            return (
+              <button key={i.id} className={'pick look' + (on ? ' on' : '')} onClick={() => toggle(i, !on)} aria-pressed={on}>
+                <Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" />
+                {on && <span className="badge"><Icon name="check" /></span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

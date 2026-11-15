@@ -81,7 +81,11 @@
     "outfitWithSet": "Outfit with the whole set",
     "inOutfits_one": "In {{count}} outfit",
     "inOutfits_other": "In {{count}} outfits",
-    "delete": "Delete item"
+    "delete": "Delete item",
+    "inspiredBy_one": "Inspired by {{count}} look",
+    "inspiredBy_other": "Inspired by {{count}} looks",
+    "inspiredByNone": "Inspired by",
+    "linkLooks": "Link looks"
   },
   "form": {
     "materialPlaceholder": "e.g. Cotton",
@@ -229,7 +233,12 @@
     },
     "worthBuying": "Worth buying",
     "yourNote": "Your note: {{note}}",
-    "analyzeAgain": "Analyze again"
+    "analyzeAgain": "Analyze again",
+    "wishTitle": "To buy from the wishlist",
+    "wishEmpty": "Link the wishlist pieces this look needs.",
+    "linkWish": "Link from the wishlist",
+    "noWish": "Your wishlist is empty.",
+    "alreadyMine": "Already mine"
   },
   "shop": {
     "toList": "List",

@@ -513,3 +513,13 @@ details.card .dict-list { margin-top: 12px; }
 .prompt-preview pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 420px; overflow: auto; }
 .prompt-preview .icon-btn { position: absolute; top: 6px; right: 6px; }
 .seg.looks-count { margin: 0; width: 100%; }
+
+/* Links between looks and wishlist pieces */
+.pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.pick { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 2px solid transparent; background: var(--card); }
+.pick.look { aspect-ratio: 3 / 4; }
+.pick .photo { width: 100%; height: 100%; }
+.pick.on { border-color: var(--accent); }
+.mini.owned { opacity: .55; }
+.tile-need { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px 2px 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; }
+.tile-need .icon { width: 13px; height: 13px; }

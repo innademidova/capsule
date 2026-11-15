@@ -83,7 +83,13 @@
     "inOutfits_few": "У {{count}} образах",
     "inOutfits_many": "У {{count}} образах",
     "inOutfits_other": "У {{count}} образах",
-    "delete": "Видалити річ"
+    "delete": "Видалити річ",
+    "inspiredBy_one": "Натхнення: {{count}} образ",
+    "inspiredBy_few": "Натхнення: {{count}} образи",
+    "inspiredBy_many": "Натхнення: {{count}} образів",
+    "inspiredBy_other": "Натхнення: {{count}} образу",
+    "inspiredByNone": "Натхнення",
+    "linkLooks": "Привʼязати образи"
   },
   "form": {
     "materialPlaceholder": "напр. Бавовна",
@@ -239,7 +245,12 @@
     },
     "worthBuying": "Варто купити",
     "yourNote": "Твоя нотатка: {{note}}",
-    "analyzeAgain": "Проаналізувати ще раз"
+    "analyzeAgain": "Проаналізувати ще раз",
+    "wishTitle": "Купити з вішліста",
+    "wishEmpty": "Привʼяжи речі з вішліста, потрібні для цього образу.",
+    "linkWish": "Додати з вішліста",
+    "noWish": "Вішліст порожній.",
+    "alreadyMine": "Вже моє"
   },
   "shop": {
     "toList": "У список",

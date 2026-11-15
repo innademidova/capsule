@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle, kindLabel, kindId, materialLabel, materialName,
-  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
+  processPhoto, uploadPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage } from './ui'
 import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
+import { InspiredBy } from './Inspo'
 
 // --- List ---
 
@@ -21,7 +22,10 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
   items: Item[]; filters: Filters; setFilters: (f: Filters) => void; wish?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const { inspirations } = useStore()
   const f = filters
+  // Wishlist: how many saved looks need each piece; the most needed come first
+  const need = (id: string) => wish ? looksFor(id, inspirations).length : 0
   const set = (patch: Partial<Filters>) => setFilters({ ...f, ...patch })
   const extra = f.colors.length + f.seasons.length + f.styles.length + f.occasions.length + (f.fav ? 1 : 0)
 
@@ -31,7 +35,8 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
       (!f.category || i.category === f.category) && (!f.fav || i.favorite) &&
       anyOf(f.colors, i.colors) && anyOf(f.seasons, i.seasons) && anyOf(f.styles, i.styles) && anyOf(f.occasions, i.occasions) &&
       (!q || [i.name, i.kind, i.kind && kindLabel(i.kind), i.brand, i.notes].some(s => s?.toLowerCase().includes(q))))
-  }, [items, f])
+      .sort((a, b) => need(b.id) - need(a.id))
+  }, [items, f, inspirations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const count = (cat: string) => items.filter(i => i.category === cat).length
   const newPath = wish ? '/i/new/wish' : '/i/new'
@@ -95,6 +100,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
             <button key={i.id} className="tile" onClick={() => go(`/i/${i.id}`)}>
               <Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} />
               {i.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
+              {need(i.id) > 0 && <span className="tile-need" title={t('item.inspiredBy', { count: need(i.id) })}><Icon name="image" />{need(i.id)}</span>}
               <span className="tile-name">{itemTitle(i)}</span>
               <span className="tile-colors">{i.colors.slice(0, 4).map(c => <Swatch key={c} id={c} size={10} />)}</span>
             </button>
@@ -179,6 +185,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
               <button className="btn primary" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> {t('item.buildOutfit')}</button>
             </div>
           </>}
+          <InspiredBy item={item} />
           {mates.length > 0 && (
             <div className="card">
               <h3 className="card-title">{t('item.partOfSet')}</h3>

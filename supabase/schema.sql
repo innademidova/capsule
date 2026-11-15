@@ -502,3 +502,6 @@ from public.dict_global g
 full join (select * from public.dict_user where user_id = auth.uid()) u
   on u.type = g.type and u.category = g.category and u.id = g.id
 where not coalesce(u.hidden, false);
+
+-- 2026-11-15: wishlist pieces linked to looks
+alter table public.inspirations add column if not exists item_ids uuid[] not null default '{}';

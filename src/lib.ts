@@ -352,7 +352,7 @@ export type Outfit = {
 }
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
-export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; created_at: string }
+export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; item_ids: string[] /* linked items, mostly wishlist */; created_at: string }
 export type StyleProfile = { appearance: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 export type ShopItem = { id: string; name: string; category: string | null; why: string | null; priority: number; done: boolean; created_at: string }
 export type AIRequest = {
@@ -440,3 +440,14 @@ export async function currentWeather(): Promise<string> {
 
 // Exact cost as cents with two decimals, e.g. 0.0583 -> "5.83¢"
 export const cents = (usd: number) => `${(usd * 100).toFixed(2)}¢`
+
+// Saved looks an item is linked to (the wishlist shows how many looks need a piece)
+export const looksFor = (id: string, inspirations: Inspiration[]) => inspirations.filter(i => i.item_ids?.includes(id))
+
+// Links or unlinks an item and a look; returns the updated look
+export async function linkInspo(insp: Inspiration, itemId: string, on: boolean): Promise<Inspiration> {
+  const ids = (insp.item_ids ?? []).filter(x => x !== itemId)
+  const { data, error } = await supabase.from('inspirations').update({ item_ids: on ? [...ids, itemId] : ids }).eq('id', insp.id).select().single()
+  if (error) throw error
+  return data as Inspiration
+}
