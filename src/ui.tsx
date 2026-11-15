@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type UIEvent } from 'react'
+import { useEffect, useState, type ReactNode, type UIEvent, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
 import { t } from './i18n'
@@ -71,9 +71,30 @@ export function Chips({ options, value, onChange, multi = true, swatches }: {
 
 // Photo from private storage
 // zoom: a tap opens the picture full screen with a download button (AI images, collages)
+// A shop or studio photo has its own background: it is shown edge to edge, and any space around it
+// takes the colour of that background, so there is no frame inside a frame. Cut-outs keep their padding.
+const backdrops = new Map<string, string | null>()
+function backdropOf(img: HTMLImageElement): string | null {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 16
+    const g = c.getContext('2d', { willReadFrequently: true })!
+    g.drawImage(img, 0, 0, 16, 16)
+    const px = [[0, 0], [15, 0], [0, 15], [15, 15]].map(([x, y]) => g.getImageData(x, y, 1, 1).data)
+    if (px.some(d => d[3] < 250)) return null
+    const avg = (i: number) => Math.round(px.reduce((a, d) => a + d[i], 0) / 4)
+    return `rgb(${avg(0)}, ${avg(1)}, ${avg(2)})`
+  } catch { return null } // no CORS: keep the default look
+}
+
 export function Photo({ path, alt, className, zoom }: { path: string | null; alt: string; className?: string; zoom?: boolean }) {
   const [url, setUrl] = useState<string>()
   const [open, setOpen] = useState(false)
+  const [bg, setBg] = useState<string | null | undefined>(path ? backdrops.get(path) : undefined)
+  useEffect(() => { setBg(path ? backdrops.get(path) : undefined) }, [path])
+  const onLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    if (!path || backdrops.has(path)) return
+    const b = backdropOf(e.currentTarget); backdrops.set(path, b); setBg(b)
+  }
   useEffect(() => {
     let live = true
     if (path) signedUrls([path]).then(m => { if (live) setUrl(m[path]) })
@@ -81,8 +102,9 @@ export function Photo({ path, alt, className, zoom }: { path: string | null; alt
     return () => { live = false }
   }, [path])
   return (
-    <div className={'photo ' + (className ?? '') + (zoom && url ? ' zoomable' : '')} onClick={zoom && url ? () => setOpen(true) : undefined}>
-      {url ? <img src={url} alt={alt} loading="lazy" /> : <span className="photo-empty"><Icon name="hanger" /></span>}
+    <div className={'photo ' + (className ?? '') + (zoom && url ? ' zoomable' : '') + (bg ? ' full' : '')} style={bg ? { background: bg } : undefined}
+      onClick={zoom && url ? () => setOpen(true) : undefined}>
+      {url ? <img src={url} alt={alt} loading="lazy" crossOrigin="anonymous" onLoad={onLoad} /> : <span className="photo-empty"><Icon name="hanger" /></span>}
       {open && url && <Lightbox url={url} alt={alt} onClose={() => setOpen(false)} />}
     </div>
   )

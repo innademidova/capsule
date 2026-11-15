@@ -152,6 +152,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .photo { position: relative; background: var(--photo); overflow: hidden; display: grid; place-items: center; }
 /* Absolute positioning: the image height cannot stretch the frame, so the item always fits */
 .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 8%; display: block; }
+.photo.full img, .look-pieces .photo.full img, .photo.big.full img { padding: 0; }
 .photo-empty { color: #b9b7b3; font-size: 14px; }
 .photo-empty .icon { width: 36px; height: 36px; }
 .photo.big { aspect-ratio: 1; border-radius: 22px; box-shadow: var(--shadow); }
