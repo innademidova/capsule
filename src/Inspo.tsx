@@ -122,7 +122,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
       <Header title="" left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label={t('common.back')}><Icon name="back" /></button>}
         right={<button className="icon-btn" onClick={del} aria-label={t('common.delete')}><Icon name="trash" /></button>} />
       <div className="detail">
-        <Photo path={insp.image_path} alt="" className="big cover-big" />
+        <Photo path={insp.image_path} alt="" className="big cover-big" zoom />
         <div className="detail-info">
           <LinkedItems insp={insp} />
           {!a && (
