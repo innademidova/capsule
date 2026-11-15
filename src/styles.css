@@ -526,12 +526,17 @@ details.card .dict-list { margin-top: 12px; }
 .tile-need .icon { width: 13px; height: 13px; }
 
 /* Item photo carousel */
-.carousel { display: grid; gap: 8px; min-width: 0; }
+.carousel { position: relative; display: grid; gap: 8px; min-width: 0; }
 .carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 22px; }
 .carousel-track::-webkit-scrollbar { display: none; }
 .carousel-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; padding: 0 1px; }
 .carousel-slide .photo.big { box-shadow: none; border: 1px solid var(--line); }
 .carousel-del { position: absolute; top: 10px; right: 10px; background: var(--card); box-shadow: var(--shadow); }
 .carousel-dots { display: flex; justify-content: center; gap: 6px; }
-.carousel-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .15s; }
-.carousel-dots span.on { background: var(--ink); }
+.carousel-dots button { padding: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--line); transition: background .15s; }
+.carousel-dots button.on { background: var(--ink); }
+.carousel-nav { position: absolute; top: calc(50% - 40px); z-index: 2; background: var(--card); box-shadow: var(--shadow); }
+.carousel-nav.prev { left: 10px; }
+.carousel-nav.next { right: 10px; }
+.carousel-nav.next .icon { transform: scaleX(-1); }
+.carousel-dots button { cursor: pointer; }

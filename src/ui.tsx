@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type UIEvent, type SyntheticEvent } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type UIEvent, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { signedUrls, colorOf, type Option, type Item, type Placement, type AIRequest } from './lib'
 import { t } from './i18n'
@@ -234,13 +234,31 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
 // Several photos of one item: swipe sideways, dots show where you are; each photo opens full screen
 export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: string; onRemove?: (path: string) => void }) {
   const [at, setAt] = useState(0)
+  const track = useRef<HTMLDivElement>(null)
   const onScroll = (e: UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     setAt(Math.round(el.scrollLeft / el.clientWidth))
   }
+  const goTo = (n: number) => {
+    const el = track.current; if (!el) return
+    const i = Math.max(0, Math.min(paths.length - 1, n))
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' }); setAt(i)
+  }
+  // Arrow keys flip the photos (not while typing or while a photo is open full screen)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector('.lightbox') || (e.target as HTMLElement).closest?.('input, textarea, select')) return
+      if (e.key === 'ArrowRight') goTo(at + 1)
+      if (e.key === 'ArrowLeft') goTo(at - 1)
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  })
   return (
     <div className="carousel">
-      <div className="carousel-track" onScroll={onScroll}>
+      {at > 0 && <button className="icon-btn carousel-nav prev" onClick={() => goTo(at - 1)} aria-label={t('common.previous')}><Icon name="back" /></button>}
+      {at < paths.length - 1 && <button className="icon-btn carousel-nav next" onClick={() => goTo(at + 1)} aria-label={t('common.next')}><Icon name="back" /></button>}
+      <div className="carousel-track" ref={track} onScroll={onScroll}>
         {paths.map((p, n) => (
           <div key={p} className="carousel-slide">
             <Photo path={p} alt={alt} className="big" zoom />
@@ -248,7 +266,7 @@ export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: strin
           </div>
         ))}
       </div>
-      {paths.length > 1 && <div className="carousel-dots">{paths.map((p, n) => <span key={p} className={n === at ? 'on' : ''} />)}</div>}
+      {paths.length > 1 && <div className="carousel-dots">{paths.map((p, n) => <button key={p} className={n === at ? 'on' : ''} onClick={() => goTo(n)} aria-label={String(n + 1)} />)}</div>}
     </div>
   )
 }

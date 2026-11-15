@@ -20,7 +20,9 @@
     "uploading": "Uploading…",
     "delete": "Delete",
     "add": "Add",
-    "save": "Save"
+    "save": "Save",
+    "previous": "Previous",
+    "next": "Next"
   },
   "login": {
     "hidePassword": "Hide password",
