@@ -114,6 +114,22 @@ async function wardrobe(sb: SupabaseClient) {
   return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up; category "sleep" is pajamas and loungewear, use it only when the request is about home or sleep):\n${text || "(empty)"}` };
 }
 
+// Her own shopping rules (Shop tab -> Rules): the wardrobe check and "Before you buy" must respect them
+async function rules(sb: SupabaseClient) {
+  const { data } = await sb.from("notes").select("title,body").eq("kind", "rule").order("pinned", { ascending: false }).order("created_at");
+  if (!data?.length) return "";
+  return `\nHER OWN SHOPPING RULES (she wrote them from experience; never suggest or approve anything that breaks one):\n${
+    data.map(n => `- ${n.title}${n.body ? `: ${n.body.replace(/\s+/g, " ")}` : ""}`).join("\n")}\n`;
+}
+
+// What she is already looking for (Shop tab -> Looking for), not bought yet
+async function lookingFor(sb: SupabaseClient) {
+  const { data } = await sb.from("shopping").select("name,category,why").eq("done", false).order("priority").order("created_at");
+  if (!data?.length) return "";
+  return `\nHER "LOOKING FOR" LIST (things she wants to find):\n${
+    data.map(s => `- ${s.name}${s.category ? ` (${s.category})` : ""}${s.why ? `: ${s.why.replace(/\s+/g, " ")}` : ""}`).join("\n")}\n`;
+}
+
 async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.ImageBlockParam> {
   const { data, error } = await sb.storage.from("photos").download(path);
   if (error || !data) throw new Error("Could not read the photo");
@@ -205,7 +221,7 @@ the pieces that appear again and again (${L}).` }] };
       const w = await wardrobe(sb);
       const { data: prof } = await sb.from("style_profile").select("summary,formulas").maybeSingle();
       return { effort: "medium", content: [{ type: "text", text: `${w.text}
-${prof ? `\nHER STYLE PROFILE: ${prof.summary}\nFormulas: ${JSON.stringify(prof.formulas)}` : ""}
+${prof ? `\nHER STYLE PROFILE: ${prof.summary}\nFormulas: ${JSON.stringify(prof.formulas)}` : ""}${await rules(sb)}
 
 Analyze her wardrobe as a capsule. summary: 2–3 sentences, honest. gaps: missing basics or pieces that would create the
 most new outfits (priority 1 = must-have, 2 = good to have, 3 = someday), name in ${L}. too_many: categories/colors
@@ -247,13 +263,18 @@ note: one short sentence in ${L} if something important is missing for this requ
     case "buy": {
       if (!r.image_path) throw new Error("No photo of the item");
       const w = await wardrobe(sb);
+      const [own, wanted] = await Promise.all([rules(sb), lookingFor(sb)]);
       return { effort: "medium", content: [await imageBlock(sb, r.image_path), { type: "text", text: `${w.text}
-
+${own}${wanted}
 She is thinking of buying the item in this photo${i.note ? ` (her note: "${i.note}")` : ""}${i.price ? `, price ${i.price}` : ""}.
 Be honest: does it fit her wardrobe? pairs_with: ids of her items it combines well with. similar: ids of items she already has
 that do the same job. outfit_ideas: 2–3 concrete outfits with it from her items (${L}). verdict: "buy" if it creates
 many new outfits and fills a gap, "skip" if it duplicates what she has or combines with little, otherwise "maybe".
-summary: 2–3 sentences with the main reason.` }] };
+summary: 2–3 sentences with the main reason.${own ? `
+Check it against HER OWN SHOPPING RULES: if it breaks one (a cut, detail, fabric or kind of piece she avoids, or her price rule
+when the price is above it and the piece is not a basic), name that rule plainly in the summary and lean to "skip".
+A fabric rule counts only when the photo, her note or a visible label shows that fabric; otherwise remind her to check the label.` : ""}${wanted ? `
+If it matches something on her "LOOKING FOR" list, say which one in the summary.` : ""}` }] };
     }
   }
   throw new Error("Unknown request kind");

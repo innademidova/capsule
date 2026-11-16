@@ -51,7 +51,7 @@ export const KINDS: Record<string, string[]> = {
   outerwear: ['coat', 'trench coat', 'jacket', 'blazer', 'leather jacket', 'denim jacket', 'puffer', 'vest', 'raincoat'],
   shoes: ['sneakers', 'boots', 'ankle boots', 'loafers', 'heels', 'flats', 'sandals', 'mules', 'ballet flats'],
   bag: ['tote', 'shoulder bag', 'crossbody', 'clutch', 'backpack', 'mini bag'],
-  accessory: ['belt', 'sunglasses', 'glasses', 'necklace', 'earrings', 'bracelet', 'ring', 'watch', 'scarf', 'hat', 'cap', 'gloves', 'hair accessory', 'brooch'],
+  accessory: ['belt', 'sunglasses', 'glasses', 'necklace', 'earrings', 'bracelet', 'ring', 'watch', 'scarf', 'hat', 'cap', 'gloves', 'hair accessory', 'brooch', 'tights'],
   swim: ['swimsuit', 'bikini', 'cover-up', 'beach dress'],
   sleep: ['pajamas', 'nightgown', 'robe', 'lounge set'],
 }
