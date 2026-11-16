@@ -8,6 +8,7 @@ import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
 import { InspiredBy } from './Inspo'
+import { RuleReminder, ForEntries, closeEntries } from './Notes'
 
 // --- List ---
 
@@ -53,6 +54,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
         <button className={wish ? '' : 'on'} onClick={() => wish && location.replace('#/')}>{t('wardrobe.title')}</button>
         <button className={wish ? 'on' : ''} onClick={() => !wish && location.replace('#/wish')}>{t('wardrobe.wishlist')}</button>
       </div>
+      {wish && <RuleReminder />}
 
       <div className="search">
         <Icon name="search" />
@@ -117,7 +119,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
 
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
-  const { outfits, items } = useStore()
+  const { outfits, items, shopping, setShopping } = useStore()
   const moreRef = useRef<HTMLInputElement>(null)
   const more = item.more_photos ?? []
   const home = item.wishlist ? '/wish' : '/'
@@ -132,7 +134,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
   const bought = async () => {
     setBusy(true)
     const { data, error } = await supabase.from('items').update({ wishlist: false }).eq('id', item.id).select().single()
-    if (error) alert(error.message); else onChange(data as Item)
+    if (error) alert(error.message); else { onChange(data as Item); await closeEntries(item, shopping, setShopping) }
     setBusy(false)
   }
   // Extra photos (back, details): added and removed right here, the first photo is changed in the edit form
@@ -211,6 +213,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             </div>
           </>}
           <InspiredBy item={item} />
+          <ForEntries item={item} />
           {mates.length > 0 && (
             <div className="card">
               <h3 className="card-title">{t('item.partOfSet')}</h3>

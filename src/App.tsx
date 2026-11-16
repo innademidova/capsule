@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   supabase, applyDict, type DictRow,
-  type Item, type Outfit, type Inspiration, type StyleProfile, type ShopItem, type AIRequest,
+  type Item, type Outfit, type Inspiration, type StyleProfile, type ShopItem, type Note, type AIRequest,
   type ImageTemplate,
 } from './lib'
 import { Icon, Header } from './ui'
@@ -13,13 +13,15 @@ import { OutfitList, OutfitDetail, OutfitEditor } from './Outfits'
 import { StyleItem, Assistant } from './Looks'
 import { Profile, type ProfileTab } from './Profile'
 import { InspoList, InspoDetail } from './Inspo'
-import { Shop, BeforeBuy } from './Shop'
+import { Shop, BeforeBuy, type ShopTab } from './Shop'
+import { FindDetail } from './Notes'
 
 // Routes live after # so they work on GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
-  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
+  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop'; tab: ShopTab } | { view: 'find'; id?: string }
+  | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
@@ -35,7 +37,8 @@ function parse(hash: string): Route {
   if (a === 'style' && b) return { view: 'style', id: b }
   if (a === 'inspo') return { view: 'inspo' }
   if (a === 'n' && b) return { view: 'insp', id: b }
-  if (a === 'shop') return { view: 'shop' }
+  if (a === 'shop') return { view: 'shop', tab: b === 'rules' || b === 'insights' ? b : 'find' }
+  if (a === 'f' && b) return { view: 'find', id: b === 'new' ? undefined : b }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me', tab: (b || 'overview') as ProfileTab }
   if (a === 'admin') return { view: 'me', tab: 'dictionaries' } // old link
@@ -105,6 +108,7 @@ function Main({ email }: { email: string }) {
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
   const [profile, setProfile] = useState<StyleProfile | null>(null)
   const [shopping, setShopping] = useState<ShopItem[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
   const [requests, setRequests] = useState<AIRequest[]>([])
   const [role, setRole] = useState<Store['role']>('user')
   const [account, setAccount] = useState<Store['account']>({ display_name: null })
@@ -122,12 +126,12 @@ function Main({ email }: { email: string }) {
   const load = useCallback(async () => {
     setLoadError('')
     const by = (t: string) => supabase.from(t).select('*').order('created_at', { ascending: false })
-    const [it, ou, ins, pr, sh, rq, di, ro, ac, st] = await Promise.all([
+    const [it, ou, ins, pr, sh, rq, di, ro, ac, st, no] = await Promise.all([
       by('items'), by('outfits'),
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
       supabase.from('dict_effective').select('type,category,id,label,hex,sort,is_default,is_own'),
       supabase.from('user_roles').select('role').maybeSingle(), supabase.from('profiles').select('display_name,language').maybeSingle(),
-      supabase.from('image_templates').select('*'),
+      supabase.from('image_templates').select('*'), supabase.from('notes').select('*').order('created_at'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
     // The account's language wins over the device's guess (a new phone, a cleared browser)
@@ -139,7 +143,7 @@ function Main({ email }: { email: string }) {
     setTemplates((st.data ?? []) as ImageTemplate[])
     setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
-    setShopping((sh.data ?? []) as ShopItem[]); setRequests((rq.data ?? []) as AIRequest[])
+    setShopping((sh.data ?? []) as ShopItem[]); setNotes((no.data ?? []) as Note[]); setRequests((rq.data ?? []) as AIRequest[])
   }, [])
   useEffect(() => { load() }, [load])
   // When the app is opened again, pull fresh data (e.g. a processed queue)
@@ -162,8 +166,8 @@ function Main({ email }: { email: string }) {
   const wishlist = allItems.filter(i => i.wishlist)
 
   const store: Store = {
-    items, wishlist, outfits, inspirations, profile, shopping, requests, role, account, templates,
-    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setRequests, reload: load,
+    items, wishlist, outfits, inspirations, profile, shopping, notes, requests, role, account, templates,
+    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setNotes, setRequests, reload: load,
   }
   const save = (i: Item) => store.setItems(upsert(i))
   const drop = (id: string) => store.setItems(without(id))
@@ -188,13 +192,18 @@ function Main({ email }: { email: string }) {
     case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
     case 'inspo': screen = <InspoList />; break
     case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
-    case 'shop': screen = <Shop />; break
+    case 'shop': screen = <Shop tab={route.tab} />; break
+    case 'find': {
+      const s = shopping.find(x => x.id === route.id)
+      screen = route.id && !s ? notFound : <FindDetail key={route.id ?? 'new'} entry={s} />
+      break
+    }
     case 'buy': screen = <BeforeBuy />; break
     case 'me': screen = <Profile key={route.tab} tab={route.tab} email={email} />; break
   }
 
   const tab = route.view.startsWith('item') || route.view === 'wishlist' || route.view === 'style' ? 'wardrobe' : route.view.startsWith('outfit') || route.view === 'stylist' ? 'outfits'
-    : route.view === 'insp' ? 'inspo' : route.view === 'buy' ? 'shop' : route.view
+    : route.view === 'insp' ? 'inspo' : route.view === 'buy' || route.view === 'find' ? 'shop' : route.view
   const tabs = [
     { id: 'wardrobe', icon: 'hanger', path: '/' },
     { id: 'outfits', icon: 'layers', path: '/outfits' },

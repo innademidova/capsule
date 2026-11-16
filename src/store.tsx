@@ -1,16 +1,17 @@
 import { createContext, useContext } from 'react'
-import type { Item, Outfit, Inspiration, StyleProfile, ShopItem, AIRequest, ImageTemplate } from './lib'
+import type { Item, Outfit, Inspiration, StyleProfile, ShopItem, Note, AIRequest, ImageTemplate } from './lib'
 
 // All app data in one place
 export type Store = {
   items: Item[]; wishlist: Item[]; outfits: Outfit[]; inspirations: Inspiration[]
-  profile: StyleProfile | null; shopping: ShopItem[]; requests: AIRequest[]
+  profile: StyleProfile | null; shopping: ShopItem[]; notes: Note[]; requests: AIRequest[]
   // role is only for showing admin screens; the database enforces it (RLS)
   role: 'admin' | 'user'; account: { display_name: string | null }; templates: ImageTemplate[] /* defaults + this user's own rows */
   setItems: (f: (x: Item[]) => Item[]) => void
   setOutfits: (f: (x: Outfit[]) => Outfit[]) => void
   setInspirations: (f: (x: Inspiration[]) => Inspiration[]) => void
   setShopping: (f: (x: ShopItem[]) => ShopItem[]) => void
+  setNotes: (f: (x: Note[]) => Note[]) => void
   setRequests: (f: (x: AIRequest[]) => AIRequest[]) => void
   reload: () => Promise<void>
 }

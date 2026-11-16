@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import {
-  supabase, processPhoto, uploadPhoto, askAI, CATEGORIES, categoryLabel, itemTitle,
+  supabase, processPhoto, uploadPhoto, askAI, itemTitle,
   type AIRequest, type ShopItem, type Item,
 } from './lib'
-import { useStore, upsert, without } from './store'
-import { Icon, Header, Photo, AIActions, RequestState, Chips, Section } from './ui'
+import { useStore, upsert } from './store'
+import { Icon, Header, Photo, AIActions, RequestState, Section } from './ui'
+import { FindList, RuleReminder, Rules, Insights } from './Notes'
 import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
@@ -12,16 +13,20 @@ const priority = (p: number) => [1, 2, 3].includes(p) ? t(`shop.priority.${p}`) 
 
 type Gap = { name: string; category: string; why: string; priority: number }
 
-export function Shop() {
-  const { requests, shopping, setRequests, setShopping } = useStore()
+export type ShopTab = 'find' | 'rules' | 'insights'
+const TABS: ShopTab[] = ['find', 'rules', 'insights']
+
+// Shop tab: what she is looking for, her rules and insights, plus the AI checks
+export function Shop({ tab }: { tab: ShopTab }) {
+  const { requests, shopping, notes, setRequests, setShopping } = useStore()
   const [busy, setBusy] = useState(false)
-  const [adding, setAdding] = useState(false)
-  const [name, setName] = useState('')
-  const [cat, setCat] = useState<string[]>([])
   const gapsReq = requests.find(r => r.kind === 'gaps')
   const lastGaps = requests.find(r => r.kind === 'gaps' && r.status === 'done')
-  const todo = shopping.filter(s => !s.done).sort((a, b) => a.priority - b.priority)
-  const done = shopping.filter(s => s.done)
+  const counts: Record<ShopTab, number> = {
+    find: shopping.filter(s => !s.done).length,
+    rules: notes.filter(n => n.kind === 'rule').length,
+    insights: notes.filter(n => n.kind === 'insight').length,
+  }
 
   const analyze = async (mode: 'now') => {
     setBusy(true)
@@ -34,63 +39,38 @@ export function Shop() {
     if (error) return alert(error.message)
     setShopping(upsert(data as ShopItem))
   }
-  const toggle = async (s: ShopItem) => {
-    const { data } = await supabase.from('shopping').update({ done: !s.done }).eq('id', s.id).select().single()
-    if (data) setShopping(upsert(data as ShopItem))
-  }
-  const remove = async (s: ShopItem) => {
-    await supabase.from('shopping').delete().eq('id', s.id); setShopping(without(s.id))
-  }
   const inList = (n: string) => shopping.some(s => s.name.toLowerCase() === n.toLowerCase())
 
   return (
     <div className="screen">
-      <Header title={t('shop.title')} />
-
-      <button className="card stylist-cta" onClick={() => go('/buy')}>
-        <span className="cta-icon"><Icon name="bag" /></span>
-        <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
-      </button>
-
-      <div className="card">
-        <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
-        {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
-          : <p className="muted">{t('shop.checkHint')}</p>}
-        {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
-        <AIActions label={lastGaps ? t('shop.checkAgain') : t('shop.checkMine')} onRun={analyze} busy={busy}  />
+      <Header title={t('shop.title')}
+        right={tab === 'find' ? <button className="icon-btn" onClick={() => go('/f/new')} aria-label={t('notes.newFind')}><Icon name="plus" /></button> : undefined} />
+      <div className="seg notes-seg">
+        {TABS.map(x => (
+          <button key={x} className={tab === x ? 'on' : ''} onClick={() => tab !== x && location.replace('#/shop' + (x === 'find' ? '' : '/' + x))}>
+            {t(`notes.tab.${x}`)}{counts[x] > 0 && <span className="seg-count">{counts[x]}</span>}
+          </button>
+        ))}
       </div>
-
-      <div className="card">
-        <div className="row"><h3 className="card-title grow">{t('shop.list')}</h3>
-          <button className="icon-btn sm" onClick={() => setAdding(a => !a)} aria-label={t('common.add')}><Icon name={adding ? 'x' : 'plus'} /></button></div>
-        {adding && (
-          <div className="add-shop">
-            <input placeholder={t('shop.namePlaceholder')} value={name} onChange={e => setName(e.target.value)} />
-            <Chips options={CATEGORIES} value={cat} onChange={setCat} multi={false} />
-            <button className="btn primary sm" disabled={!name.trim()} onClick={async () => {
-              await addItem({ name: name.trim(), category: cat[0] ?? null, priority: 2 }); setName(''); setCat([]); setAdding(false)
-            }}>{t('common.add')}</button>
+      <div className="notes-body">
+        {tab === 'find' && <>
+          <button className="card stylist-cta" onClick={() => go('/buy')}>
+            <span className="cta-icon"><Icon name="bag" /></span>
+            <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
+          </button>
+          <RuleReminder />
+          <FindList />
+          <div className="card find-check">
+            <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
+            {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
+              : <p className="muted">{t('shop.checkHint')}</p>}
+            {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
+            <AIActions label={lastGaps ? t('shop.checkAgain') : t('shop.checkMine')} onRun={analyze} busy={busy} />
           </div>
-        )}
-        {!todo.length && !adding && <p className="muted small">{t('shop.empty')}</p>}
-        {todo.map(s => <ShopRow key={s.id} s={s} onToggle={toggle} onRemove={remove} />)}
-        {done.length > 0 && <details className="done-list"><summary className="muted small">{t('shop.bought', { count: done.length })}</summary>
-          {done.map(s => <ShopRow key={s.id} s={s} onToggle={toggle} onRemove={remove} />)}</details>}
+        </>}
+        {tab === 'rules' && <Rules />}
+        {tab === 'insights' && <Insights />}
       </div>
-    </div>
-  )
-}
-
-function ShopRow({ s, onToggle, onRemove }: { s: ShopItem; onToggle: (s: ShopItem) => void; onRemove: (s: ShopItem) => void }) {
-  return (
-    <div className={'shop-row' + (s.done ? ' done' : '')}>
-      <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)} aria-label={t('shop.markBought')}><Icon name="check" /></button>
-      <div className="grow">
-        <b>{s.name}</b>
-        <span className="muted small">{[s.category && categoryLabel(s.category), priority(s.priority)].filter(Boolean).join(' · ')}</span>
-        {s.why && <span className="small">{s.why}</span>}
-      </div>
-      <button className="icon-btn sm" onClick={() => onRemove(s)} aria-label={t('common.remove')}><Icon name="x" /></button>
     </div>
   )
 }
