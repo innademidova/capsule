@@ -25,7 +25,7 @@ type Piece = { id: string; category: string; kind: string | null; name: string |
 type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
 
 // Outer layers first, so the model reads the outfit from the outside in
-const ORDER = ["outerwear", "dress", "top", "bottom", "swim", "shoes", "bag", "accessory"];
+const ORDER = ["outerwear", "dress", "top", "bottom", "swim", "sleep", "shoes", "bag", "accessory"];
 
 const pieceName = (p: Piece) => p.name ?? p.kind ?? p.category;
 

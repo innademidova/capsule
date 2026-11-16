@@ -102,7 +102,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 - `outfits` (layout jsonb `[{item_id,x,y,w,z}]`, occasions, seasons, notes, favorite, source manual|ai),
   `inspirations` (image, note, analysis jsonb), `style_profile` (one row),
   `shopping` (name, category, why, priority 1–3, done), `ai_requests` (see AI section). All RLS "own rows".
-- `items`: name, category (`top|bottom|dress|outerwear|shoes|bag|accessory|swim`), kind (lowercase English), colors[],
+- `items`: name, category (`top|bottom|dress|outerwear|shoes|bag|accessory|swim|sleep`; `sleep` = pajamas and loungewear, added 2026-11-16, the AI uses it only for home or sleep requests), kind (lowercase English), colors[],
   seasons[], styles[], occasions[], brand, notes, photo_path, thumb_path, favorite. RLS "own rows only".
 - Storage bucket `photos` (private, signed URLs valid 24h), path `<user_id>/<uuid>.webp` + `<uuid>_thumb.webp`.
   Policy: only the user's own folder.

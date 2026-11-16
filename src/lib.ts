@@ -39,7 +39,7 @@ export type Material = { name: string; pct: number | null }
 export const compositionText = (m: Material[]) =>
   [...m].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)).map(x => x.pct != null ? `${x.pct}% ${materialLabel(x.name)}` : materialLabel(x.name)).join(' · ')
 
-export const CATEGORIES: Option[] = ['top', 'bottom', 'dress', 'outerwear', 'shoes', 'bag', 'accessory', 'swim']
+export const CATEGORIES: Option[] = ['top', 'bottom', 'dress', 'outerwear', 'shoes', 'bag', 'accessory', 'swim', 'sleep']
   .map(id => ({ id, label: t(`category.${id}`) }))
 export const categoryLabel = (id: string) => CATEGORIES.find(c => c.id === id)?.label ?? id
 
@@ -53,6 +53,7 @@ export const KINDS: Record<string, string[]> = {
   bag: ['tote', 'shoulder bag', 'crossbody', 'clutch', 'backpack', 'mini bag'],
   accessory: ['belt', 'sunglasses', 'glasses', 'necklace', 'earrings', 'bracelet', 'ring', 'watch', 'scarf', 'hat', 'cap', 'gloves', 'hair accessory', 'brooch'],
   swim: ['swimsuit', 'bikini', 'cover-up', 'beach dress'],
+  sleep: ['pajamas', 'nightgown', 'robe', 'lounge set'],
 }
 
 export const COLORS: (Option & { hex: string })[] = [
@@ -420,6 +421,7 @@ const SLOTS: Record<string, { x: number; y: number; w: number }[]> = {
   shoes: [{ x: 56, y: 74, w: 32 }, { x: 8, y: 76, w: 28 }],
   bag: [{ x: 68, y: 42, w: 30 }],
   swim: [{ x: 24, y: 4, w: 52 }],
+  sleep: [{ x: 24, y: 4, w: 52 }],
   accessory: [{ x: 4, y: 56, w: 22 }, { x: 74, y: 22, w: 22 }, { x: 72, y: 62, w: 20 }],
 }
 export function autoLayout(items: Item[]): Placement[] {

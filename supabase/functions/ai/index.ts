@@ -24,7 +24,7 @@ const anthropic = new Anthropic({
 
 // ---------- Option lists (must match src/lib.ts) ----------
 
-const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory", "swim"];
+const CATEGORIES = ["top", "bottom", "dress", "outerwear", "shoes", "bag", "accessory", "swim", "sleep"];
 const COLORS = ["black", "white", "cream", "beige", "camel", "brown", "grey", "navy", "blue", "light-blue", "denim",
   "green", "olive", "red", "burgundy", "pink", "purple", "butter-yellow", "yellow", "orange", "silver", "gold", "print"];
 const SEASONS = ["spring", "summer", "autumn", "winter"];
@@ -111,7 +111,7 @@ async function wardrobe(sb: SupabaseClient) {
     (i.seasons as string[]).join("/"), (i.styles as string[]).join("/"), (i.occasions as string[]).join("/"),
     i.brand ?? "", ((i.materials ?? []) as { name: string; pct: number | null }[]).map(m => m.pct != null ? `${m.pct}% ${m.name}` : m.name).join(" + "),
     i.notes ?? "", i.set_id ? `set ${String(i.set_id).slice(0, 8)}` : ""].join(" | ")).join("\n");
-  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up):\n${text || "(empty)"}` };
+  return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up; category "sleep" is pajamas and loungewear, use it only when the request is about home or sleep):\n${text || "(empty)"}` };
 }
 
 async function imageBlock(sb: SupabaseClient, path: string): Promise<Anthropic.ImageBlockParam> {

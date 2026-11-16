@@ -4,7 +4,7 @@ create table if not exists public.items (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name        text,                              -- short name, e.g. "Cream cable-knit sweater"
-  category    text not null,                     -- top, bottom, dress, outerwear, shoes, bag, accessory, swim
+  category    text not null,                     -- top, bottom, dress, outerwear, shoes, bag, accessory, swim, sleep
   kind        text,                              -- detail: sweater, jeans, loafers…
   colors      text[] not null default '{}',
   seasons     text[] not null default '{}',      -- winter, spring, summer, autumn
@@ -508,3 +508,11 @@ alter table public.inspirations add column if not exists item_ids uuid[] not nul
 
 -- 2026-11-15: more photos per item (carousel)
 alter table public.items add column if not exists more_photos text[] not null default '{}';
+
+-- New item category "sleep" (pajamas and loungewear) with its default kinds.
+insert into public.dict_global (type, category, id, label, sort) values
+  ('kind', 'sleep', 'pajamas', 'pajamas', 0),
+  ('kind', 'sleep', 'nightgown', 'nightgown', 1),
+  ('kind', 'sleep', 'robe', 'robe', 2),
+  ('kind', 'sleep', 'lounge set', 'lounge set', 3)
+on conflict do nothing;
