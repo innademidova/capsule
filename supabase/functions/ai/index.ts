@@ -152,9 +152,8 @@ async function buildPrompt(sb: SupabaseClient, r: Req, L: string): Promise<{ con
       if (!r.image_path) throw new Error("No template picture");
       const current = String(i.current ?? ""), marks = ((i.placeholders as string[] | undefined) ?? []).map(p => `{${p}}`).join(", ");
       return { effort: "medium", content: [await imageBlock(sb, r.image_path), { type: "text", text:
-        `This picture is the new layout template for an AI image model (${i.purpose === "many"
-          ? "one collage: one clothing piece in the middle and several looks with it around it"
-          : "a styling post: one woman wearing one outfit, plus the separate pieces"}). The model gets these instructions,
+        `This picture is the new layout template for an AI image model (a styling post: one woman wearing one outfit,
+plus the separate pieces). The model gets these instructions,
 the product photos of her clothes and this picture, and must draw a new picture in the same format with HER clothes.
 
 Write the instructions in English for this picture, as a plain text in the same structure as the current ones below:
@@ -239,8 +238,16 @@ she has more than she needs (empty array if none). strengths: what already works
         if (it.photo_path) blocks.push(await imageBlock(sb, it.photo_path));
         anchor = `THE ITEM (shown in the image): id ${it.id} | ${it.category} | ${it.kind ?? ""} | ${it.name ?? ""} | ${(it.colors as string[]).join("/")}${it.wishlist ? " | she does not own it yet, she is thinking of buying it" : ""}`;
       }
+      // "Style it" asks for one look at a time and lists the looks she already got, so each new one differs
+      const avoid = Array.isArray(i.avoid) ? (i.avoid as { label: string; item_ids: string[] }[]).slice(0, 12) : [];
+      const already = avoid.length
+        ? ` She already has these looks with it, so make something clearly different (other pieces, silhouette, colours and vibe): ${avoid.map(a => `"${a.label}" (${a.item_ids.join(", ")})`).join("; ")}.`
+        : "";
       const task = i.item_id
-        ? `Create ${count} different fashionable looks that ALL include THE ITEM (put its id in every look), each one for a different vibe, e.g. casual day, city chic, office style, cozy vibes, feminine touch, evening out.${i.request ? ` Her wish: ${i.request}.` : ""}`
+        ? (count === 1
+          ? `Create ONE fashionable look that includes THE ITEM (put its id in it).`
+          : `Create ${count} different fashionable looks that ALL include THE ITEM (put its id in every look), each one for a different vibe, e.g. casual day, city chic, office style, cozy vibes, feminine touch, evening out.`)
+          + `${i.request ? ` Her wish: ${i.request}.` : ""}${already}`
         : `Create ${count} different fashionable looks for her request: "${i.request || "any"}".`;
       blocks.push({ type: "text", text: `${w.text}
 ${prof?.summary ? `\nHER STYLE PROFILE: ${prof.summary}` : ""}${prof?.appearance ? `\nHER APPEARANCE: ${prof.appearance}` : ""}
@@ -254,7 +261,7 @@ Rules for each look:
 - label: 1–3 lowercase English words naming the vibe (it is drawn on the picture, so always English), e.g. "city chic".
 - why: one short sentence in ${L} on why it works (colours, proportions, the styling trick).
 - scene: one English sentence for a photographer: the place, light and pose that suit the vibe and season, e.g. "a cobbled old-town street in soft autumn daylight, walking towards the camera with a coffee". Do not describe the clothes.
-title: a short English headline for the whole set (drawn on the picture, so always English), e.g. "one sweater, many looks" or "soft autumn layers".
+title: a short English headline, e.g. "soft autumn layers".
 palette: 3–6 hex colours that sum up the looks, main colour first.
 missing: up to 3 short ${L} names of pieces she does not have that would make these looks better (e.g. "white leather sneakers"), [] if nothing. Shoes count: she may have few in the app.
 note: one short sentence in ${L} if something important is missing for this request, else "".` });

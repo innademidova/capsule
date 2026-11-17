@@ -4,7 +4,7 @@
 //            touches my overrides; the default itself stays for everyone else.
 //   'global' the defaults themselves (dict_global, image_templates rows without user_id); admins only.
 import { useEffect, useState } from 'react'
-import { supabase, CATEGORIES, TEMPLATES, processPhoto, removePhotos, askAI, dictLabel, type Item, type Material, type DictType, type TemplateId, type LooksResult } from './lib'
+import { supabase, CATEGORIES, TEMPLATES, processPhoto, removePhotos, askAI, dictLabel, type Item, type Material, type DictType, type TemplateId } from './lib'
 import { t, formatDate } from './i18n'
 import { useStore } from './store'
 import { Icon, Photo } from './ui'
@@ -235,7 +235,7 @@ export function Templates({ scope }: { scope: Scope }) {
 }
 
 function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
-  const { templates, requests, outfits, reload } = useStore()
+  const { templates, outfits, reload } = useStore()
   const tpl = TEMPLATES.find(x => x.id === id)!
   const def = templates.find(r => r.purpose === id && !r.user_id) ?? null
   const own = templates.find(r => r.purpose === id && r.user_id) ?? null
@@ -285,12 +285,7 @@ function TemplateEditor({ scope, id }: { scope: Scope; id: TemplateId }) {
   const showPrompt = () => run(t('templates.building'), async () => {
     let res
     if (id === 'garment') res = await supabase.functions.invoke('garment', { body: { preview: true, piece: 'the main garment in the photo' } })
-    else if (id === 'many') {
-      const r = requests.find(x => x.kind === 'looks' && x.input.item_id && x.status === 'done')
-      if (!r) throw new Error(t('templates.needStyleIt'))
-      const lr = r.result as LooksResult
-      res = await supabase.functions.invoke('look', { body: { preview: true, many: { anchor_id: String(r.input.item_id), title: 'One piece', palette: lr.palette, looks: lr.looks.map(l => ({ label: l.label, item_ids: l.item_ids })) } } })
-    } else {
+    else {
       const o = outfits.find(x => x.layout.length)
       if (!o) throw new Error(t('templates.needOutfit'))
       res = await supabase.functions.invoke('look', { body: { preview: true, item_ids: o.layout.map(l => l.item_id), vibe: o.name ?? '' } })

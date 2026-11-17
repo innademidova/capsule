@@ -1,4 +1,4 @@
-// Fashion looks: ideas around one item ("one sweater, many looks"), the stylist assistant (free request),
+// Fashion looks: ideas around one item ("Style it": one look at a time), the stylist assistant (free request),
 // and AI photos of a woman wearing a look, shown next to the real item photos.
 import { useState } from 'react'
 import { supabase, autoLayout, askAI, renderLook, currentWeather, itemTitle, kindLabel, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
@@ -23,7 +23,7 @@ export function Palette({ colors }: { colors: string[] }) {
 }
 
 type Drawing = Record<string, 'busy' | 'error'>
-const key = (req: AIRequest, n: number | 'collage') => `${req.id}:${n}`
+const key = (req: AIRequest, n: number) => `${req.id}:${n}`
 
 // Draws every look of an answer at once; each photo appears as soon as it is ready.
 // The look function also writes the path into the request, so the photos stay after a reload.
@@ -43,25 +43,10 @@ function useDrawing() {
       } catch { setDrawing(d => ({ ...d, [key(req, n)]: 'error' })) }
     }))
   }
-  // "Style it": all looks in one collage around the piece (one image instead of one per look)
-  const drawCollage = async (req: AIRequest, anchor: Item) => {
-    const r = req.result as LooksResult
-    const k = key(req, 'collage')
-    setDrawing(d => ({ ...d, [k]: 'busy' }))
-    try {
-      const res = await renderLook({ request_id: req.id, many: {
-        anchor_id: anchor.id, title: `One ${anchor.kind || 'piece'}`, palette: r.palette,
-        looks: r.looks.map(l => ({ label: l.label, item_ids: l.item_ids })),
-      } })
-      setRequests(list => list.map(x => x.id !== req.id ? x : { ...x, result: { ...x.result, collage_path: res.path } }))
-      setDrawing(d => { const c = { ...d }; delete c[k]; return c })
-    } catch { setDrawing(d => ({ ...d, [k]: 'error' })) }
-  }
-  return { drawing, draw, drawCollage }
+  return { drawing, draw }
 }
 
-// onDraw is left out on "Style it": there the looks are drawn together in one collage
-function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw?: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
+function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'busy' | 'error'; onDraw: () => void; onPatch: (p: Partial<LookIdea>) => Promise<void> }) {
   const { items, wishlist, setOutfits } = useStore()
   const its = pick(look.item_ids, [...items, ...wishlist])
   const [busy, setBusy] = useState(false)
@@ -69,7 +54,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
     if (look.outfit_id) return go(`/o/${look.outfit_id}`)
     setBusy(true)
     const { data, error } = await supabase.from('outfits').insert({
-      name: look.label.charAt(0).toUpperCase() + look.label.slice(1), layout: autoLayout(its.filter(i => !i.wishlist)),
+      name: look.label.charAt(0).toUpperCase() + look.label.slice(1), layout: autoLayout(its),
       source: 'ai', notes: look.why, image_path: look.image_path ?? null,
     }).select().single()
     setBusy(false)
@@ -84,7 +69,7 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
         : state === 'busy' ? <div className="look-wait"><FlatLay items={its} /><p><Icon name="sparkle" /> {t('looks.dressing')}</p></div>
         : <>
           <FlatLay items={its} />
-          {onDraw && <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? t('looks.drawError') : t('outfits.showOnMe')}<span className="cost">(OpenAI ≈9¢)</span></button>}
+          <button className="btn sm" onClick={onDraw}><Icon name="sparkle" /> {state === 'error' ? t('looks.drawError') : t('outfits.showOnMe')}<span className="cost">(OpenAI ≈9¢)</span></button>
         </>}
       <p className="look-label">{look.label}</p>
       <p className="small">{look.why}</p>
@@ -94,10 +79,8 @@ function LookCard({ look, state, onDraw, onPatch }: { look: LookIdea; state?: 'b
 }
 
 // One AI answer: headline, palette, looks, what is missing
-function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
-  req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void; onCollage?: () => void
-}) {
-  const { setRequests, items, setOutfits } = useStore()
+function LooksView({ req, eyebrow, drawing, onDraw }: { req: AIRequest; eyebrow?: string; drawing: Drawing; onDraw: (n: number) => void }) {
+  const { setRequests } = useStore()
   const r = req.result as LooksResult | null
   const patch = async (n: number, p: Partial<LookIdea>) => {
     const result = { ...r!, looks: r!.looks.map((l, i) => i === n ? { ...l, ...p } : l) }
@@ -105,45 +88,18 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
     if (error) throw error
     setRequests(upsert(data as AIRequest))
   }
-  // The collage as an AI outfit: the picture plus the anchor piece, so it shows up under that piece too
-  const [savingCollage, setSavingCollage] = useState(false)
-  const saveCollage = async () => {
-    if (!r?.collage_path) return
-    if (r.collage_outfit_id) return go(`/o/${r.collage_outfit_id}`)
-    setSavingCollage(true)
-    const anchor = String(req.input.item_id ?? '')
-    const kind = items.find(i => i.id === anchor)?.kind
-    const { data, error } = await supabase.from('outfits').insert({
-      name: t('looks.collageName', { piece: kind ? kindLabel(kind) : t('looks.piece') }), layout: anchor ? [{ item_id: anchor, x: 20, y: 20, w: 60, z: 1 }] : [],
-      source: 'ai', notes: r.looks.map(l => l.label).join(' · '), image_path: r.collage_path,
-    }).select().single()
-    if (error) { setSavingCollage(false); return alert(error.message) }
-    setOutfits(upsert(data as Outfit))
-    const result = { ...r, collage_outfit_id: (data as Outfit).id }
-    const { data: saved } = await supabase.from('ai_requests').update({ result }).eq('id', req.id).select().single()
-    if (saved) setRequests(upsert(saved as AIRequest))
-    setSavingCollage(false)
-  }
   return (
     <div className="idea-block">
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <RequestState req={req} hideModel={!!onCollage} />
+      <RequestState req={req} />
       {req.status === 'done' && r && <>
         <div className="looks-head">
           <h2 className="looks-title">{r.title}</h2>
           <Palette colors={r.palette} />
         </div>
         {r.note && <p className="muted small">{r.note}</p>}
-        {onCollage && (r.collage_path ? <>
-            <Photo path={r.collage_path} alt={r.title} className="look-post collage-post" zoom />
-            <button className="btn wide collage-save" onClick={saveCollage} disabled={savingCollage}>
-              <Icon name="heart" filled={!!r.collage_outfit_id} /> {r.collage_outfit_id ? t('looks.savedToOutfits') : t('looks.saveToOutfits')}
-            </button>
-          </>
-          : drawing[key(req, 'collage')] === 'busy' ? <div className="photo look-post collage-post collage-wait"><p><Icon name="sparkle" /> {t('looks.drawingCollage')}</p></div>
-          : <button className="btn wide" onClick={onCollage}><Icon name="sparkle" /> {drawing[key(req, 'collage')] === 'error' ? t('looks.collageError') : t('looks.drawCollage')}<span className="cost">(OpenAI ≈17¢)</span></button>)}
         <div className="looks">
-          {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={onCollage ? undefined : () => onDraw(n)} onPatch={p => patch(n, p)} />)}
+          {r.looks.map((l, n) => <LookCard key={n} look={l} state={drawing[key(req, n)]} onDraw={() => onDraw(n)} onPatch={p => patch(n, p)} />)}
         </div>
         {r.missing.length > 0 && <p className="muted small">{t('looks.missing', { list: r.missing.join(', ') })}</p>}
       </>}
@@ -151,35 +107,35 @@ function LooksView({ req, eyebrow, drawing, onDraw, onCollage }: {
   )
 }
 
-// Ask for looks, then draw them right away: each look apart, or (with an anchor piece) all in one collage
-function useLooks(anchor?: Item) {
+// Ask for looks, then draw each of them right away
+function useLooks() {
   const { setRequests } = useStore()
-  const { drawing, draw, drawCollage } = useDrawing()
+  const { drawing, draw } = useDrawing()
   const [busy, setBusy] = useState(false)
   const ask = async (input: Record<string, unknown>) => {
     setBusy(true)
     try {
       const req = await askAI('looks', input, 'now')
       setRequests(upsert(req)); setBusy(false)
-      await (anchor ? drawCollage(req, anchor) : draw(req))
+      await draw(req)
     } catch (e) {
       const r = (e as { request?: AIRequest }).request; if (r) setRequests(upsert(r)); else alert((e as Error).message)
       setBusy(false)
     }
   }
-  return { busy, ask, drawing, draw, drawCollage }
+  return { busy, ask, drawing, draw }
 }
 
-// --- Feature 1: one item, many looks ---
+// --- Feature 1: one item, its looks one at a time ---
+// Each tap asks the stylist for ONE new look with the piece and draws it on her (2026-11-18: several looks in one
+// collage confused the image model). The looks she already got are passed on, so the next one is different.
 
 export function StyleItem({ item }: { item: Item }) {
   const { requests } = useStore()
   const [wish, setWish] = useState('')
-  // How many looks around the piece; the last choice is remembered on this device
-  const [count, setCount] = useState(() => { try { return Number(localStorage.getItem('style-it-count')) || 4 } catch { return 4 } })
-  const chooseCount = (n: number) => { setCount(n); try { localStorage.setItem('style-it-count', String(n)) } catch { /* private mode */ } }
-  const { busy, ask, drawing, draw, drawCollage } = useLooks(item)
+  const { busy, ask, drawing, draw } = useLooks()
   const past = requests.filter(r => r.kind === 'looks' && r.input.item_id === item.id)
+  const avoid = past.flatMap(r => r.status === 'done' ? (r.result as LooksResult).looks.map(l => ({ label: l.label, item_ids: l.item_ids })) : []).slice(0, 12)
   return (
     <div className="screen">
       <Header title="" left={<button className="icon-btn" onClick={() => back(`/i/${item.id}`)} aria-label={t('common.back')}><Icon name="back" /></button>} />
@@ -190,13 +146,10 @@ export function StyleItem({ item }: { item: Item }) {
       </div>
       <div className="form">
         <input placeholder={t('looks.wishPlaceholder')} value={wish} onChange={e => setWish(e.target.value)} />
-        <div className="seg looks-count" role="radiogroup" aria-label={t('looks.count')}>
-          {[3, 4, 5, 6].map(n => <button key={n} type="button" role="radio" aria-checked={count === n} className={count === n ? 'on' : ''} onClick={() => chooseCount(n)} disabled={busy}>{t('looks.nLooks', { count: n })}</button>)}
-        </div>
-        <AIActions label={past.length ? t('looks.newLooks') : t('looks.getLooks')} cost="OpenAI ≈19¢" onRun={() => { ask({ item_id: item.id, count, request: wish.trim() || null }); setWish('') }} busy={busy} />
+        <AIActions label={past.length ? t('looks.anotherLook') : t('looks.getLook')} cost="OpenAI ≈10¢"
+          onRun={() => { ask({ item_id: item.id, count: 1, request: wish.trim() || null, avoid }); setWish('') }} busy={busy} />
       </div>
-      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing}
-        onDraw={n => draw(r, n)} onCollage={() => drawCollage(r, item)} />)}
+      {past.map(r => <LooksView key={r.id} req={r} eyebrow={r.input.request ? String(r.input.request) : undefined} drawing={drawing} onDraw={n => draw(r, n)} />)}
     </div>
   )
 }

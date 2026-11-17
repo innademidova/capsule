@@ -2,12 +2,10 @@
 // The instructions and the layout picture come from the image template for the purpose (table image_templates,
 // _shared/templates.ts): the user's own version, else the default. This code only fills the {placeholders} and appends
 // the technical part: which attached image is which and what each look is made of.
-// Jobs:
-// 1. {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', one outfit on her.
-//    With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
-// 2. {many: {anchor_id, title, looks: [{label, item_ids}], palette}, request_id?}: template 'many', one collage with the
-//    piece in the middle and the same woman in each look around it. Written to result.collage_path.
-// preview: true with job 1 or 2 returns {prompt} (the full text the model would get) without drawing anything.
+// Job: {item_ids, scene, vibe, palette?, request_id?, index?}: template 'look', one outfit on her.
+// With request_id/index the path is also written into that ai_requests row (looks[index].image_path).
+// (The 'many' collage, several looks in one picture, was removed on 2026-11-18: it mixed the looks up.)
+// preview: true returns {prompt} (the full text the model would get) without drawing anything.
 // Writes to photos/<uid>/looks/ and returns the path.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { decodeBase64 } from "jsr:@std/encoding@1/base64";
@@ -22,7 +20,6 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 type Piece = { id: string; category: string; kind: string | null; name: string | null; colors: string[]; styles: string[] | null; photo_path: string | null };
-type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
 
 // Outer layers first, so the model reads the outfit from the outside in
 const ORDER = ["outerwear", "dress", "top", "bottom", "swim", "sleep", "shoes", "bag", "accessory"];
@@ -34,9 +31,9 @@ function imagesPart(pieces: Piece[], hasRef: boolean) {
   const list = pieces.map((p, n) => `- Image ${n + 1}: ${pieceName(p)} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")}${p.styles?.length ? `; style: ${p.styles.join(", ")}` : ""})`).join("\n");
   return `ATTACHED IMAGES
 ${list}
-Copy every piece exactly as its photo shows it: the same waistband, fabric, sheen, drape and length. Keep its style: an elegant piece stays elegant, never turn it sporty (no wide elastic or athletic waistbands that the photo does not show).
 ${hasRef ? `- Image ${pieces.length + 1}: the layout reference picture.` : "- No layout reference picture is attached: keep the layout calm and editorial."}
-The image numbers are only for you: never draw numbers, file names or colour codes.`;
+The image numbers are only for you: never draw numbers, file names or colour codes.
+Copy every piece exactly: the fit its name gives (a relaxed, boxy or oversized piece stays loose and is never cinched at the waist) and, from its photo, the same waistband, fabric, sheen, drape and length. Keep its style: an elegant piece stays elegant, never turn it sporty (no wide elastic or athletic waistbands that the photo does not show).`;
 }
 
 function lookPrompt(text: string, pieces: Piece[], appearance: string, scene: string, vibe: string, palette: string[], hasRef: boolean) {
@@ -54,26 +51,6 @@ function lookPrompt(text: string, pieces: Piece[], appearance: string, scene: st
     has("bag") ? "" : "No bag unless it is in the list.",
   ].filter(Boolean).map(l => `- ${l}`).join("\n");
   return `${filled}\n\n${imagesPart(pieces, hasRef)}\n\nTHE OUTFIT\n${notes}`;
-}
-
-function manyPrompt(text: string, pieces: Piece[], appearance: string, many: Many, hasRef: boolean) {
-  const num = new Map(pieces.map((p, n) => [p.id, n + 1]));
-  const filled = fill(text, {
-    title: many.title.toUpperCase(),
-    anchor: pieceName(pieces[0]),
-    looks_count: String(many.looks.length),
-    labels: many.looks.map(l => `"${l.label}"`).join(", "),
-    palette: many.palette.length ? many.palette.join(", ") : "the main colours of the looks",
-    palette_count: String(many.palette.length || 5),
-    appearance: appearance || DEFAULT_APPEARANCE,
-  });
-  const looks = many.looks.map((l, k) =>
-    `- Photo ${k + 1}, label "${l.label}": she wears images ${l.item_ids.map(id => num.get(id)).filter(Boolean).join(", ")}`).join("\n");
-  return `${filled}\n\n${imagesPart(pieces, hasRef)}
-Image 1 is the main piece.
-
-THE LOOKS (every photo shows image 1 plus the listed pieces, and no other visible garments; simple shoes if none are listed)
-${looks}`;
 }
 
 async function download(sb: SupabaseClient, path: string) {
@@ -127,31 +104,14 @@ Deno.serve(async req => {
     if (!user) return json({ error: "Please sign in again" }, 401);
     const body0 = await req.json() as {
       item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number;
-      many?: Many; preview?: boolean;
+      preview?: boolean;
     };
-    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, many, preview = false } = body0;
+    const { item_ids = [], scene = "", vibe = "", palette = [], request_id, index, preview = false } = body0;
     if (!preview && !Deno.env.get("OPENAI_API_KEY")) throw new Error("OpenAI key is not set up yet.");
 
     const { data: prof } = await sb.from("style_profile").select("appearance").maybeSingle();
     const appearance = prof?.appearance ?? "";
     const refOf = async (path: string | null) => path ? await download(sb, path).catch(() => null) : null;
-
-    if (many) {
-      // Every piece once: the anchor first, then the rest in the order the looks use them (14 + the template)
-      const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 14);
-      const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,styles,photo_path").in("id", ids);
-      const pieces = ids.map(id => ((rows ?? []) as Piece[]).find(p => p.id === id)).filter((p): p is Piece => !!p?.photo_path);
-      if (!pieces.length || pieces[0].id !== many.anchor_id) throw new Error("The piece has no photo");
-      const t = await loadTemplate(sb, "many");
-      if (preview) return json({ prompt: manyPrompt(t.prompt, pieces, appearance, many, !!t.image_path) });
-      const ref = await refOf(t.image_path);
-      const images = await Promise.all(pieces.map(p => download(sb, p.photo_path!)));
-      if (ref) images.push(ref);
-      // Many small figures: "medium" smeared faces and garment details; "high" cost only ~1c more here
-      const out = await paint(sb, "looks-collage", manyPrompt(t.prompt, pieces, appearance, many, !!ref), images, "high", "1024x1536", `${user.id}/looks`);
-      if (request_id) await sb.rpc("set_request_collage", { req: request_id, path: out.path });
-      return json(out);
-    }
 
     const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,styles,photo_path").in("id", item_ids.slice(0, 10));
     const pieces = ((rows ?? []) as Piece[]).filter(p => p.photo_path)

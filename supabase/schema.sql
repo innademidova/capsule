@@ -453,18 +453,12 @@ create policy "admins write global photos" on storage.objects for all to authent
 -- Which model answered an AI request (e.g. "Gemini 3.8 Flash", "OpenAI")
 alter table public.ai_requests add column if not exists model text;
 
-create or replace function public.set_request_collage(req uuid, path text) returns void
-language sql security invoker as $$
-  update public.ai_requests set result = jsonb_set(result, '{collage_path}', to_jsonb(path))
-  where id = req and user_id = auth.uid();
-$$;
-
 -- Image templates: layout picture + instructions per purpose (supabase/migrations/20261112_image_templates_with_prompts.sql
 -- also seeds the default rows with their instruction texts)
 create table if not exists public.image_templates (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid references auth.users on delete cascade,
-  purpose    text not null check (purpose in ('look', 'many', 'garment')),
+  purpose    text not null check (purpose in ('look', 'garment')),
   image_path text,
   prompt     text,
   updated_at timestamptz not null default now(),
@@ -546,3 +540,6 @@ create policy "own rows" on public.notes for all to authenticated
 insert into public.dict_global (type, category, id, label, sort)
 select 'kind', 'accessory', 'tights', 'tights', coalesce(max(sort) + 1, 0) from public.dict_global where type = 'kind' and category = 'accessory'
 on conflict do nothing;
+
+-- 20261118_one_look_template.sql: the 'many' collage template and set_request_collage were removed (above);
+-- requests whose collage was saved to outfits lost their collage keys.

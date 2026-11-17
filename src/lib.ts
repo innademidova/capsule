@@ -86,13 +86,13 @@ export const colorOf = (id: string) => COLORS.find(c => c.id === id)
 // The lists above and below (colors, kinds, styles, occasions) are only fallbacks. The real lists come from the
 // database view dict_effective (admin defaults + this user's own changes); applyDict() puts them into these arrays.
 // Colors, styles and occasions are stored in items by id; brands, materials and kinds by their text (id = lowercase).
-// Image templates (table image_templates), one per purpose: a layout picture plus the instructions for the image model.
+// Image templates (table image_templates): 'look' (one outfit on her, with a layout picture) and 'garment' (item photos).
+// Each is a layout picture (optional) plus the instructions for the image model.
 // A row without user_id is the default (admins); a user's own row overrides it field by field (null = the default).
 // placeholders: the {names} the Edge Functions fill in (keep in sync with supabase/functions/_shared/templates.ts).
 // Names, hints and placeholder descriptions are in the locale files: templates.<id>.label / .hint, templates.placeholder.<name>
 export const TEMPLATES = [
   { id: 'look', picture: true, placeholders: ['vibe', 'scene', 'palette', 'palette_count', 'appearance'] },
-  { id: 'many', picture: true, placeholders: ['title', 'anchor', 'looks_count', 'labels', 'palette', 'palette_count', 'appearance'] },
   { id: 'garment', picture: false, placeholders: ['piece'] },
 ] as const
 export type TemplateId = typeof TEMPLATES[number]['id']
@@ -382,12 +382,10 @@ export type AIRequest = {
 export type OutfitIdea = { title: string; item_ids: string[]; why: string; tip: string }
 // Result of the 'looks' AI task; image_path / outfit_id are added by the app later
 export type LookIdea = { label: string; item_ids: string[]; why: string; scene: string; image_path?: string | null; outfit_id?: string | null }
-export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string; collage_path?: string; collage_outfit_id?: string }
+export type LooksResult = { title: string; palette: string[]; looks: LookIdea[]; missing: string[]; note: string }
 
 // AI photo of a woman (described in style_profile.appearance) wearing these items, ≈7¢
-export async function renderLook(body: { item_ids?: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number
-  many?: { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] }
-}) {
+export async function renderLook(body: { item_ids: string[]; scene?: string; vibe?: string; palette?: string[]; request_id?: string; index?: number }) {
   const res = await supabase.functions.invoke('look', { body })
   if (res.error) {
     let msg = res.error.message

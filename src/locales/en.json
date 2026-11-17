@@ -187,20 +187,11 @@
   "looks": {
     "dressing": "Dressing you up, about a minute…",
     "drawError": "Could not draw it. Try again",
-    "savedToOutfits": "Saved to outfits",
-    "saveToOutfits": "Save to outfits",
-    "drawingCollage": "Drawing all looks on you in one picture, about a minute…",
-    "collageError": "Could not draw the collage. Try again",
-    "drawCollage": "Draw all looks in one picture",
     "missing": "Would make these looks even better: {{list}}",
     "one": "One {{piece}}",
     "piece": "piece",
     "many": "many looks",
     "wishPlaceholder": "Wish (optional): e.g. for autumn, more relaxed",
-    "count": "Number of looks",
-    "nLooks_one": "{{count}} look",
-    "nLooks_other": "{{count}} looks",
-    "newLooks": "New looks",
     "getLooks": "Get looks",
     "weatherError": "Could not get the weather. Allow location access or type it in.",
     "stylist": "Stylist",
@@ -208,7 +199,8 @@
     "requestPlaceholder": "What do you need? e.g. soft looks for autumn, +15, in pastel shades",
     "weatherPlaceholder": "Weather (optional), e.g. +15°C, sunny",
     "now": "Now",
-    "collageName": "One {{piece}}, many looks"
+    "getLook": "Get a look",
+    "anotherLook": "One more look"
   },
   "inspo": {
     "title": "Inspiration",
@@ -379,10 +371,6 @@
       "label": "One outfit on me",
       "hint": "Saved outfits and the stylist’s looks: you wearing one outfit, with the pieces and a palette."
     },
-    "many": {
-      "label": "One piece, many looks",
-      "hint": "“Style it” on an item: one collage with the piece in the middle and several looks around it."
-    },
     "garment": {
       "label": "Item photos",
       "hint": "Enhance with AI: a clean product photo of a piece from a photo of you wearing it."
@@ -393,15 +381,10 @@
       "palette": "the colours of the dots",
       "palette_count": "how many dots",
       "appearance": "your appearance from Preferences",
-      "title": "the headline, e.g. ONE SWEATER",
-      "anchor": "the main piece",
-      "looks_count": "how many looks",
-      "labels": "the names of the looks",
       "piece": "which piece to draw"
     },
     "looking": "Looking at the picture…",
     "building": "Building the prompt…",
-    "needStyleIt": "Try “Style it” on a piece once, then the example uses it.",
     "needOutfit": "Save an outfit first, then the example uses it.",
     "forEveryone": "Default for every user.",
     "picture": "Picture",

@@ -4,11 +4,10 @@
 // user never edits: which attached image is which, and what each look is made of.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-export type Purpose = "look" | "many" | "garment";
+export type Purpose = "look" | "garment";
 
 // The placeholders each purpose understands, shown under the editor in the app (keep in sync with src/lib.ts)
 export const PLACEHOLDERS: Record<Purpose, string[]> = {
-  many: ["title", "anchor", "looks_count", "labels", "palette", "palette_count", "appearance"],
   look: ["vibe", "scene", "palette", "palette_count", "appearance"],
   garment: ["piece"],
 };
