@@ -14,7 +14,8 @@ const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
 // --- Outfit list ---
 
 export function OutfitList() {
-  const { outfits, items } = useStore()
+  const { outfits, items, wishlist } = useStore()
+  const all = [...items, ...wishlist]
   const [fav, setFav] = useState(false)
   const [kind, setKind] = useState<'all' | 'ai' | 'mine'>('all')
   const shown = outfits.filter(o => (!fav || o.favorite) && (kind === 'all' || (kind === 'ai') === isAI(o)))
@@ -48,7 +49,7 @@ export function OutfitList() {
         <div className="grid outfits">
           {shown.map(o => (
             <button key={o.id} className="tile" onClick={() => go(`/o/${o.id}`)}>
-              {o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={items} />}
+              {o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={all} />}
               {o.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
               <span className="tile-name">{o.name || t('outfits.outfit')}</span>
             </button>
@@ -69,8 +70,9 @@ let drawOnOpen: string | null = null
 // --- Outfit card ---
 
 export function OutfitDetail({ outfit }: { outfit: Outfit }) {
-  const { items, setOutfits } = useStore()
-  const list = outfitItems(outfit, items)
+  const { items, wishlist, setOutfits } = useStore()
+  const all = [...items, ...wishlist]
+  const list = outfitItems(outfit, all)
 
   const patch = async (p: Partial<Outfit>) => {
     const { data, error } = await supabase.from('outfits').update(p).eq('id', outfit.id).select().single()
@@ -102,7 +104,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label={t('common.edit')}><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        {outfit.image_path ? <Photo path={outfit.image_path} alt={outfit.name || t('outfits.outfit')} className="look-post" zoom /> : <Collage layout={outfit.layout} items={items} className="big" />}
+        {outfit.image_path ? <Photo path={outfit.image_path} alt={outfit.name || t('outfits.outfit')} className="look-post" zoom /> : <Collage layout={outfit.layout} items={all} className="big" />}
         <div className="detail-info">
           {outfit.source === 'ai' && <p className="eyebrow">{t('outfits.stylistIdea')}</p>}
           <h2 className="title">{outfit.name || t('outfits.outfit')}</h2>
@@ -119,6 +121,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
               {list.map(i => (
                 <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}>
                   <Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span>
+                  {i.wishlist && <span className="mini-wish">{t('wardrobe.wishlist')}</span>}
                 </button>
               ))}
             </div>
@@ -133,7 +136,9 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
 // --- Outfit builder ---
 
 export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: string[] }) {
-  const { items, setOutfits } = useStore()
+  const { items: own, wishlist, setOutfits } = useStore()
+  // Outfits she puts together herself may use wishlist pieces too (the AI stylist still sees only the wardrobe)
+  const items = useMemo(() => [...own, ...wishlist], [own, wishlist])
   const [layout, setLayout] = useState<Placement[]>(() =>
     outfit?.layout ?? (preset ? autoLayout(preset.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)) : []))
   const [name, setName] = useState(outfit?.name ?? '')
@@ -244,11 +249,24 @@ function BoardItem({ p, item, on, onDown }: { p: Placement; item?: Item; on: boo
 }
 
 function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle: (i: Item) => void; onClose: () => void }) {
-  const { items } = useStore()
+  const { items: own, wishlist } = useStore()
+  const [wish, setWish] = useState(false)
   const [cat, setCat] = useState('')
+  const items = wish ? wishlist : own
   const shown = items.filter(i => !cat || i.category === cat)
+  const pick = (w: boolean) => { setWish(w); setCat('') }
   return (
     <Sheet title={t('outfits.addPieces')} onClose={onClose}>
+      {wishlist.length > 0 && (
+        <div className="seg picker-source" role="tablist">
+          <button role="tab" aria-selected={!wish} className={wish ? '' : 'on'} onClick={() => pick(false)}>
+            {t('wardrobe.title')}<span className="seg-count">{own.length}</span>
+          </button>
+          <button role="tab" aria-selected={wish} className={wish ? 'on' : ''} onClick={() => pick(true)}>
+            {t('wardrobe.wishlist')}<span className="seg-count">{wishlist.length}</span>
+          </button>
+        </div>
+      )}
       <div className="cat-row">
         <button className={'cat' + (!cat ? ' on' : '')} onClick={() => setCat('')}>{t('common.all')}</button>
         {CATEGORIES.filter(c => items.some(i => i.category === c.id)).map(c => (

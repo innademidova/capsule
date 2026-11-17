@@ -300,6 +300,9 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 .mini { flex: none; width: 76px; display: grid; gap: 4px; text-align: center; font-size: 11px; font-weight: 600; }
 .mini .photo { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); }
 .mini span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+.mini { position: relative; }
+.mini .mini-wish { position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 9px; font-weight: 700; text-transform: none; }
+.seg.picker-source { margin: 0 0 12px; max-width: none; }
 .mini-outfits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .mini-outfits .collage { border: 1px solid var(--line); }
 

@@ -119,7 +119,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
 
 export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange: (i: Item) => void; onDelete: (id: string) => void }) {
   const [busy, setBusy] = useState(false)
-  const { outfits, items, shopping, setShopping } = useStore()
+  const { outfits, items, wishlist, shopping, setShopping } = useStore()
   const moreRef = useRef<HTMLInputElement>(null)
   const more = item.more_photos ?? []
   const home = item.wishlist ? '/wish' : '/'
@@ -227,7 +227,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             <div className="card">
               <h3 className="card-title">{t('item.inOutfits', { count: inOutfits.length })}</h3>
               <div className="mini-outfits">
-                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}><Collage layout={o.layout} items={items} /></button>)}
+                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}><Collage layout={o.layout} items={[...items, ...wishlist]} /></button>)}
               </div>
             </div>
           )}
