@@ -256,7 +256,7 @@ function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle:
   const shown = items.filter(i => !cat || i.category === cat)
   const pick = (w: boolean) => { setWish(w); setCat('') }
   return (
-    <Sheet title={t('outfits.addPieces')} onClose={onClose}>
+    <Sheet title={t('outfits.addPieces')} onClose={onClose} sticky>
       {wishlist.length > 0 && (
         <div className="seg picker-source" role="tablist">
           <button role="tab" aria-selected={!wish} className={wish ? '' : 'on'} onClick={() => pick(false)}>

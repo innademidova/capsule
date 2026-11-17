@@ -222,9 +222,10 @@ export function RequestState({ req, hideModel }: { req?: AIRequest; hideModel?: 
   return <div className="queued err"><span>{req.error}</span></div>
 }
 
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+// sticky: a tap outside does not close it, only the cross (or the sheet's own buttons)
+export function Sheet({ title, onClose, children, sticky }: { title: string; onClose: () => void; children: ReactNode; sticky?: boolean }) {
   return (
-    <div className="sheet-bg" onClick={onClose}>
+    <div className="sheet-bg" onClick={sticky ? undefined : onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
         <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
         {children}
