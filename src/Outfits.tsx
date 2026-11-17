@@ -254,25 +254,31 @@ function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle:
   const [cat, setCat] = useState('')
   const items = wish ? wishlist : own
   const shown = items.filter(i => !cat || i.category === cat)
-  const pick = (w: boolean) => { setWish(w); setCat('') }
+  // A new source or category starts from the top of the list
+  const toTop = () => document.querySelector('.sheet-body')?.scrollTo(0, 0)
+  const pick = (w: boolean) => { setWish(w); setCat(''); toTop() }
+  const pickCat = (c: string) => { setCat(c); toTop() }
   return (
-    <Sheet title={t('outfits.addPieces')} onClose={onClose} sticky>
-      {wishlist.length > 0 && (
-        <div className="seg picker-source" role="tablist">
-          <button role="tab" aria-selected={!wish} className={wish ? '' : 'on'} onClick={() => pick(false)}>
-            {t('wardrobe.title')}<span className="seg-count">{own.length}</span>
-          </button>
-          <button role="tab" aria-selected={wish} className={wish ? 'on' : ''} onClick={() => pick(true)}>
-            {t('wardrobe.wishlist')}<span className="seg-count">{wishlist.length}</span>
-          </button>
+    <Sheet title={t('outfits.addPieces')} onClose={onClose} sticky
+      top={<>
+        {wishlist.length > 0 && (
+          <div className="seg picker-source" role="tablist">
+            <button role="tab" aria-selected={!wish} className={wish ? '' : 'on'} onClick={() => pick(false)}>
+              {t('wardrobe.title')}<span className="seg-count">{own.length}</span>
+            </button>
+            <button role="tab" aria-selected={wish} className={wish ? 'on' : ''} onClick={() => pick(true)}>
+              {t('wardrobe.wishlist')}<span className="seg-count">{wishlist.length}</span>
+            </button>
+          </div>
+        )}
+        <div className="cat-row">
+          <button className={'cat' + (!cat ? ' on' : '')} onClick={() => pickCat('')}>{t('common.all')}</button>
+          {CATEGORIES.filter(c => items.some(i => i.category === c.id)).map(c => (
+            <button key={c.id} className={'cat' + (cat === c.id ? ' on' : '')} onClick={() => pickCat(c.id)}>{c.label}</button>
+          ))}
         </div>
-      )}
-      <div className="cat-row">
-        <button className={'cat' + (!cat ? ' on' : '')} onClick={() => setCat('')}>{t('common.all')}</button>
-        {CATEGORIES.filter(c => items.some(i => i.category === c.id)).map(c => (
-          <button key={c.id} className={'cat' + (cat === c.id ? ' on' : '')} onClick={() => setCat(c.id)}>{c.label}</button>
-        ))}
-      </div>
+      </>}
+      foot={<button className="btn primary wide" onClick={onClose}>{t('common.done')}</button>}>
       <div className="grid picker-grid">
         {shown.map(i => (
           <button key={i.id} className={'tile' + (chosen.includes(i.id) ? ' chosen' : '')} onClick={() => onToggle(i)}>
@@ -282,7 +288,6 @@ function ItemPicker({ chosen, onToggle, onClose }: { chosen: string[]; onToggle:
           </button>
         ))}
       </div>
-      <button className="btn primary wide" onClick={onClose}>{t('common.done')}</button>
     </Sheet>
   )
 }

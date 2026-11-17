@@ -222,13 +222,20 @@ export function RequestState({ req, hideModel }: { req?: AIRequest; hideModel?: 
   return <div className="queued err"><span>{req.error}</span></div>
 }
 
-// sticky: a tap outside does not close it, only the cross (or the sheet's own buttons)
-export function Sheet({ title, onClose, children, sticky }: { title: string; onClose: () => void; children: ReactNode; sticky?: boolean }) {
+// sticky: a tap outside does not close it, only the cross (or the sheet's own buttons).
+// The head (with the cross) and `top` stay in place while the body scrolls; `foot` stays at the bottom.
+export function Sheet({ title, onClose, children, sticky, top, foot }: {
+  title: string; onClose: () => void; children: ReactNode; sticky?: boolean; top?: ReactNode; foot?: ReactNode
+}) {
   return (
     <div className="sheet-bg" onClick={sticky ? undefined : onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
-        <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
-        {children}
+        <div className="sheet-top">
+          <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
+          {top}
+        </div>
+        <div className={'sheet-body' + (foot ? '' : ' last')}>{children}</div>
+        {foot && <div className="sheet-foot">{foot}</div>}
       </div>
     </div>
   )
