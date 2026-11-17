@@ -21,7 +21,7 @@ const cors = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-type Piece = { id: string; category: string; kind: string | null; name: string | null; colors: string[]; photo_path: string | null };
+type Piece = { id: string; category: string; kind: string | null; name: string | null; colors: string[]; styles: string[] | null; photo_path: string | null };
 type Many = { anchor_id: string; title: string; looks: { label: string; item_ids: string[] }[]; palette: string[] };
 
 // Outer layers first, so the model reads the outfit from the outside in
@@ -31,9 +31,10 @@ const pieceName = (p: Piece) => p.name ?? p.kind ?? p.category;
 
 // The technical part after the user's instructions: the attached images in order
 function imagesPart(pieces: Piece[], hasRef: boolean) {
-  const list = pieces.map((p, n) => `- Image ${n + 1}: ${pieceName(p)} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")})`).join("\n");
+  const list = pieces.map((p, n) => `- Image ${n + 1}: ${pieceName(p)} (${p.category}${p.kind ? `, ${p.kind}` : ""}; ${p.colors.join(", ")}${p.styles?.length ? `; style: ${p.styles.join(", ")}` : ""})`).join("\n");
   return `ATTACHED IMAGES
 ${list}
+Copy every piece exactly as its photo shows it: the same waistband, fabric, sheen, drape and length. Keep its style: an elegant piece stays elegant, never turn it sporty (no wide elastic or athletic waistbands that the photo does not show).
 ${hasRef ? `- Image ${pieces.length + 1}: the layout reference picture.` : "- No layout reference picture is attached: keep the layout calm and editorial."}
 The image numbers are only for you: never draw numbers, file names or colour codes.`;
 }
@@ -138,7 +139,7 @@ Deno.serve(async req => {
     if (many) {
       // Every piece once: the anchor first, then the rest in the order the looks use them (14 + the template)
       const ids = [...new Set([many.anchor_id, ...many.looks.flatMap(l => l.item_ids)])].slice(0, 14);
-      const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", ids);
+      const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,styles,photo_path").in("id", ids);
       const pieces = ids.map(id => ((rows ?? []) as Piece[]).find(p => p.id === id)).filter((p): p is Piece => !!p?.photo_path);
       if (!pieces.length || pieces[0].id !== many.anchor_id) throw new Error("The piece has no photo");
       const t = await loadTemplate(sb, "many");
@@ -152,7 +153,7 @@ Deno.serve(async req => {
       return json(out);
     }
 
-    const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,photo_path").in("id", item_ids.slice(0, 10));
+    const { data: rows } = await sb.from("items").select("id,category,kind,name,colors,styles,photo_path").in("id", item_ids.slice(0, 10));
     const pieces = ((rows ?? []) as Piece[]).filter(p => p.photo_path)
       .sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category)).slice(0, 8);
     if (!pieces.length) throw new Error("No pieces with photos in this outfit");
