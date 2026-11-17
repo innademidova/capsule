@@ -115,6 +115,12 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
 .search input { border: 0; padding: 12px 0; background: transparent; color: var(--ink); }
 .cat-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px 14px; padding: 2px 16px; scrollbar-width: none; }
 .cat-row::-webkit-scrollbar { display: none; }
+/* With a mouse, show a thin scrollbar so it is clear the row goes on */
+@media (hover: hover) and (pointer: fine) {
+  .cat-row { scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding-bottom: 6px; }
+  .cat-row::-webkit-scrollbar { display: block; height: 6px; }
+  .cat-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+}
 .cat {
   flex: none; padding: 8px 14px; border-radius: 999px; font-weight: 600; font-size: 14px;
   background: var(--card); box-shadow: var(--shadow); white-space: nowrap;
