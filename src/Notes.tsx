@@ -6,7 +6,7 @@ import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
 // "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
-// rules ("never buy satin pajamas") and insights live in the Notes tab. One rule at a time is shown as a reminder.
+// rules ("never buy satin pajamas"), insights and her favourite bloggers live in the Notes tab. One rule at a time is shown as a reminder.
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 const pathOf = (url: string) => { try { return decodeURIComponent(new URL(url).pathname).replace(/\/$/, '') } catch { return '' } }
@@ -279,13 +279,14 @@ export async function closeEntries(item: Item, shopping: ShopItem[], setShopping
 
 // --- Rules and insights ---
 
-export type NotesTab = 'rules' | 'insights'
-const NOTE_TABS: NotesTab[] = ['rules', 'insights']
+export type NotesTab = 'rules' | 'insights' | 'bloggers'
+const NOTE_TABS: NotesTab[] = ['rules', 'insights', 'bloggers']
+const KIND: Record<NotesTab, Note['kind']> = { rules: 'rule', insights: 'insight', bloggers: 'blogger' }
 
-// Notes tab: her rules and insights
+// Notes tab: her rules, insights and favourite bloggers
 export function NotesScreen({ tab }: { tab: NotesTab }) {
   const { notes } = useStore()
-  const count = (x: NotesTab) => notes.filter(n => n.kind === (x === 'rules' ? 'rule' : 'insight')).length
+  const count = (x: NotesTab) => notes.filter(n => n.kind === KIND[x]).length
   return (
     <div className="screen">
       <Header title={t('nav.notes')} />
@@ -297,7 +298,7 @@ export function NotesScreen({ tab }: { tab: NotesTab }) {
         ))}
       </div>
       <div className="notes-body">
-        {tab === 'rules' ? <Rules /> : <Insights />}
+        {tab === 'rules' ? <Rules /> : tab === 'insights' ? <Insights /> : <Bloggers />}
       </div>
     </div>
   )
@@ -385,6 +386,71 @@ export function Insights() {
   )
 }
 
+// A profile link or @name: what to show and where it leads (a bare name is an Instagram account)
+function profileOf(raw: string): { title: string; url: string } | null {
+  const s = raw.trim().replace(/[,;]+$/, '')
+  if (!s) return null
+  if (!/[/:]/.test(s)) {
+    const h = s.replace(/^@/, '')
+    return /^[\w.]+$/.test(h) ? { title: '@' + h, url: `https://www.instagram.com/${h}/` } : null
+  }
+  try {
+    const u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s)
+    const host = u.hostname.replace(/^www\./, '')
+    const first = u.pathname.split('/').filter(Boolean)[0] ?? ''
+    if (host.endsWith('instagram.com') && first) {
+      const h = first.replace(/^@/, '')
+      return { title: '@' + h, url: `https://www.instagram.com/${h}/` }
+    }
+    if (host.endsWith('tiktok.com') && first.startsWith('@')) return { title: first, url: `https://www.tiktok.com/${first}` }
+    return { title: first ? `${host}/${first}` : host, url: u.href }
+  } catch { return null }
+}
+
+// Her favourite fashion bloggers: tap opens the profile, the pencil edits the note; several links can be pasted at once
+export function Bloggers() {
+  const { notes, setNotes } = useStore()
+  const [open, setOpen] = useState<Note | null>(null)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const list = notes.filter(n => n.kind === 'blogger')
+  const add = async () => {
+    const have = new Set(list.map(n => n.url))
+    const found = text.split(/\s+/).map(profileOf).filter((p): p is { title: string; url: string } => !!p && !have.has(p.url))
+    const rows = found.filter((p, i) => found.findIndex(q => q.url === p.url) === i)
+    if (!rows.length) return setText('')
+    setBusy(true)
+    const { data, error } = await supabase.from('notes').insert(rows.map(p => ({ kind: 'blogger', ...p }))).select()
+    setBusy(false)
+    if (error) return alert(error.message)
+    setNotes(x => [...x, ...(data as Note[])]); setText('')
+  }
+  return (
+    <>
+      <p className="notes-hint">{t('notes.bloggersHint')}</p>
+      {list.length > 0 && (
+        <div className="card blogger-list">
+          {list.map(n => (
+            <div key={n.id} className="blogger-row">
+              <a className="blogger-link" href={n.url ?? undefined} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')}>
+                <span className="blogger-ava">{n.title.replace(/^@/, '').charAt(0).toUpperCase()}</span>
+                <span className="blogger-text"><b>{n.title}</b>{n.body && <span className="muted small">{n.body}</span>}</span>
+              </a>
+              <button className="icon-btn" onClick={() => setOpen(n)} aria-label={t('common.edit')}><Icon name="edit" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="composer">
+        <textarea rows={1} value={text} placeholder={t('notes.bloggerPlaceholder')} onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); add() } }} />
+        <button className="composer-send" disabled={busy || !text.trim()} onClick={add} aria-label={t('common.add')}><Icon name="send" /></button>
+      </div>
+      {open && <NoteSheet note={open} onClose={() => setOpen(null)} />}
+    </>
+  )
+}
+
 // Quick capture like a chat with yourself: the first line becomes the title, the rest the text
 function Composer({ kind }: { kind: Note['kind'] }) {
   const { setNotes } = useStore()
@@ -416,10 +482,13 @@ function NoteSheet({ note, onClose }: { note: Note; onClose: () => void }) {
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body)
   const [pinned, setPinned] = useState(note.pinned)
+  const [url, setUrl] = useState(note.url ?? '')
   const [busy, setBusy] = useState(false)
+  const blogger = note.kind === 'blogger'
   const save = async () => {
     setBusy(true)
-    const { data, error } = await supabase.from('notes').update({ title: title.trim(), body: body.trim(), pinned }).eq('id', note.id).select().single()
+    const patch = { title: title.trim(), body: body.trim(), pinned, ...(blogger ? { url: url.trim() || null } : {}) }
+    const { data, error } = await supabase.from('notes').update(patch).eq('id', note.id).select().single()
     setBusy(false)
     if (error) return alert(error.message)
     setNotes(replace(data as Note)); onClose()
@@ -431,10 +500,13 @@ function NoteSheet({ note, onClose }: { note: Note; onClose: () => void }) {
     setNotes(without(note.id)); onClose()
   }
   return (
-    <Sheet title={t(note.kind === 'rule' ? 'notes.rule' : 'notes.insight')} onClose={onClose}>
+    <Sheet title={t(`notes.${note.kind}`)} onClose={onClose}>
       <div className="form note-form">
-        <Section title={t('notes.title')}><input value={title} onChange={e => setTitle(e.target.value)} /></Section>
-        <Section title={t('notes.text')}><textarea rows={8} value={body} onChange={e => setBody(e.target.value)} /></Section>
+        <Section title={t(blogger ? 'notes.handle' : 'notes.title')}><input value={title} onChange={e => setTitle(e.target.value)} /></Section>
+        {blogger && <Section title={t('notes.profileLink')}><input type="url" value={url} onChange={e => setUrl(e.target.value)} /></Section>}
+        <Section title={t(blogger ? 'notes.likeWhat' : 'notes.text')}>
+          <textarea rows={blogger ? 4 : 8} value={body} placeholder={blogger ? t('notes.likeWhatPlaceholder') : undefined} onChange={e => setBody(e.target.value)} />
+        </Section>
         {note.kind === 'rule' && (
           <label className="check-row"><input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)} /><span><b>{t('notes.pin')}</b></span></label>
         )}

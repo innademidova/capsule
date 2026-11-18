@@ -51,7 +51,7 @@ function parse(hash: string): Route {
   if (a === 'n' && b) return { view: 'insp', id: b }
   if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', tab: b } // old link
   if (a === 'shop') return { view: 'shop' }
-  if (a === 'notes') return { view: 'notes', tab: b === 'insights' ? 'insights' : 'rules' }
+  if (a === 'notes') return { view: 'notes', tab: b === 'insights' || b === 'bloggers' ? b : 'rules' }
   if (a === 'f' && b) return { view: 'find', id: b === 'new' ? undefined : b }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me', tab: (b || 'overview') as ProfileTab }

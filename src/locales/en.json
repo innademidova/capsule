@@ -509,7 +509,8 @@
   "notes": {
     "tab": {
       "rules": "Rules",
-      "insights": "Insights"
+      "insights": "Insights",
+      "bloggers": "Bloggers"
     },
     "other": "Other",
     "findEmpty": "Write down what you want to find, even without a photo or a shop: colour, fabric, doubts. Wishlist options can be attached later.",
@@ -542,7 +543,15 @@
     "pin": "Main: show it first and large",
     "showAll": "Read in full",
     "showLess": "Show less",
-    "confirmDeleteNote": "Delete this note?"
+    "confirmDeleteNote": "Delete this note?",
+    "bloggersHint": "Bloggers whose style feels like yours. Paste a profile link (several at once is fine); the pencil lets you write what you like about them.",
+    "bloggerPlaceholder": "Profile link or @name",
+    "blogger": "Blogger",
+    "handle": "Name",
+    "profileLink": "Profile link",
+    "likeWhat": "What I like",
+    "likeWhatPlaceholder": "Silhouettes, colours, how they wear palazzo…",
+    "openProfile": "Open the profile"
   },
   "wish": {
     "need1": "Must have",

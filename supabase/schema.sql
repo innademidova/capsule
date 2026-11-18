@@ -611,3 +611,8 @@ create policy "own rows" on public.agent_messages for all to authenticated
 alter table public.outfits add column if not exists miss boolean not null default false;
 alter table public.outfits add column if not exists worn_on date;
 comment on column public.outfits.source is 'manual | ai | worn (her own photo of what she wore)';
+
+-- 2026-11-18: Notes tab "Bloggers" (migration 20261118d_notes_bloggers.sql)
+alter table public.notes drop constraint if exists notes_kind_check;
+alter table public.notes add constraint notes_kind_check check (kind in ('rule', 'insight', 'blogger'));
+alter table public.notes add column if not exists url text;

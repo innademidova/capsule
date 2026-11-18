@@ -387,7 +387,7 @@ export type ShopItem = {
   links: string[]; item_ids: string[]; occasions: string[]
 }
 // A shopping rule or an insight: title + free text; a pinned rule is shown first and larger
-export type Note = { id: string; kind: 'rule' | 'insight'; title: string; body: string; pinned: boolean; created_at: string; updated_at: string }
+export type Note = { id: string; kind: 'rule' | 'insight' | 'blogger'; title: string; body: string; pinned: boolean; url: string | null; created_at: string; updated_at: string }
 export type AIRequest = {
   id: string; kind: string; input: Record<string, unknown>; image_path: string | null; mode: string
   status: 'queued' | 'done' | 'error'; result: any; error: string | null; created_at: string; done_at: string | null
