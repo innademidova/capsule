@@ -3,6 +3,7 @@ import { supabase, CATEGORIES, OCCASIONS, categoryLabel, labelOf, itemTitle, typ
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, Chips, Section, Sheet } from './ui'
 import { go, back } from './App'
+import { Stores } from './Stores'
 import { t, formatDate } from './i18n'
 
 // "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
@@ -279,14 +280,14 @@ export async function closeEntries(item: Item, shopping: ShopItem[], setShopping
 
 // --- Rules and insights ---
 
-export type NotesTab = 'rules' | 'insights' | 'bloggers'
-const NOTE_TABS: NotesTab[] = ['rules', 'insights', 'bloggers']
-const KIND: Record<NotesTab, Note['kind']> = { rules: 'rule', insights: 'insight', bloggers: 'blogger' }
+export type NotesTab = 'rules' | 'insights' | 'bloggers' | 'stores'
+const NOTE_TABS: NotesTab[] = ['rules', 'insights', 'bloggers', 'stores']
+const KIND: Record<Exclude<NotesTab, 'stores'>, Note['kind']> = { rules: 'rule', insights: 'insight', bloggers: 'blogger' }
 
-// Notes tab: her rules, insights and favourite bloggers
+// Notes tab: her rules, insights, favourite bloggers and stores
 export function NotesScreen({ tab }: { tab: NotesTab }) {
-  const { notes } = useStore()
-  const count = (x: NotesTab) => notes.filter(n => n.kind === KIND[x]).length
+  const { notes, stores } = useStore()
+  const count = (x: NotesTab) => x === 'stores' ? stores.length : notes.filter(n => n.kind === KIND[x]).length
   return (
     <div className="screen">
       <Header title={t('nav.notes')} />
@@ -298,7 +299,7 @@ export function NotesScreen({ tab }: { tab: NotesTab }) {
         ))}
       </div>
       <div className="notes-body">
-        {tab === 'rules' ? <Rules /> : tab === 'insights' ? <Insights /> : <Bloggers />}
+        {tab === 'rules' ? <Rules /> : tab === 'insights' ? <Insights /> : tab === 'bloggers' ? <Bloggers /> : <Stores />}
       </div>
     </div>
   )

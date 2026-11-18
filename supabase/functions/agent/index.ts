@@ -75,7 +75,7 @@ const short = (v: unknown, n: number) => { const s = line(v); return s.length > 
 
 // Everything she has, compact: the model sees the lists in every turn (OpenAI caches the long same prefix)
 async function snapshot(sb: SupabaseClient) {
-  const [items, notes, shopping, insp, prof, profile, misses] = await Promise.all([
+  const [items, notes, shopping, insp, prof, profile, misses, stores] = await Promise.all([
     sb.from("items").select("id,wishlist,category,kind,name,colors,seasons,styles,occasions,brand,need,notes,set_id").order("created_at"),
     sb.from("notes").select("kind,title,body,pinned").order("pinned", { ascending: false }).order("created_at"),
     sb.from("shopping").select("id,name,category,why,priority,occasions,item_ids").eq("done", false).order("priority").order("created_at"),
@@ -83,6 +83,7 @@ async function snapshot(sb: SupabaseClient) {
     sb.from("style_profile").select("summary,appearance").maybeSingle(),
     sb.from("profiles").select("language").maybeSingle(),
     sb.from("outfits").select("name,notes,layout,worn_on").eq("source", "worn").eq("miss", true).order("created_at"),
+    sb.from("stores").select("name,url,tags,ukrainian,regular,note").order("name"),
   ]);
   const all = (items.data ?? []) as Row[];
   const looks = (id: string) => (insp.data ?? []).filter((x: { item_ids: string[] | null }) => (x.item_ids ?? []).includes(id)).length;
@@ -110,6 +111,9 @@ ${(misses.data ?? []).map((o: Record<string, unknown>) => `- ${line(o.name) || "
 
 HER LOOKING FOR LIST (id | name | category | priority | details | candidate item ids):
 ${(shopping.data ?? []).map((s: Row) => [s.id, s.name, s.category ?? "", s.priority, short(s.why, 160), ((s.item_ids ?? []) as string[]).join(",")].join(" | ")).join("\n") || "(empty)"}
+
+HER STORES (where she buys or looks; name | what they sell | site | flags | note). When she asks where to look for something, name these first:
+${(stores.data ?? []).map((s: Record<string, unknown>) => [s.name, ((s.tags ?? []) as string[]).join("/"), s.url ?? "", [s.regular ? "buys there regularly" : "", s.ukrainian ? "Ukrainian brand" : ""].filter(Boolean).join(", "), short(s.note, 160)].join(" | ")).join("\n") || "(none)"}
 ${prof.data?.summary ? `\nHER STYLE PROFILE: ${line(prof.data.summary)}` : ""}${prof.data?.appearance ? `\nHER APPEARANCE: ${line(prof.data.appearance)}` : ""}`;
   return { text, all, L: LANGUAGE[profile.data?.language ?? ""] ?? "Ukrainian" };
 }

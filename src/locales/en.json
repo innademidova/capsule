@@ -510,7 +510,8 @@
     "tab": {
       "rules": "Rules",
       "insights": "Insights",
-      "bloggers": "Bloggers"
+      "bloggers": "Bloggers",
+      "stores": "Stores"
     },
     "other": "Other",
     "findEmpty": "Write down what you want to find, even without a photo or a shop: colour, fabric, doubts. Wishlist options can be attached later.",
@@ -585,6 +586,29 @@
       "link_candidates": "Options added to: {{text}}",
       "add_note": "Saved to notes: {{text}}",
       "link_look": "Linked to the look: {{text}}"
+    }
+  },
+  "stores": {
+    "hint": "Where you buy clothes or go looking. The globe opens the website, the icon next to it Instagram; tap a store to edit it.",
+    "add": "Add a store",
+    "new": "New store",
+    "name": "Name",
+    "site": "Website",
+    "instaPlaceholder": "@name or profile link",
+    "instaBad": "Paste the profile link or @name",
+    "sells": "What they sell",
+    "regular": "I buy here regularly",
+    "regularShort": "Regular",
+    "ukrainian": "Ukrainian brand",
+    "ukrainianShort": "Ukrainian",
+    "note": "Note",
+    "notePlaceholder": "Good basics, pajamas, sizes run small…",
+    "confirmDelete": "Delete \"{{name}}\"?",
+    "tag": {
+      "all": "Everything",
+      "basics": "Basics",
+      "underwear": "Underwear",
+      "sport": "Sport and hiking"
     }
   }
 }

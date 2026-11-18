@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import {
   supabase, applyDict, type DictRow,
   type Item, type Outfit, type Inspiration, type StyleProfile, type ShopItem, type Note, type AIRequest,
-  type ImageTemplate,
+  type ImageTemplate, type Retailer,
 } from './lib'
 import { Icon, Header } from './ui'
 import { t, lang, remember } from './i18n'
@@ -51,7 +51,7 @@ function parse(hash: string): Route {
   if (a === 'n' && b) return { view: 'insp', id: b }
   if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', tab: b } // old link
   if (a === 'shop') return { view: 'shop' }
-  if (a === 'notes') return { view: 'notes', tab: b === 'insights' || b === 'bloggers' ? b : 'rules' }
+  if (a === 'notes') return { view: 'notes', tab: b === 'insights' || b === 'bloggers' || b === 'stores' ? b : 'rules' }
   if (a === 'f' && b) return { view: 'find', id: b === 'new' ? undefined : b }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me', tab: (b || 'overview') as ProfileTab }
@@ -123,6 +123,7 @@ function Main({ email }: { email: string }) {
   const [profile, setProfile] = useState<StyleProfile | null>(null)
   const [shopping, setShopping] = useState<ShopItem[]>([])
   const [notes, setNotes] = useState<Note[]>([])
+  const [stores, setStores] = useState<Retailer[]>([])
   const [requests, setRequests] = useState<AIRequest[]>([])
   const [role, setRole] = useState<Store['role']>('user')
   const [account, setAccount] = useState<Store['account']>({ display_name: null })
@@ -140,12 +141,13 @@ function Main({ email }: { email: string }) {
   const load = useCallback(async () => {
     setLoadError('')
     const by = (t: string) => supabase.from(t).select('*').order('created_at', { ascending: false })
-    const [it, ou, ins, pr, sh, rq, di, ro, ac, st, no] = await Promise.all([
+    const [it, ou, ins, pr, sh, rq, di, ro, ac, st, no, sto] = await Promise.all([
       by('items'), by('outfits'),
       by('inspirations'), supabase.from('style_profile').select('*').maybeSingle(), by('shopping'), by('ai_requests').limit(60),
       supabase.from('dict_effective').select('type,category,id,label,hex,sort,is_default,is_own'),
       supabase.from('user_roles').select('role').maybeSingle(), supabase.from('profiles').select('display_name,language').maybeSingle(),
       supabase.from('image_templates').select('*'), supabase.from('notes').select('*').order('created_at'),
+      supabase.from('stores').select('*').order('name'),
     ])
     if (it.error) { setLoadError(it.error.message); return }
     // The account's language wins over the device's guess (a new phone, a cleared browser)
@@ -157,7 +159,7 @@ function Main({ email }: { email: string }) {
     setTemplates((st.data ?? []) as ImageTemplate[])
     setItemsS(it.data as Item[]); setOutfits((ou.data ?? []) as Outfit[])
     setInspirations((ins.data ?? []) as Inspiration[]); setProfile((pr.data as StyleProfile | null) ?? null)
-    setShopping((sh.data ?? []) as ShopItem[]); setNotes((no.data ?? []) as Note[]); setRequests((rq.data ?? []) as AIRequest[])
+    setShopping((sh.data ?? []) as ShopItem[]); setNotes((no.data ?? []) as Note[]); setStores((sto.data ?? []) as Retailer[]); setRequests((rq.data ?? []) as AIRequest[])
   }, [])
   useEffect(() => { load() }, [load])
   // When the app is opened again, pull fresh data (e.g. a processed queue)
@@ -180,8 +182,8 @@ function Main({ email }: { email: string }) {
   const wishlist = allItems.filter(i => i.wishlist)
 
   const store: Store = {
-    items, wishlist, outfits, inspirations, profile, shopping, notes, requests, role, account, templates,
-    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setNotes, setRequests, reload: load,
+    items, wishlist, outfits, inspirations, profile, shopping, notes, stores, requests, role, account, templates,
+    setItems: f => setItemsS(x => f(x ?? [])), setOutfits, setInspirations, setShopping, setNotes, setStores, setRequests, reload: load,
   }
   const save = (i: Item) => store.setItems(upsert(i))
   const drop = (id: string) => store.setItems(without(id))
