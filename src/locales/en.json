@@ -299,7 +299,9 @@
     "ideas": "Outfit ideas",
     "movedToBought": "\"{{name}}\" moved to Bought",
     "undo": "Undo",
-    "markNotBought": "Not bought yet"
+    "markNotBought": "Not bought yet",
+    "byType": "By type",
+    "byNeed": "By urgency"
   },
   "profile": {
     "title": "My profile",

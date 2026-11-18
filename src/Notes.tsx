@@ -31,13 +31,29 @@ function useCandidates(s: ShopItem) {
 
 const ALL = '*'
 
+// The list is grouped by type (category) or by urgency (must-haves first); the choice is kept on this device
+type FindView = 'type' | 'need'
+const VIEW_KEY = 'find-view'
+
 export function FindList() {
   const { shopping, setShopping } = useStore()
   const [cat, setCat] = useState(ALL)
+  const [view, setViewS] = useState<FindView>(() => { try { return localStorage.getItem(VIEW_KEY) === 'need' ? 'need' : 'type' } catch { return 'type' } })
+  const setView = (v: FindView) => { setViewS(v); try { localStorage.setItem(VIEW_KEY, v) } catch { /* private mode */ } }
   const todo = shopping.filter(s => !s.done)
   const done = shopping.filter(s => s.done)
   const groupOf = (s: ShopItem) => CATEGORIES.some(c => c.id === s.category) ? s.category! : ''
   const groups = [...CATEGORIES, { id: '', label: t('notes.other') }].filter(c => todo.some(s => groupOf(s) === c.id))
+  const catOrder = (s: ShopItem) => { const i = CATEGORIES.findIndex(c => c.id === s.category); return i < 0 ? CATEGORIES.length : i }
+  const sections = view === 'type'
+    ? groups.filter(c => cat === ALL || cat === c.id).map(c => ({
+      key: c.id, label: c.label, need: 0,
+      rows: todo.filter(s => groupOf(s) === c.id).sort((a, b) => a.priority - b.priority || a.created_at.localeCompare(b.created_at)),
+    }))
+    : [1, 2, 3].map(p => ({
+      key: String(p), label: priorityLabel(p), need: p,
+      rows: todo.filter(s => s.priority === p && (cat === ALL || groupOf(s) === cat)).sort((a, b) => catOrder(a) - catOrder(b) || a.created_at.localeCompare(b.created_at)),
+    })).filter(x => x.rows.length > 0)
   // Ticking moves the entry to "Bought" at the bottom; a toast says so and can undo it
   const [moved, setMoved] = useState<ShopItem | null>(null)
   const timer = useRef<number>(0)
@@ -63,20 +79,24 @@ export function FindList() {
   )
   return (
     <>
+      {todo.length > 1 && (
+        <div className="seg find-view">
+          {(['type', 'need'] as FindView[]).map(v => (
+            <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>{t(v === 'type' ? 'shop.byType' : 'shop.byNeed')}</button>
+          ))}
+        </div>
+      )}
       {groups.length > 1 && (
         <div className="find-filter">
           <Chips options={[{ id: ALL, label: t('common.all') }, ...groups]} value={[cat]} onChange={v => setCat(v[0] ?? ALL)} multi={false} />
         </div>
       )}
-      {groups.filter(c => cat === ALL || cat === c.id).map(c => {
-        const rows = todo.filter(s => groupOf(s) === c.id).sort((a, b) => a.priority - b.priority || a.created_at.localeCompare(b.created_at))
-        return (
-          <section key={c.id} className="find-group">
-            <h3 className="group-title">{c.label} <span>{rows.length}</span></h3>
-            <div className="card find-list">{rows.map(s => <FindRow key={s.id} s={s} onToggle={toggle} />)}</div>
-          </section>
-        )
-      })}
+      {sections.map(x => (
+        <section key={x.key} className="find-group">
+          <h3 className={'group-title' + (x.need ? ` need-${x.need}` : '')}>{x.label} <span>{x.rows.length}</span></h3>
+          <div className="card find-list">{x.rows.map(s => <FindRow key={s.id} s={s} onToggle={toggle} byNeed={view === 'need'} />)}</div>
+        </section>
+      ))}
       {done.length > 0 && (
         <details className="card done-list find-done">
           <summary className="muted small">{t('shop.bought', { count: done.length })}</summary>
@@ -93,19 +113,22 @@ export function FindList() {
   )
 }
 
-function FindRow({ s, onToggle }: { s: ShopItem; onToggle: (s: ShopItem) => void }) {
+// byNeed: the list is grouped by urgency, so the row shows its type instead of the urgency pills
+function FindRow({ s, onToggle, byNeed }: { s: ShopItem; onToggle: (s: ShopItem) => void; byNeed?: boolean }) {
   const cands = useCandidates(s)
-  const meta = s.priority === 3 || s.occasions.length > 0 || s.links.length > 0 || cands.length > 0
+  const showCat = byNeed && !!s.category
+  const meta = (s.priority === 3 && !byNeed) || showCat || s.occasions.length > 0 || s.links.length > 0 || cands.length > 0
   return (
     <div className={'find-row' + (s.done ? ' done' : '')}>
       <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)}
         aria-label={s.done ? t('shop.markNotBought') : t('shop.markBought')} title={s.done ? t('shop.markNotBought') : t('shop.markBought')}><Icon name="check" /></button>
       <button className="find-body" onClick={() => go(`/f/${s.id}`)}>
-        <span className="find-name">{s.name}{s.priority === 1 && !s.done && <span className="pill p1">{priorityLabel(1)}</span>}</span>
+        <span className="find-name">{s.name}{s.priority === 1 && !s.done && !byNeed && <span className="pill p1">{priorityLabel(1)}</span>}</span>
         {s.why && <span className="find-why">{s.why}</span>}
         {meta && (
           <span className="find-meta">
-            {s.priority === 3 && <span className="pill p3">{priorityLabel(3)}</span>}
+            {showCat && <span className="pill">{categoryLabel(s.category!)}</span>}
+            {s.priority === 3 && !byNeed && <span className="pill p3">{priorityLabel(3)}</span>}
             {s.occasions.map(o => <span key={o} className="pill">{labelOf(OCCASIONS, o)}</span>)}
             {s.links.length > 0 && <span className="find-count"><Icon name="link" />{s.links.length}</span>}
             {cands.length > 0 && (

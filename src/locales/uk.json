@@ -311,7 +311,9 @@
     "ideas": "Ідеї образів",
     "movedToBought": "«{{name}}» перенесено в «Куплено»",
     "undo": "Повернути",
-    "markNotBought": "Ще не куплено"
+    "markNotBought": "Ще не куплено",
+    "byType": "За типом",
+    "byNeed": "За терміновістю"
   },
   "profile": {
     "title": "Мій профіль",

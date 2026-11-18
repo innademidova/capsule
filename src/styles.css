@@ -557,6 +557,9 @@ details.card .dict-list { margin-top: 12px; }
 .find-filter .chip { flex: none; }
 .group-title { display: flex; gap: 6px; margin: 18px 4px 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .group-title span { opacity: 0.6; }
+.group-title.need-1 { color: var(--danger); }
+.seg.find-view { margin: 4px 0 10px; max-width: 340px; }
+.seg.find-view button { flex: 1; }
 .find-list { padding: 2px 14px; margin-bottom: 0; }
 .find-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; }
 .find-row + .find-row { border-top: 1px solid var(--line); }
