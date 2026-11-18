@@ -34,7 +34,7 @@ const fn = (name: string, description: string, properties: Record<string, unknow
 
 const TOOLS = [
   fn("get_item", "Full details of one of her items or wishlist pieces: all fields, notes, how many saved looks and outfits use it.", { id: str }),
-  fn("list_outfits", "Her saved outfits: id, name, occasions, item ids, whether the AI made it.", {}),
+  fn("list_outfits", "Her saved outfits: id, name, occasions, item ids, source (manual collage, ai, or her own photo of what she wore), whether it did not work and her notes.", {}),
   fn("list_inspirations", "Her saved inspiration looks: id, note, linked item ids, short breakdown if any.", {}),
   fn("propose_look", "Show her ONE outfit as a card in the chat (the pieces, a Save button and a Show on me button that draws her wearing it for about 9 cents). Call it once per look; up to 4 looks per answer.", {
     label: { ...str, description: "1-3 lowercase English words naming the vibe, e.g. city chic" },
@@ -75,13 +75,14 @@ const short = (v: unknown, n: number) => { const s = line(v); return s.length > 
 
 // Everything she has, compact: the model sees the lists in every turn (OpenAI caches the long same prefix)
 async function snapshot(sb: SupabaseClient) {
-  const [items, notes, shopping, insp, prof, profile] = await Promise.all([
+  const [items, notes, shopping, insp, prof, profile, misses] = await Promise.all([
     sb.from("items").select("id,wishlist,category,kind,name,colors,seasons,styles,occasions,brand,need,notes,set_id").order("created_at"),
     sb.from("notes").select("kind,title,body,pinned").order("pinned", { ascending: false }).order("created_at"),
     sb.from("shopping").select("id,name,category,why,priority,occasions,item_ids").eq("done", false).order("priority").order("created_at"),
     sb.from("inspirations").select("item_ids"),
     sb.from("style_profile").select("summary,appearance").maybeSingle(),
     sb.from("profiles").select("language").maybeSingle(),
+    sb.from("outfits").select("name,notes,layout,worn_on").eq("source", "worn").eq("miss", true).order("created_at"),
   ]);
   const all = (items.data ?? []) as Row[];
   const looks = (id: string) => (insp.data ?? []).filter((x: { item_ids: string[] | null }) => (x.item_ids ?? []).includes(id)).length;
@@ -103,6 +104,9 @@ ${rules.map((n: { title: string; body: string }) => `- ${line(n.title)}${n.body 
 
 HER INSIGHTS:
 ${insights.map((n: { title: string; body: string }) => `- ${line(n.title)}${n.body ? `: ${short(n.body, 300)}` : ""}`).join("\n") || "(none)"}
+
+HER OWN OUTFITS THAT DID NOT WORK (photos of what she wore; her notes say what to avoid):
+${(misses.data ?? []).map((o: Record<string, unknown>) => `- ${line(o.name) || "outfit"}${o.worn_on ? ` (${o.worn_on})` : ""}: ${short(o.notes, 300) || "no notes"} | items ${(o.layout as { item_id: string }[]).map(l => l.item_id).join(", ")}`).join("\n") || "(none)"}
 
 HER LOOKING FOR LIST (id | name | category | priority | details | candidate item ids):
 ${(shopping.data ?? []).map((s: Row) => [s.id, s.name, s.category ?? "", s.priority, short(s.why, 160), ((s.item_ids ?? []) as string[]).join(",")].join(" | ")).join("\n") || "(empty)"}
@@ -156,6 +160,7 @@ She can ask anything: advice, analysis, or actions in the app. Act with the tool
   and of several pieces doing the same job only one can be a must-have.
 - You cannot delete anything, buy anything, open shop links or change how the app works; say so briefly when asked.
 - Her rules are strict: never suggest or approve anything that breaks one, and name the rule when it matters.
+- Her outfits that did not work are lessons: do not repeat what her notes there warn about.
 - Use ids exactly as given; never show ids to her, call pieces by their names.`;
 
 async function runTool(sb: SupabaseClient, name: string, a: Record<string, unknown>, all: Row[], cards: Card[], actions: Action[]) {
@@ -172,9 +177,10 @@ async function runTool(sb: SupabaseClient, name: string, a: Record<string, unkno
         outfits: (outs ?? []).filter((o: { layout: { item_id: string }[] }) => o.layout.some(l => l.item_id === data.id)).length };
     }
     case "list_outfits": {
-      const { data } = await sb.from("outfits").select("id,name,occasions,seasons,layout,source,notes").order("created_at");
-      return (data ?? []).map((o: Row) => ({ id: o.id, name: o.name, occasions: o.occasions, source: o.source,
-        item_ids: (o.layout as { item_id: string }[]).map(l => l.item_id), notes: short(o.notes, 120) }));
+      const { data } = await sb.from("outfits").select("id,name,occasions,seasons,layout,source,notes,miss,worn_on").order("created_at");
+      return (data ?? []).map((o: Row) => ({ id: o.id, name: o.name, occasions: o.occasions,
+        source: o.source === "worn" ? "her own photo" : o.source, did_not_work: o.miss, worn_on: o.worn_on,
+        item_ids: (o.layout as { item_id: string }[]).map(l => l.item_id), notes: short(o.notes, o.miss ? 400 : 120) }));
     }
     case "list_inspirations": {
       const { data } = await sb.from("inspirations").select("id,note,item_ids,analysis,created_at").order("created_at");

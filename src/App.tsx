@@ -9,7 +9,7 @@ import { Icon, Header } from './ui'
 import { t, lang, remember } from './i18n'
 import { StoreCtx, useStore, upsert, without, type Store } from './store'
 import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from './Wardrobe'
-import { OutfitList, OutfitDetail, OutfitEditor } from './Outfits'
+import { OutfitList, OutfitDetail, OutfitEditor, WornForm } from './Outfits'
 import { StyleItem, Assistant } from './Looks'
 import { Profile, type ProfileTab } from './Profile'
 import { InspoList, InspoDetail } from './Inspo'
@@ -20,7 +20,7 @@ import { AgentButton, type AgentContext } from './Agent'
 // Routes live after # so they work on GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
-  | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
+  | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'outfit-photo' } | { view: 'stylist' }
   | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop'; tab: ShopTab } | { view: 'find'; id?: string }
   | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
 
@@ -42,6 +42,7 @@ function parse(hash: string): Route {
   if (a === 'i' && b) return { view: 'item', id: b }
   if (a === 'outfits') return { view: 'outfits' }
   if (a === 'o' && b === 'new') return { view: 'outfit-edit', with: c }
+  if (a === 'o' && b === 'photo') return { view: 'outfit-photo' }
   if (a === 'o' && b && c === 'edit') return { view: 'outfit-edit', id: b }
   if (a === 'o' && b) return { view: 'outfit', id: b }
   if (a === 'stylist') return { view: 'stylist' }
@@ -196,7 +197,10 @@ function Main({ email }: { email: string }) {
       break
     case 'outfits': screen = <OutfitList />; break
     case 'outfit': { const o = findO(route.id); screen = o ? <OutfitDetail outfit={o} /> : notFound; break }
+    case 'outfit-photo': screen = <WornForm />; break
     case 'outfit-edit':
+      // Her own outfit photos are edited in their own form
+      if (route.id && findO(route.id)?.source === 'worn') { screen = <WornForm key={route.id} outfit={findO(route.id)} />; break }
       screen = route.id && !findO(route.id) ? notFound : <OutfitEditor key={route.id ?? route.with ?? 'new'} outfit={findO(route.id)} preset={route.with ? route.with.split(',') : undefined} />
       break
     case 'stylist': screen = <Assistant />; break
@@ -222,7 +226,7 @@ function Main({ email }: { email: string }) {
     { id: 'shop', icon: 'bag', path: '/shop' },
     { id: 'me', icon: 'user', path: '/me' },
   ]
-  const editing = route.view === 'item-edit' || route.view === 'outfit-edit'
+  const editing = route.view === 'item-edit' || route.view === 'outfit-edit' || route.view === 'outfit-photo'
 
   return (
     <StoreCtx.Provider value={store}>

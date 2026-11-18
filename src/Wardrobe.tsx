@@ -286,7 +286,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             <div className="card">
               <h3 className="card-title">{t('item.inOutfits', { count: inOutfits.length })}</h3>
               <div className="mini-outfits">
-                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}><Collage layout={o.layout} items={[...items, ...wishlist]} /></button>)}
+                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}>{o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={[...items, ...wishlist]} />}</button>)}
               </div>
             </div>
           )}

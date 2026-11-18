@@ -371,7 +371,11 @@ export async function pasteImage(): Promise<Blob | null> {
 export type Placement = { item_id: string; x: number; y: number; w: number; z: number }
 export type Outfit = {
   id: string; name: string | null; layout: Placement[]; occasions: string[]; seasons: string[]
-  notes: string | null; favorite: boolean; source: string; image_path: string | null; created_at: string; updated_at: string
+  notes: string | null; favorite: boolean; image_path: string | null; created_at: string; updated_at: string
+  // manual (collage) | ai | worn (her own photo of what she wore; image_path is that photo)
+  source: string
+  miss: boolean // a worn outfit that did not work; notes say why
+  worn_on: string | null
 }
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }

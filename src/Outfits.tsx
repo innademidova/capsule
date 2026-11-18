@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, itemTitle, labelOf,
+  supabase, CATEGORIES, OCCASIONS, SEASONS, autoLayout, renderLook, itemTitle, labelOf, processPhoto, removePhotos, canPaste, pasteImage,
   type Item, type Outfit, type Placement,
 } from './lib'
 import { useStore, upsert, without } from './store'
@@ -13,12 +13,19 @@ const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
 
 // --- Outfit list ---
 
+type Kind = 'all' | 'ai' | 'mine' | 'worn'
+
 export function OutfitList() {
   const { outfits, items, wishlist } = useStore()
   const all = [...items, ...wishlist]
   const [fav, setFav] = useState(false)
-  const [kind, setKind] = useState<'all' | 'ai' | 'mine'>('all')
-  const shown = outfits.filter(o => (!fav || o.favorite) && (kind === 'all' || (kind === 'ai') === isAI(o)))
+  const [kind, setKind] = useState<Kind>(() => { try { return (sessionStorage.getItem('outfits-kind') as Kind) || 'all' } catch { return 'all' } })
+  const [miss, setMiss] = useState(false)
+  const pick = (k: Kind) => { setKind(k); try { sessionStorage.setItem('outfits-kind', k) } catch { /* private mode */ } }
+  // Outfits that did not work live only under "On me" -> "Didn't work"
+  const of = (k: Kind) => outfits.filter(o => k === 'worn' ? isWorn(o) : !o.miss && (k === 'all' || (k === 'ai' ? isAI(o) : !isAI(o) && !isWorn(o))))
+  const shown = of(kind).filter(o => (!fav || o.favorite) && (kind !== 'worn' || o.miss === miss))
+  const add = () => go(kind === 'worn' ? '/o/photo' : '/o/new')
   return (
     <div className="screen">
       <Header title={t('outfits.title')} right={
@@ -28,41 +35,55 @@ export function OutfitList() {
         <span className="cta-icon"><Icon name="sparkle" /></span>
         <span><b>{t('outfits.askStylist')}</b><span className="muted small">{t('outfits.askStylistHint')}</span></span>
       </button>
-      {outfits.length > 0 && (
-        <div className="seg outfit-filter" role="tablist">
-          {(['all', 'ai', 'mine'] as const).map(id => (
-            <button key={id} role="tab" aria-selected={kind === id} className={kind === id ? 'on' : ''} onClick={() => setKind(id)}>
-              {t(`outfits.filter.${id}`)} <span className="muted">{outfits.filter(o => id === 'all' || (id === 'ai') === isAI(o)).length}</span>
-            </button>
-          ))}
+      <div className="seg outfit-filter" role="tablist">
+        {(['all', 'ai', 'mine', 'worn'] as const).map(id => (
+          <button key={id} role="tab" aria-selected={kind === id} className={kind === id ? 'on' : ''} onClick={() => pick(id)}>
+            {t(`outfits.filter.${id}`)} <span className="muted">{of(id).length}</span>
+          </button>
+        ))}
+      </div>
+      {kind === 'worn' && of('worn').length > 0 && (
+        <div className="switch worn-switch">
+          <button className={miss ? '' : 'on'} onClick={() => setMiss(false)}>{t('outfits.good')} <span className="muted">{of('worn').filter(o => !o.miss).length}</span></button>
+          <button className={miss ? 'on' : ''} onClick={() => setMiss(true)}>{t('outfits.miss')} <span className="muted">{of('worn').filter(o => o.miss).length}</span></button>
         </div>
       )}
-      {outfits.length > 0 && !shown.length && <p className="muted center pad">{t('common.nothingYet')}</p>}
-      {outfits.length === 0 ? (
+      {kind === 'worn' && !of('worn').length ? (
+        <div className="empty">
+          <Icon name="camera" />
+          <h2>{t('outfits.emptyWorn')}</h2>
+          <p className="muted">{t('outfits.emptyWornHint')}</p>
+          <button className="btn primary" onClick={add}><Icon name="plus" /> {t('outfits.addPhoto')}</button>
+        </div>
+      ) : outfits.length === 0 ? (
         <div className="empty">
           <Icon name="layers" />
           <h2>{t('outfits.empty')}</h2>
           <p className="muted">{t('outfits.emptyHint')}</p>
           <button className="btn primary" onClick={() => go('/o/new')} disabled={!items.length}><Icon name="plus" /> {t('outfits.new')}</button>
+          <button className="btn" onClick={() => go('/o/photo')}><Icon name="camera" /> {t('outfits.addPhoto')}</button>
         </div>
-      ) : (
+      ) : !shown.length ? <p className="muted center pad">{t('common.nothingYet')}</p> : (
         <div className="grid outfits">
           {shown.map(o => (
             <button key={o.id} className="tile" onClick={() => go(`/o/${o.id}`)}>
               {o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={all} />}
               {o.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
-              <span className="tile-name">{o.name || t('outfits.outfit')}</span>
+              {o.miss && <span className="tile-miss"><Icon name="ban" /></span>}
+              <span className="tile-name">{o.name || (isWorn(o) ? t('outfits.myOutfit') : t('outfits.outfit'))}</span>
             </button>
           ))}
         </div>
       )}
-      {outfits.length > 0 && <button className="fab" onClick={() => go('/o/new')} aria-label={t('outfits.new')}><Icon name="plus" /></button>}
+      {outfits.length > 0 && <button className="fab" onClick={add} aria-label={kind === 'worn' ? t('outfits.addPhoto') : t('outfits.new')}><Icon name={kind === 'worn' ? 'camera' : 'plus'} /></button>}
     </div>
   )
 }
 
+// Her own photo of what she wore
+const isWorn = (o: Outfit) => o.source === 'worn'
 // An outfit counts as AI generated when the AI drew it (photo of a woman) or the stylist suggested it
-const isAI = (o: Outfit) => !!o.image_path || o.source === 'ai'
+const isAI = (o: Outfit) => !isWorn(o) && (!!o.image_path || o.source === 'ai')
 
 // Set by the editor's "Generate with AI": the outfit card starts drawing as soon as it opens
 let drawOnOpen: string | null = null
@@ -82,8 +103,11 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
     if (!confirm(t('outfits.confirmDelete'))) return
     const { error } = await supabase.from('outfits').delete().eq('id', outfit.id)
     if (error) return alert(error.message)
+    if (worn) await removePhotos(outfit.image_path)
     setOutfits(without(outfit.id)); back('/outfits')
   }
+  const worn = isWorn(outfit)
+  const title = outfit.name || (worn ? t('outfits.myOutfit') : t('outfits.outfit'))
   // AI photo of a woman wearing these pieces
   const [drawing, setDrawing] = useState(false)
   const draw = async () => {
@@ -104,18 +128,27 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
           <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label={t('common.edit')}><Icon name="edit" /></button>
         </>} />
       <div className="detail">
-        {outfit.image_path ? <Photo path={outfit.image_path} alt={outfit.name || t('outfits.outfit')} className="look-post" zoom /> : <Collage layout={outfit.layout} items={all} className="big" />}
+        {outfit.image_path ? <Photo path={outfit.image_path} alt={title} className="look-post" zoom /> : <Collage layout={outfit.layout} items={all} className="big" />}
         <div className="detail-info">
           {outfit.source === 'ai' && <p className="eyebrow">{t('outfits.stylistIdea')}</p>}
-          <h2 className="title">{outfit.name || t('outfits.outfit')}</h2>
+          {worn && <p className="eyebrow">{[outfit.miss ? t('outfits.miss') : t('outfits.filter.worn'), outfit.worn_on && new Date(outfit.worn_on).toLocaleDateString()].filter(Boolean).join(' · ')}</p>}
+          <h2 className="title">{title}</h2>
           {(outfit.occasions.length > 0 || outfit.seasons.length > 0) && (
             <p className="muted">{[...outfit.occasions.map(o => labelOf(OCCASIONS, o)), ...outfit.seasons.map(s => labelOf(SEASONS, s))].join(' · ')}</p>
           )}
-          {outfit.notes && <div className="card notes">{outfit.notes}</div>}
-          <button className="btn" onClick={draw} disabled={drawing || !list.length}>
-            <Icon name="sparkle" /> {drawing ? t('outfits.drawing') : outfit.image_path ? t('outfits.drawAgain') : t('outfits.showOnMe')}<span className="cost">(OpenAI ≈9¢)</span>
-          </button>
-          <div className="card">
+          {outfit.notes && (outfit.miss
+            ? <div className="card notes miss-notes"><h3 className="card-title"><Icon name="ban" /> {t('outfits.missTitle')}</h3>{outfit.notes}</div>
+            : <div className="card notes">{outfit.notes}</div>)}
+          {worn ? (
+            <button className="btn" onClick={() => patch({ miss: !outfit.miss })}>
+              <Icon name={outfit.miss ? 'check' : 'ban'} /> {outfit.miss ? t('outfits.markGood') : t('outfits.markMiss')}
+            </button>
+          ) : (
+            <button className="btn" onClick={draw} disabled={drawing || !list.length}>
+              <Icon name="sparkle" /> {drawing ? t('outfits.drawing') : outfit.image_path ? t('outfits.drawAgain') : t('outfits.showOnMe')}<span className="cost">(OpenAI ≈9¢)</span>
+            </button>
+          )}
+          {(list.length > 0 || !worn) && <div className="card">
             <h3 className="card-title">{t('outfits.pieces')}</h3>
             <div className="mini-list">
               {list.map(i => (
@@ -125,7 +158,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           <button className="btn ghost danger" onClick={del}><Icon name="trash" /> {t('outfits.delete')}</button>
         </div>
       </div>
@@ -227,6 +260,98 @@ export function OutfitEditor({ outfit, preset }: { outfit?: Outfit; preset?: str
         </div>
       </div>
       {picker && <ItemPicker chosen={layout.map(p => p.item_id)} onToggle={toggleItem} onClose={() => setPicker(false)} />}
+    </div>
+  )
+}
+
+// --- Her own outfit photo: what she wore, which pieces, whether it worked and why not ---
+
+export function WornForm({ outfit }: { outfit?: Outfit }) {
+  const { items, wishlist, setOutfits } = useStore()
+  const all = useMemo(() => [...items, ...wishlist], [items, wishlist])
+  const [file, setFile] = useState<{ blob: Blob; url: string } | null>(null)
+  const [name, setName] = useState(outfit?.name ?? '')
+  const [wornOn, setWornOn] = useState(outfit?.worn_on ?? '')
+  const [occasions, setOccasions] = useState<string[]>(outfit?.occasions ?? [])
+  const [seasons, setSeasons] = useState<string[]>(outfit?.seasons ?? [])
+  const [ids, setIds] = useState<string[]>(outfit?.layout.map(p => p.item_id) ?? [])
+  const [miss, setMiss] = useState(outfit?.miss ?? false)
+  const [notes, setNotes] = useState(outfit?.notes ?? '')
+  const [picker, setPicker] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  useEffect(() => () => { if (file) URL.revokeObjectURL(file.url) }, [file])
+  const take = (blob?: Blob | null) => blob && setFile({ blob, url: URL.createObjectURL(blob) })
+  const paste = async () => { try { take(await pasteImage()) } catch (e) { alert((e as Error).message) } }
+  const chosen = ids.map(id => all.find(i => i.id === id)).filter((i): i is Item => !!i)
+
+  const save = async () => {
+    if (!file && !outfit?.image_path) return alert(t('outfits.needPhoto'))
+    setBusy(true)
+    try {
+      let image_path = outfit?.image_path ?? null
+      if (file) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error(t('error.signIn'))
+        const p = await processPhoto(file.blob)
+        const path = `${user.id}/worn/${crypto.randomUUID()}.${p.full.type.split('/')[1] || 'webp'}`
+        const { error } = await supabase.storage.from('photos').upload(path, p.full, { contentType: p.full.type })
+        if (error) throw error
+        image_path = path
+      }
+      const row = { name: name.trim() || null, image_path, layout: autoLayout(chosen), occasions, seasons,
+        notes: notes.trim() || null, source: 'worn', miss, worn_on: wornOn || null }
+      const q = outfit ? supabase.from('outfits').update(row).eq('id', outfit.id) : supabase.from('outfits').insert(row)
+      const { data, error } = await q.select().single()
+      if (error) throw error
+      if (file && outfit?.image_path) await removePhotos(outfit.image_path)
+      setOutfits(upsert(data as Outfit))
+      if (outfit) back(`/o/${outfit.id}`); else location.replace(`#/o/${(data as Outfit).id}`)
+    } catch (e) { alert((e as Error).message); setBusy(false) }
+  }
+
+  return (
+    <div className="screen">
+      <Header title={outfit ? t('outfits.editPhoto') : t('outfits.addPhoto')}
+        left={<button className="icon-btn" onClick={() => back(outfit ? `/o/${outfit.id}` : '/outfits')} aria-label={t('common.back')}><Icon name="back" /></button>} />
+      <div className="editor">
+        <div className="editor-board">
+          {file ? <img className="worn-preview" src={file.url} alt="" />
+            : outfit?.image_path ? <Photo path={outfit.image_path} alt="" className="look-post" />
+            : <button className="worn-drop" onClick={() => fileRef.current?.click()}><Icon name="camera" /><span>{t('outfits.choosePhoto')}</span></button>}
+          <div className="board-tools">
+            <button className="btn sm" onClick={() => fileRef.current?.click()}><Icon name="image" /> {file || outfit?.image_path ? t('outfits.otherPhoto') : t('outfits.choosePhoto')}</button>
+            {canPaste() && <button className="btn sm" onClick={paste}><Icon name="paste" /> {t('outfits.pastePhoto')}</button>}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { take(e.target.files?.[0]); e.target.value = '' }} />
+        </div>
+        <div className="form">
+          <Section title={t('field.name')}><input placeholder={t('outfits.photoNamePlaceholder')} value={name} onChange={e => setName(e.target.value)} /></Section>
+          <Section title={t('outfits.wornOn')}><input type="date" value={wornOn} onChange={e => setWornOn(e.target.value)} /></Section>
+          <Section title={t('outfits.wornPieces')}>
+            {chosen.length > 0 && (
+              <div className="mini-list">
+                {chosen.map(i => <span key={i.id} className="mini"><Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span></span>)}
+              </div>
+            )}
+            <button className="btn wide" onClick={() => setPicker(true)}><Icon name="plus" /> {t('outfits.addPieces')}</button>
+            <p className="hint">{t('outfits.wornPiecesHint')}</p>
+          </Section>
+          <Section title={t('field.occasion')}><Chips options={OCCASIONS} value={occasions} onChange={setOccasions} /></Section>
+          <Section title={t('field.season')}><Chips options={SEASONS} value={seasons} onChange={setSeasons} /></Section>
+          <div className="switch worn-verdict">
+            <button className={miss ? '' : 'on'} onClick={() => setMiss(false)}><Icon name="check" /> {t('outfits.good')}</button>
+            <button className={miss ? 'on' : ''} onClick={() => setMiss(true)}><Icon name="ban" /> {t('outfits.miss')}</button>
+          </div>
+          <Section title={miss ? t('outfits.missTitle') : t('field.notes')}>
+            <textarea rows={miss ? 5 : 3} placeholder={miss ? t('outfits.missPlaceholder') : t('outfits.notesPlaceholder')} value={notes} onChange={e => setNotes(e.target.value)} />
+          </Section>
+          <button className="btn primary wide" onClick={save} disabled={busy || (!file && !outfit?.image_path)}>
+            <Icon name="check" /> {busy ? t('common.saving') : t('outfits.savePhoto')}
+          </button>
+        </div>
+      </div>
+      {picker && <ItemPicker chosen={ids} onToggle={i => setIds(x => x.includes(i.id) ? x.filter(y => y !== i.id) : [...x, i.id])} onClose={() => setPicker(false)} />}
     </div>
   )
 }

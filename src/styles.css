@@ -658,3 +658,15 @@ details.card .dict-list { margin-top: 12px; }
 .agent-input { display: flex; align-items: flex-end; gap: 8px; }
 .agent-input textarea { flex: 1; resize: none; min-height: 44px; max-height: 160px; }
 .sheet.agent .sheet-foot .hint { margin: 6px 0 0; }
+
+/* Her own outfit photos ("On me") */
+.worn-switch { margin-top: -6px; }
+.tile-miss { position: absolute; top: 12px; left: 12px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card); color: var(--danger); box-shadow: var(--shadow); }
+.tile-miss .icon { width: 15px; height: 15px; }
+.worn-preview { width: 100%; border-radius: 18px; display: block; box-shadow: var(--shadow); }
+.worn-drop { width: 100%; aspect-ratio: 3 / 4; border-radius: 18px; border: 2px dashed var(--line); display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--muted); font-weight: 600; background: var(--card); }
+.worn-drop .icon { width: 32px; height: 32px; }
+.worn-verdict { margin: 4px 0 0; }
+.worn-verdict .icon { width: 15px; height: 15px; vertical-align: -2px; }
+.miss-notes { white-space: pre-wrap; }
+.miss-notes .card-title { color: var(--danger); }

@@ -160,7 +160,8 @@
     "filter": {
       "all": "All",
       "ai": "AI generated",
-      "mine": "Made by me"
+      "mine": "Made by me",
+      "worn": "On me"
     },
     "empty": "No outfits yet",
     "emptyHint": "Put together a look from your wardrobe, or ask the stylist for ideas.",
@@ -182,7 +183,28 @@
     "save": "Save outfit",
     "generate": "Generate with AI",
     "saveHint": "“Save outfit” keeps this collage. “Generate with AI” saves it and draws you wearing it, in the look format.",
-    "resize": "Resize"
+    "resize": "Resize",
+    "good": "Worked",
+    "miss": "Didn't work",
+    "myOutfit": "My outfit",
+    "addPhoto": "Add my outfit photo",
+    "editPhoto": "Edit my outfit",
+    "choosePhoto": "Choose a photo",
+    "otherPhoto": "Another photo",
+    "pastePhoto": "Paste",
+    "needPhoto": "Add a photo first",
+    "photoNamePlaceholder": "e.g. Vienna, Belvedere",
+    "wornOn": "When",
+    "wornPieces": "What I wore",
+    "wornPiecesHint": "Link your pieces: their pages then show this photo.",
+    "missTitle": "What went wrong",
+    "missPlaceholder": "What does not work and how not to do it next time",
+    "notesPlaceholder": "Notes (optional)",
+    "markMiss": "Mark as didn't work",
+    "markGood": "Mark as worked",
+    "savePhoto": "Save",
+    "emptyWorn": "No photos of your outfits yet",
+    "emptyWornHint": "Add photos of your outfits. Keep the ones that didn't work separately, with notes on what to avoid."
   },
   "looks": {
     "dressing": "Dressing you up, about a minute…",
