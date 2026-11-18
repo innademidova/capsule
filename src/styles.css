@@ -667,6 +667,7 @@ details.card .dict-list { margin-top: 12px; }
 .worn-drop { width: 100%; aspect-ratio: 3 / 4; border-radius: 18px; border: 2px dashed var(--line); display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--muted); font-weight: 600; background: var(--card); }
 .worn-drop .icon { width: 32px; height: 32px; }
 .worn-verdict { margin: 4px 0 0; }
-.worn-verdict .icon { width: 15px; height: 15px; vertical-align: -2px; }
+.worn-verdict button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.worn-verdict .icon { width: 15px; height: 15px; flex: none; }
 .miss-notes { white-space: pre-wrap; }
 .miss-notes .card-title { color: var(--danger); }
