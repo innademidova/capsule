@@ -13,7 +13,18 @@ const TAGS: Option[] = [
 const tagLabel = (id: string) => TAGS.find(x => x.id === id)?.label ?? id
 const ALL = '*'
 
-const withHttps = (s: string) => { const v = s.trim(); return !v ? null : /^https?:\/\//i.test(v) ? v : 'https://' + v }
+// The website as typed or pasted, with https and without tracking tags (utm_*, fbclid, igsh… from Instagram bios)
+const TRACKING = /^(utm_\w+|fbclid|gclid|igsh|igshid|si|mc_\w+|_ga)$/i
+const withHttps = (s: string) => {
+  const v = s.trim()
+  if (!v) return null
+  const full = /^https?:\/\//i.test(v) ? v : 'https://' + v
+  try {
+    const u = new URL(full)
+    for (const k of [...u.searchParams.keys()]) if (TRACKING.test(k)) u.searchParams.delete(k)
+    return u.href
+  } catch { return full }
+}
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 // A profile link, @name or bare name: the Instagram profile link (null when it is neither)
 const instaLink = (s: string) => {
