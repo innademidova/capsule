@@ -60,7 +60,7 @@ const TOOLS = [
     occasions: strs,
   }),
   fn("link_candidates", "Attach wishlist pieces to a Looking for entry as options that could close it.", { entry_id: str, item_ids: strs }),
-  fn("add_note", "Save a rule or an insight to her notes (Shop tab).", {
+  fn("add_note", "Save a rule or an insight to her notes (Notes tab).", {
     kind: { type: "string", enum: ["rule", "insight"] }, title: str, body: str,
   }),
   fn("link_look", "Link items to one of her saved inspiration looks (the look then shows them, the item shows the look).", { inspiration_id: str, item_ids: strs }),

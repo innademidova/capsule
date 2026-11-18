@@ -5,8 +5,8 @@ import { Icon, Header, Photo, Chips, Section, Sheet } from './ui'
 import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
-// Notes in the Shop tab: "Looking for" (things to find, with or without a picture or a shop),
-// rules ("never buy satin pajamas") and insights. One rule at a time is shown as a reminder.
+// "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
+// rules ("never buy satin pajamas") and insights live in the Notes tab. One rule at a time is shown as a reminder.
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 const pathOf = (url: string) => { try { return decodeURIComponent(new URL(url).pathname).replace(/\/$/, '') } catch { return '' } }
@@ -259,6 +259,30 @@ export async function closeEntries(item: Item, shopping: ShopItem[], setShopping
 
 // --- Rules and insights ---
 
+export type NotesTab = 'rules' | 'insights'
+const NOTE_TABS: NotesTab[] = ['rules', 'insights']
+
+// Notes tab: her rules and insights
+export function NotesScreen({ tab }: { tab: NotesTab }) {
+  const { notes } = useStore()
+  const count = (x: NotesTab) => notes.filter(n => n.kind === (x === 'rules' ? 'rule' : 'insight')).length
+  return (
+    <div className="screen">
+      <Header title={t('nav.notes')} />
+      <div className="seg notes-seg">
+        {NOTE_TABS.map(x => (
+          <button key={x} className={tab === x ? 'on' : ''} onClick={() => tab !== x && location.replace('#/notes' + (x === 'rules' ? '' : '/' + x))}>
+            {t(`notes.tab.${x}`)}{count(x) > 0 && <span className="seg-count">{count(x)}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="notes-body">
+        {tab === 'rules' ? <Rules /> : <Insights />}
+      </div>
+    </div>
+  )
+}
+
 const replace = (n: Note) => (list: Note[]) => list.map(x => x.id === n.id ? n : x)
 
 export function RuleReminder() {
@@ -268,7 +292,7 @@ export function RuleReminder() {
   if (!rules.length) return null
   const r = rules[Math.floor(seed * rules.length)]
   return (
-    <button className="reminder" onClick={() => go('/shop/rules')}>
+    <button className="reminder" onClick={() => go('/notes')}>
       <span className="rule-mark"><Icon name="ban" /></span>
       <span className="reminder-text"><span className="eyebrow">{t('notes.remember')}</span><b>{r.title}</b></span>
     </button>

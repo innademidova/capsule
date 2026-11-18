@@ -5,7 +5,7 @@ import {
 } from './lib'
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState, Section } from './ui'
-import { FindList, RuleReminder, Rules, Insights } from './Notes'
+import { FindList, RuleReminder } from './Notes'
 import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
@@ -13,20 +13,12 @@ const priority = (p: number) => [1, 2, 3].includes(p) ? t(`shop.priority.${p}`) 
 
 type Gap = { name: string; category: string; why: string; priority: number }
 
-export type ShopTab = 'find' | 'rules' | 'insights'
-const TABS: ShopTab[] = ['find', 'rules', 'insights']
-
-// Shop tab: what she is looking for, her rules and insights, plus the AI checks
-export function Shop({ tab }: { tab: ShopTab }) {
-  const { requests, shopping, notes, setRequests, setShopping } = useStore()
+// Looking for tab: what she wants to find, "Before you buy" and the wardrobe check
+export function Shop() {
+  const { requests, shopping, setRequests, setShopping } = useStore()
   const [busy, setBusy] = useState(false)
   const gapsReq = requests.find(r => r.kind === 'gaps')
   const lastGaps = requests.find(r => r.kind === 'gaps' && r.status === 'done')
-  const counts: Record<ShopTab, number> = {
-    find: shopping.filter(s => !s.done).length,
-    rules: notes.filter(n => n.kind === 'rule').length,
-    insights: notes.filter(n => n.kind === 'insight').length,
-  }
 
   const analyze = async (mode: 'now') => {
     setBusy(true)
@@ -43,33 +35,22 @@ export function Shop({ tab }: { tab: ShopTab }) {
 
   return (
     <div className="screen">
-      <Header title={t('shop.title')}
-        right={tab === 'find' ? <button className="icon-btn" onClick={() => go('/f/new')} aria-label={t('notes.newFind')}><Icon name="plus" /></button> : undefined} />
-      <div className="seg notes-seg">
-        {TABS.map(x => (
-          <button key={x} className={tab === x ? 'on' : ''} onClick={() => tab !== x && location.replace('#/shop' + (x === 'find' ? '' : '/' + x))}>
-            {t(`notes.tab.${x}`)}{counts[x] > 0 && <span className="seg-count">{counts[x]}</span>}
-          </button>
-        ))}
-      </div>
+      <Header title={t('nav.shop')}
+        right={<button className="icon-btn" onClick={() => go('/f/new')} aria-label={t('notes.newFind')}><Icon name="plus" /></button>} />
       <div className="notes-body">
-        {tab === 'find' && <>
-          <button className="card stylist-cta" onClick={() => go('/buy')}>
-            <span className="cta-icon"><Icon name="bag" /></span>
-            <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
-          </button>
-          <RuleReminder />
-          <FindList />
-          <div className="card find-check">
-            <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
-            {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
-              : <p className="muted">{t('shop.checkHint')}</p>}
-            {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
-            <AIActions label={lastGaps ? t('shop.checkAgain') : t('shop.checkMine')} onRun={analyze} busy={busy} />
-          </div>
-        </>}
-        {tab === 'rules' && <Rules />}
-        {tab === 'insights' && <Insights />}
+        <button className="card stylist-cta" onClick={() => go('/buy')}>
+          <span className="cta-icon"><Icon name="bag" /></span>
+          <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
+        </button>
+        <RuleReminder />
+        <FindList />
+        <div className="card find-check">
+          <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
+          {lastGaps ? <Gaps r={lastGaps} onAdd={g => addItem({ name: g.name, category: g.category, why: g.why, priority: g.priority })} inList={inList} />
+            : <p className="muted">{t('shop.checkHint')}</p>}
+          {gapsReq && gapsReq !== lastGaps && <RequestState req={gapsReq} />}
+          <AIActions label={lastGaps ? t('shop.checkAgain') : t('shop.checkMine')} onRun={analyze} busy={busy} />
+        </div>
       </div>
     </div>
   )

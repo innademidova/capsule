@@ -206,11 +206,11 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 14px);
   display: flex; gap: 2px; padding: 6px; border-radius: 999px; z-index: 10;
   background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); border: 1px solid var(--line);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); border: 1px solid var(--line); max-width: calc(100vw - 16px);
 }
 .tab {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 7px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 60px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap;
+  padding: 7px 5px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 52px;
 }
 .tab.on { background: var(--accent); color: var(--on-accent); }
 .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -221,7 +221,7 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
   .app.with-tabs { padding-left: 232px; }
   .app.with-tabs .screen { padding: 28px 32px 56px; }
   .tabbar {
-    top: 0; bottom: 0; left: 0; transform: none; width: 232px;
+    top: 0; bottom: 0; left: 0; transform: none; width: 232px; max-width: none;
     flex-direction: column; gap: 4px; padding: 28px 16px; border-radius: 0;
     background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none;
     border: 0; border-right: 1px solid var(--line); box-shadow: none;
@@ -543,7 +543,7 @@ details.card .dict-list { margin-top: 12px; }
 .carousel-nav.next .icon { transform: scaleX(-1); }
 .carousel-dots button { cursor: pointer; }
 
-/* Notes in the Shop tab: looking for, rules, insights */
+/* Looking for tab and Notes tab (rules, insights) */
 .notes-seg { margin-top: 0; }
 .seg-count { margin-left: 6px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--line); color: var(--muted); }
 .seg button.on .seg-count { background: var(--soft); color: var(--ink); }

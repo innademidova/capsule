@@ -13,15 +13,15 @@ import { OutfitList, OutfitDetail, OutfitEditor, WornForm } from './Outfits'
 import { StyleItem, Assistant } from './Looks'
 import { Profile, type ProfileTab } from './Profile'
 import { InspoList, InspoDetail } from './Inspo'
-import { Shop, BeforeBuy, type ShopTab } from './Shop'
-import { FindDetail } from './Notes'
+import { Shop, BeforeBuy } from './Shop'
+import { FindDetail, NotesScreen, type NotesTab } from './Notes'
 import { AgentButton, type AgentContext } from './Agent'
 
 // Routes live after # so they work on GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'outfit-photo' } | { view: 'stylist' }
-  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop'; tab: ShopTab } | { view: 'find'; id?: string }
+  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'notes'; tab: NotesTab } | { view: 'find'; id?: string }
   | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
 
 // What the assistant should know about the open screen
@@ -49,7 +49,9 @@ function parse(hash: string): Route {
   if (a === 'style' && b) return { view: 'style', id: b }
   if (a === 'inspo') return { view: 'inspo' }
   if (a === 'n' && b) return { view: 'insp', id: b }
-  if (a === 'shop') return { view: 'shop', tab: b === 'rules' || b === 'insights' ? b : 'find' }
+  if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', tab: b } // old link
+  if (a === 'shop') return { view: 'shop' }
+  if (a === 'notes') return { view: 'notes', tab: b === 'insights' ? 'insights' : 'rules' }
   if (a === 'f' && b) return { view: 'find', id: b === 'new' ? undefined : b }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me', tab: (b || 'overview') as ProfileTab }
@@ -207,7 +209,8 @@ function Main({ email }: { email: string }) {
     case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
     case 'inspo': screen = <InspoList />; break
     case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
-    case 'shop': screen = <Shop tab={route.tab} />; break
+    case 'shop': screen = <Shop />; break
+    case 'notes': screen = <NotesScreen tab={route.tab} />; break
     case 'find': {
       const s = shopping.find(x => x.id === route.id)
       screen = route.id && !s ? notFound : <FindDetail key={route.id ?? 'new'} entry={s} />
@@ -224,6 +227,7 @@ function Main({ email }: { email: string }) {
     { id: 'outfits', icon: 'layers', path: '/outfits' },
     { id: 'inspo', icon: 'image', path: '/inspo' },
     { id: 'shop', icon: 'bag', path: '/shop' },
+    { id: 'notes', icon: 'note', path: '/notes' },
     { id: 'me', icon: 'user', path: '/me' },
   ]
   const editing = route.view === 'item-edit' || route.view === 'outfit-edit' || route.view === 'outfit-photo'

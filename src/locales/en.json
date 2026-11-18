@@ -43,7 +43,8 @@
     "wardrobe": "Wardrobe",
     "outfits": "Outfits",
     "inspo": "Inspo",
-    "shop": "Shop",
+    "shop": "Looking for",
+    "notes": "Notes",
     "me": "Profile"
   },
   "wardrobe": {
@@ -265,7 +266,6 @@
       "2": "Good to have",
       "3": "Someday"
     },
-    "title": "Shopping",
     "beforeBuy": "Before you buy",
     "beforeBuyHint": "Snap the item in the shop: does it really fit your wardrobe?",
     "check": "Wardrobe check",
@@ -505,7 +505,6 @@
   },
   "notes": {
     "tab": {
-      "find": "Looking for",
       "rules": "Rules",
       "insights": "Insights"
     },

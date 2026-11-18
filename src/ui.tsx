@@ -22,6 +22,7 @@ const PATHS: Record<string, string> = {
   camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   check: 'M5 12l5 5 9-10',
   bag: 'M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2',
+  note: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5',
   sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
   layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
