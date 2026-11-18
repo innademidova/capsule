@@ -37,8 +37,21 @@ export function FindList() {
   const done = shopping.filter(s => s.done)
   const groupOf = (s: ShopItem) => CATEGORIES.some(c => c.id === s.category) ? s.category! : ''
   const groups = [...CATEGORIES, { id: '', label: t('notes.other') }].filter(c => todo.some(s => groupOf(s) === c.id))
+  // Ticking moves the entry to "Bought" at the bottom; a toast says so and can undo it
+  const [moved, setMoved] = useState<ShopItem | null>(null)
+  const timer = useRef<number>(0)
   const toggle = async (s: ShopItem) => {
-    try { setShopping(upsert(await saveEntry(s.id, { done: !s.done }))) } catch (e) { alert((e as Error).message) }
+    try {
+      setShopping(upsert(await saveEntry(s.id, { done: !s.done })))
+      window.clearTimeout(timer.current)
+      setMoved(s.done ? null : s)
+      if (!s.done) timer.current = window.setTimeout(() => setMoved(null), 6000)
+    } catch (e) { alert((e as Error).message) }
+  }
+  const undo = async () => {
+    if (!moved) return
+    window.clearTimeout(timer.current); setMoved(null)
+    try { setShopping(upsert(await saveEntry(moved.id, { done: false }))) } catch (e) { alert((e as Error).message) }
   }
 
   if (!shopping.length) return (
@@ -69,6 +82,12 @@ export function FindList() {
           <div className="find-list">{done.map(s => <FindRow key={s.id} s={s} onToggle={toggle} />)}</div>
         </details>
       )}
+      {moved && (
+        <div className="toast" role="status">
+          <span>{t('shop.movedToBought', { name: moved.name })}</span>
+          <button className="toast-btn" onClick={undo}>{t('shop.undo')}</button>
+        </div>
+      )}
     </>
   )
 }
@@ -78,7 +97,8 @@ function FindRow({ s, onToggle }: { s: ShopItem; onToggle: (s: ShopItem) => void
   const meta = s.priority === 3 || s.occasions.length > 0 || s.links.length > 0 || cands.length > 0
   return (
     <div className={'find-row' + (s.done ? ' done' : '')}>
-      <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)} aria-label={t('shop.markBought')}><Icon name="check" /></button>
+      <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)}
+        aria-label={s.done ? t('shop.markNotBought') : t('shop.markBought')} title={s.done ? t('shop.markNotBought') : t('shop.markBought')}><Icon name="check" /></button>
       <button className="find-body" onClick={() => go(`/f/${s.id}`)}>
         <span className="find-name">{s.name}{s.priority === 1 && !s.done && <span className="pill p1">{priorityLabel(1)}</span>}</span>
         {s.why && <span className="find-why">{s.why}</span>}

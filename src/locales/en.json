@@ -296,7 +296,10 @@
     "pairsWith_one": "Goes with {{count}} of your items",
     "pairsWith_other": "Goes with {{count}} of your items",
     "similar": "You already have similar",
-    "ideas": "Outfit ideas"
+    "ideas": "Outfit ideas",
+    "movedToBought": "\"{{name}}\" moved to Bought",
+    "undo": "Undo",
+    "markNotBought": "Not bought yet"
   },
   "profile": {
     "title": "My profile",

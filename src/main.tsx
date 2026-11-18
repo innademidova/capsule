@@ -16,8 +16,10 @@ registerSW({
 })
 
 // Chip rows scroll sideways: with a mouse wheel the vertical turn moves them left and right
+// (the category row, the Looking for filter, mini item lists and segment bars)
+const SIDEWAYS = '.cat-row, .chips, .mini-list, .seg'
 document.addEventListener('wheel', e => {
-  const row = (e.target as Element | null)?.closest?.('.cat-row') as HTMLElement | null
+  const row = (e.target as Element | null)?.closest?.(SIDEWAYS) as HTMLElement | null
   if (!row || row.scrollWidth <= row.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
   const max = row.scrollWidth - row.clientWidth
   if ((e.deltaY < 0 && row.scrollLeft <= 0) || (e.deltaY > 0 && row.scrollLeft >= max)) return

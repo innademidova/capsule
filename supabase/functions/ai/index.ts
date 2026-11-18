@@ -295,7 +295,7 @@ need: 1 = must have: fills a real gap, combines with many of her pieces, many sa
 combines with little or does not suit her style.
 Be strict: about a third at most are must-haves. When several pieces do the same job (e.g. three rain jackets, two pairs of loafers), at most
 one of them is a must-have; the others are 2 or 3 and the why names the better one.
-why: max 12 words in ${L}. summary: 1–2 sentences in ${L} on what her wishlist really needs.` }] };
+why: max 12 words in ${L}; name other pieces by a short name (e.g. "the black loafers"), never by id. summary: 1–2 sentences in ${L} on what her wishlist really needs.` }] };
     }
     case "buy": {
       if (!r.image_path) throw new Error("No photo of the item");
