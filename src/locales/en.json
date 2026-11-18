@@ -519,5 +519,38 @@
     "showAll": "Read in full",
     "showLess": "Show less",
     "confirmDeleteNote": "Delete this note?"
+  },
+  "wish": {
+    "need1": "Must have",
+    "need2": "Good to have",
+    "need3": "Someday",
+    "needTitle": "How much I need it",
+    "rate": "Rate my wishlist",
+    "rateAgain": "Rate again",
+    "rateHint": "The AI checks every piece against your wardrobe, rules and saved looks and marks it must have, good to have or someday."
+  },
+  "agent": {
+    "title": "Assistant",
+    "newChat": "New chat",
+    "here": "Here: {{place}}",
+    "aLook": "a saved look",
+    "placeholder": "Ask anything: a look, shoes for this, rate my wishlist…",
+    "send": "Send",
+    "cost": "OpenAI ≈1–3¢ per message. Pictures only when you tap “{{draw}}”.",
+    "thinking": "Thinking…",
+    "error": "Could not answer: {{msg}}",
+    "empty": "Ask me anything about your wardrobe. I can see which screen you are on, change things in the app and suggest looks.",
+    "ex1": "Pick shoes for this",
+    "ex2": "Make an elegant look with this",
+    "ex3": "Rate my wishlist: what is a must have?",
+    "fromWish": "Not yours yet: {{list}}",
+    "did": {
+      "set_need": "Wishlist pieces marked: {{text}}",
+      "update_item": "Updated: {{text}}",
+      "add_looking_for": "Added to Looking for: {{text}}",
+      "link_candidates": "Options added to: {{text}}",
+      "add_note": "Saved to notes: {{text}}",
+      "link_look": "Linked to the look: {{text}}"
+    }
   }
 }

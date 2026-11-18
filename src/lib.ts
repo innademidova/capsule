@@ -26,9 +26,19 @@ export type Item = {
   thumb_path: string | null
   favorite: boolean
   wishlist: boolean
+  // Wishlist only: 1 = must have, 2 = good to have, 3 = someday (null = not rated); need_why = the short reason
+  need: number | null
+  need_why: string | null
   set_id: string | null
   created_at: string
   updated_at: string
+}
+
+// Assistant chat (Edge Function 'agent', table agent_messages)
+export type AgentCard = { label: string; item_ids: string[]; why: string; scene: string; image_path?: string | null; outfit_id?: string | null }
+export type AgentMessage = {
+  id: string; thread_id: string; role: 'user' | 'assistant'; content: string
+  cards: AgentCard[]; actions: { tool: string; text: string }[]; created_at: string
 }
 
 export type Option = { id: string; label: string }

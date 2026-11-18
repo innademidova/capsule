@@ -3,7 +3,7 @@ import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle, kindLabel, kindId, materialLabel, materialName,
   processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
-import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel } from './ui'
+import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel, AIActions } from './ui'
 import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
@@ -24,9 +24,12 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
 }) {
   const [open, setOpen] = useState(false)
   const { inspirations } = useStore()
+  // Wishlist: filter by how much she needs a piece (must have / good to have / someday)
+  const [prio, setPrio] = useState(0)
   const f = filters
-  // Wishlist: how many saved looks need each piece; the most needed come first
+  // Wishlist: how many saved looks need each piece; must-haves first, then the most needed
   const need = (id: string) => wish ? looksFor(id, inspirations).length : 0
+  const rank = (i: Item) => wish ? i.need ?? 4 : 0
   const set = (patch: Partial<Filters>) => setFilters({ ...f, ...patch })
   const extra = f.colors.length + f.seasons.length + f.styles.length + f.occasions.length + (f.fav ? 1 : 0)
 
@@ -35,9 +38,10 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
     return items.filter(i =>
       (!f.category || i.category === f.category) && (!f.fav || i.favorite) &&
       anyOf(f.colors, i.colors) && anyOf(f.seasons, i.seasons) && anyOf(f.styles, i.styles) && anyOf(f.occasions, i.occasions) &&
-      (!q || [i.name, i.kind, i.kind && kindLabel(i.kind), i.brand, i.notes].some(s => s?.toLowerCase().includes(q))))
-      .sort((a, b) => need(b.id) - need(a.id))
-  }, [items, f, inspirations]) // eslint-disable-line react-hooks/exhaustive-deps
+      (!q || [i.name, i.kind, i.kind && kindLabel(i.kind), i.brand, i.notes].some(s => s?.toLowerCase().includes(q))) &&
+      (!prio || i.need === prio))
+      .sort((a, b) => rank(a) - rank(b) || need(b.id) - need(a.id))
+  }, [items, f, inspirations, prio]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const count = (cat: string) => items.filter(i => i.category === cat).length
   const newPath = wish ? '/i/new/wish' : '/i/new'
@@ -55,6 +59,7 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
         <button className={wish ? 'on' : ''} onClick={() => !wish && location.replace('#/wish')}>{t('wardrobe.wishlist')}</button>
       </div>
       {wish && <RuleReminder />}
+      {wish && items.length > 0 && <WishRating items={items} prio={prio} setPrio={setPrio} />}
 
       <div className="search">
         <Icon name="search" />
@@ -101,7 +106,8 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
           {shown.map(i => (
             <button key={i.id} className="tile" onClick={() => go(`/i/${i.id}`)}>
               <Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} />
-              {i.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
+              {wish && i.need ? <span className="tile-tags"><span className={`need-pill p${i.need}`}>{t(`wish.need${i.need}`)}</span>{i.favorite && <Icon name="heart" filled />}</span>
+                : i.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
               {need(i.id) > 0 && <span className="tile-need" title={t('item.inspiredBy', { count: need(i.id) })}><Icon name="image" />{need(i.id)}</span>}
               <span className="tile-name">{itemTitle(i)}</span>
               <span className="tile-colors">{i.colors.slice(0, 4).map(c => <Swatch key={c} id={c} size={10} />)}</span>
@@ -111,6 +117,58 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
       )}
 
       <button className="fab" onClick={() => go(newPath)} aria-label={t('wardrobe.addItem')}><Icon name="plus" /></button>
+    </div>
+  )
+}
+
+// Wishlist: how much she needs each piece. The AI rates them all (task 'wish_rank', the trigger writes items.need);
+// the chips filter the list; she can change any mark on the item page.
+function WishRating({ items, prio, setPrio }: { items: Item[]; prio: number; setPrio: (n: number) => void }) {
+  const { requests, setRequests, reload } = useStore()
+  const [busy, setBusy] = useState(false)
+  const last = requests.find(r => r.kind === 'wish_rank' && r.status === 'done')
+  const rated = items.filter(i => i.need).length
+  const rate = async () => {
+    setBusy(true)
+    try { setRequests(upsert(await askAI('wish_rank', {}, 'now'))); await reload() }
+    catch (e) { alert((e as Error).message) }
+    setBusy(false)
+  }
+  return (
+    <div className="card wish-rating">
+      {rated > 0 ? (
+        <div className="seg need-filter" role="tablist">
+          {[0, 1, 2, 3].map(n => (
+            <button key={n} role="tab" aria-selected={prio === n} className={prio === n ? 'on' : ''} onClick={() => setPrio(n)}>
+              {n ? t(`wish.need${n}`) : t('common.all')}<span className="seg-count">{n ? items.filter(i => i.need === n).length : items.length}</span>
+            </button>
+          ))}
+        </div>
+      ) : <p className="small muted">{t('wish.rateHint')}</p>}
+      {last && rated > 0 && <p className="small">{String((last.result as { summary?: string } | null)?.summary ?? '')}</p>}
+      <AIActions label={rated ? t('wish.rateAgain') : t('wish.rate')} cost="OpenAI ≈2¢" onRun={rate} busy={busy} />
+    </div>
+  )
+}
+
+// How much she needs a wishlist piece, set by hand (a tap on the active mark clears it)
+function NeedPicker({ item, onChange }: { item: Item; onChange: (i: Item) => void }) {
+  const set = async (n: number) => {
+    const need = item.need === n ? null : n
+    // A mark set by hand drops the AI's reason
+    const { data, error } = await supabase.from('items').update({ need, need_why: null }).eq('id', item.id).select().single()
+    if (error) return alert(error.message)
+    onChange(data as Item)
+  }
+  return (
+    <div className="card">
+      <h3 className="card-title">{t('wish.needTitle')}</h3>
+      <div className="seg need-pick" role="radiogroup">
+        {[1, 2, 3].map(n => (
+          <button key={n} role="radio" aria-checked={item.need === n} className={item.need === n ? 'on' : ''} onClick={() => set(n)}>{t(`wish.need${n}`)}</button>
+        ))}
+      </div>
+      {item.need_why && <p className="small muted">{item.need_why}</p>}
     </div>
   )
 }
@@ -212,6 +270,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
               <button className="btn primary" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> {t('item.buildOutfit')}</button>
             </div>
           </>}
+          {item.wishlist && <NeedPicker item={item} onChange={onChange} />}
           <InspiredBy item={item} />
           <ForEntries item={item} />
           {mates.length > 0 && (
@@ -240,7 +299,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
 
 // --- Add / edit ---
 
-type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path' | 'set_id' | 'more_photos'>
+type Draft = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'favorite' | 'wishlist' | 'photo_path' | 'thumb_path' | 'set_id' | 'more_photos' | 'need' | 'need_why'>
 // One piece cut out of an AI image of a set; tags come from AI per piece
 type Part = { path: string; url: string; blob: Blob; tags: Draft | null }
 

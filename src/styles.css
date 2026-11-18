@@ -617,3 +617,44 @@ details.card .dict-list { margin-top: 12px; }
 .composer-send .icon { width: 18px; height: 18px; }
 .note-form { gap: 14px; margin-top: 12px; }
 .find-detail .card > .btn.sm { margin-top: 10px; }
+
+/* Wishlist: how much she needs a piece */
+.tile-tags { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; color: var(--fav); }
+.tile-tags .icon { width: 16px; height: 16px; }
+.need-pill { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; background: var(--card); color: var(--muted); border: 1px solid var(--line); }
+.need-pill.p1 { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.need-pill.p2 { color: var(--ink); }
+.wish-rating { display: grid; gap: 10px; margin-bottom: 14px; }
+.wish-rating p { margin: 0; }
+.seg.need-filter, .seg.need-pick { margin: 0; max-width: none; }
+
+/* Assistant */
+.agent-fab {
+  position: fixed; z-index: 9; right: max(20px, calc(50vw - 530px)); bottom: calc(env(safe-area-inset-bottom) + 160px);
+  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.agent-fab .icon { width: 22px; height: 22px; }
+@media (min-width: 900px) { .agent-fab { bottom: 100px; right: max(36px, calc(50vw - 116px - 514px)); } }
+.app.editing .agent-fab { bottom: calc(env(safe-area-inset-bottom) + 96px); }
+.sheet.agent { height: 88dvh; }
+@media (min-width: 900px) { .sheet.agent { height: 84dvh; } }
+.agent-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
+.agent-place { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.agent-place .icon { width: 14px; height: 14px; flex: none; }
+.agent-empty { display: grid; gap: 12px; padding: 12px 0; }
+.agent-empty p { margin: 0; }
+.agent-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-msg { display: grid; gap: 8px; justify-items: start; }
+.agent-msg.user { justify-items: end; }
+.agent-msg .bubble { max-width: 88%; padding: 10px 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); white-space: pre-wrap; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.agent-msg.user .bubble { background: var(--accent); color: var(--on-accent); border-bottom-right-radius: 6px; }
+.agent-msg.assistant .bubble { border-bottom-left-radius: 6px; }
+.agent-msg .bubble.thinking { color: var(--muted); animation: pulse 1.6s ease-in-out infinite; }
+.agent-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-actions .chip { font-size: 12px; }
+.agent-actions .icon { width: 13px; height: 13px; }
+.agent-look { width: min(100%, 360px); }
+.agent-input { display: flex; align-items: flex-end; gap: 8px; }
+.agent-input textarea { flex: 1; resize: none; min-height: 44px; max-height: 160px; }
+.sheet.agent .sheet-foot .hint { margin: 6px 0 0; }

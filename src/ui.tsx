@@ -224,12 +224,12 @@ export function RequestState({ req, hideModel }: { req?: AIRequest; hideModel?: 
 
 // sticky: a tap outside does not close it, only the cross (or the sheet's own buttons).
 // The head (with the cross) and `top` stay in place while the body scrolls; `foot` stays at the bottom.
-export function Sheet({ title, onClose, children, sticky, top, foot }: {
-  title: string; onClose: () => void; children: ReactNode; sticky?: boolean; top?: ReactNode; foot?: ReactNode
+export function Sheet({ title, onClose, children, sticky, top, foot, className }: {
+  title: string; onClose: () => void; children: ReactNode; sticky?: boolean; top?: ReactNode; foot?: ReactNode; className?: string
 }) {
   return (
     <div className="sheet-bg" onClick={sticky ? undefined : onClose}>
-      <div className="sheet" onClick={e => e.stopPropagation()}>
+      <div className={'sheet' + (className ? ' ' + className : '')} onClick={e => e.stopPropagation()}>
         <div className="sheet-top">
           <div className="sheet-head"><h2>{title}</h2><button className="icon-btn sm" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button></div>
           {top}

@@ -10,7 +10,7 @@ import { t } from './i18n'
 const pick = (ids: string[], items: Item[]) => ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
 
 // Pieces of a look laid out flat, before there is a photo
-function FlatLay({ items }: { items: Item[] }) {
+export function FlatLay({ items }: { items: Item[] }) {
   return (
     <div className="look-flat">
       {items.map(i => <button key={i.id} onClick={() => go(`/i/${i.id}`)}><Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} /></button>)}

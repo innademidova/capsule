@@ -15,6 +15,7 @@ import { Profile, type ProfileTab } from './Profile'
 import { InspoList, InspoDetail } from './Inspo'
 import { Shop, BeforeBuy, type ShopTab } from './Shop'
 import { FindDetail } from './Notes'
+import { AgentButton, type AgentContext } from './Agent'
 
 // Routes live after # so they work on GitHub Pages
 type Route =
@@ -22,6 +23,16 @@ type Route =
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'stylist' }
   | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop'; tab: ShopTab } | { view: 'find'; id?: string }
   | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
+
+// What the assistant should know about the open screen
+function agentContext(r: Route): AgentContext {
+  const c: AgentContext = { screen: r.view }
+  if ((r.view === 'item' || r.view === 'style' || r.view === 'item-edit') && r.id) c.item_id = r.id
+  if ((r.view === 'outfit' || r.view === 'outfit-edit') && r.id) c.outfit_id = r.id
+  if (r.view === 'insp') c.inspiration_id = r.id
+  if (r.view === 'find' && r.id) c.entry_id = r.id
+  return c
+}
 
 function parse(hash: string): Route {
   const [a, b, c] = hash.replace(/^#\/?/, '').split('/')
@@ -217,6 +228,7 @@ function Main({ email }: { email: string }) {
     <StoreCtx.Provider value={store}>
       <div className={'app with-tabs' + (editing ? ' editing' : '')}>
         {screen}
+        <AgentButton context={agentContext(route)} />
         <nav className="tabbar" aria-label={t('nav.main')}>
           <div className="side-brand">Capsule</div>
           {tabs.map(x => (

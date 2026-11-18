@@ -85,6 +85,11 @@ const SCHEMAS: Record<string, unknown> = {
     missing: strs,
     note: str,
   }),
+  // How much she needs each wishlist piece; the apply_ai_result trigger writes need / need_why to items
+  wish_rank: obj({
+    items: { type: "array", items: obj({ id: str, need: { type: "integer", enum: [1, 2, 3] }, why: str }) },
+    summary: str,
+  }),
   buy: obj({
     verdict: { type: "string", enum: ["buy", "maybe", "skip"] }, summary: str,
     pairs_with: strs, similar: strs, outfit_ideas: strs,
@@ -266,6 +271,31 @@ palette: 3–6 hex colours that sum up the looks, main colour first.
 missing: up to 3 short ${L} names of pieces she does not have that would make these looks better (e.g. "white leather sneakers"), [] if nothing. Shoes count: she may have few in the app.
 note: one short sentence in ${L} if something important is missing for this request, else "".` });
       return { effort: "medium", content: blocks };
+    }
+    case "wish_rank": {
+      // Every wishlist piece against her wardrobe, rules, Looking for list and the saved looks that need it
+      const w = await wardrobe(sb);
+      const [own, wanted] = await Promise.all([rules(sb), lookingFor(sb)]);
+      const { data: wish } = await sb.from("items").select("id,category,kind,name,colors,styles,brand,notes").eq("wishlist", true).order("created_at");
+      const { data: insp } = await sb.from("inspirations").select("item_ids");
+      const { data: prof } = await sb.from("style_profile").select("summary").maybeSingle();
+      const looks = (id: string) => (insp ?? []).filter((x: { item_ids: string[] | null }) => (x.item_ids ?? []).includes(id)).length;
+      const list = ((wish ?? []) as Item[]).map(i => [i.id, i.category, i.kind ?? "", i.name ?? "", (i.colors as string[]).join("/"),
+        (i.styles as string[]).join("/"), i.brand ?? "", `saved looks that need it: ${looks(i.id)}`,
+        String(i.notes ?? "").replace(/\s+/g, " ").slice(0, 300)].join(" | ")).join("\n");
+      if (!list) throw new Error("The wishlist is empty");
+      return { effort: "medium", content: [{ type: "text", text: `${w.text}
+${own}${wanted}${prof?.summary ? `\nHER STYLE PROFILE: ${prof.summary}\n` : ""}
+HER WISHLIST (pieces she does not own yet; id | category | kind | name | colors | styles | brand | saved looks | notes with price):
+${list}
+
+Rate how much she needs each wishlist piece, judging by her wardrobe, style, rules and Looking for list. Rate every piece, use its id exactly.
+need: 1 = must have: fills a real gap, combines with many of her pieces, many saved looks need it or it answers a top item of her Looking for list;
+2 = good to have: useful, but she can do without it for now; 3 = someday / optional: duplicates what she has, breaks one of her rules,
+combines with little or does not suit her style.
+Be strict: about a third at most are must-haves. When several pieces do the same job (e.g. three rain jackets, two pairs of loafers), at most
+one of them is a must-have; the others are 2 or 3 and the why names the better one.
+why: max 12 words in ${L}. summary: 1–2 sentences in ${L} on what her wishlist really needs.` }] };
     }
     case "buy": {
       if (!r.image_path) throw new Error("No photo of the item");
