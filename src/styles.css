@@ -213,6 +213,8 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
   padding: 7px 5px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 52px;
 }
 .tab.on { background: var(--accent); color: var(--on-accent); }
+/* Six tabs must fit a 375px phone with the Ukrainian labels */
+@media (max-width: 400px) { .tab { padding: 7px 4px; font-size: 10.5px; } }
 .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .side-brand { display: none; }
 
