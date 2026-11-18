@@ -104,7 +104,9 @@ function AgentChat({ context, onClose }: { context: AgentContext; onClose: () =>
         <div className="agent-empty">
           <p className="muted">{t('agent.empty')}</p>
           <div className="agent-examples">
-            {['ex1', 'ex2', 'ex3'].map(k => <button key={k} className="chip" onClick={() => send(t(`agent.${k}`))}>{t(`agent.${k}`)}</button>)}
+            {(context.item_id ? ['ex1', 'ex2'] : ['ex3', 'ex4']).map(k => (
+              <button key={k} className="chip" onClick={() => { setText(t(`agent.${k}`)); input.current?.focus() }}>{t(`agent.${k}`)}</button>
+            ))}
           </div>
         </div>
       )}

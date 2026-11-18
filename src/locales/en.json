@@ -543,6 +543,7 @@
     "ex1": "Pick shoes for this",
     "ex2": "Make an elegant look with this",
     "ex3": "Rate my wishlist: what is a must have?",
+    "ex4": "What is missing in my wardrobe?",
     "fromWish": "Not yours yet: {{list}}",
     "did": {
       "set_need": "Wishlist pieces marked: {{text}}",
