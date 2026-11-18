@@ -685,3 +685,9 @@ details.card .dict-list { margin-top: 12px; }
 .toast-btn { flex: none; padding: 8px 12px; border-radius: 10px; font-weight: 700; color: inherit; background: rgba(255, 255, 255, 0.16); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (min-width: 900px) { .toast { left: calc(50% + 116px); bottom: 32px; } }
+
+/* Sideways chip rows can be dragged with the mouse (src/sideways.ts) */
+@media (hover: hover) and (pointer: fine) {
+  .can-drag { cursor: grab; }
+  .dragging, .dragging * { cursor: grabbing !important; user-select: none; }
+}
