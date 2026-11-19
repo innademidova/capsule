@@ -751,8 +751,9 @@ a.store-link { background: var(--soft); }
 .swipe-card .swipe-body > .card { box-shadow: none; }
 .swipe-card { box-shadow: var(--shadow); background: var(--card); }
 @media (hover: hover) and (pointer: fine) {
-  .swipe-del { width: 52px; }
-  .swipe-body { transition: transform .2s ease, margin-right .15s ease; }
-  .swipe:hover:not(.open) .swipe-body { margin-right: 52px; }
-  .swipe-del { background: transparent; color: var(--danger); }
+  /* With a mouse the trash only fades in; its place is kept free, so nothing moves on hover */
+  .swipe-del { width: 44px; background: transparent; color: var(--danger); opacity: 0; transition: opacity .15s ease; }
+  .swipe:hover .swipe-del, .swipe-del:focus-visible { opacity: 1; }
+  .swipe:not(.swipe-card) .swipe-body { margin-right: 44px; }
+  .swipe-card .swipe-del { z-index: 1; top: 10px; right: 10px; bottom: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--card); }
 }
