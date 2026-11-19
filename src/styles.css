@@ -592,7 +592,6 @@ details.card .dict-list { margin-top: 12px; }
 .link-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prio-seg { margin: 0; max-width: none; }
 
-  border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
 .rule-mark { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #f6dede; color: #9b2c2c; }
 .rule-mark .icon { width: 17px; height: 17px; }
 .rule-main { display: grid; gap: 8px; padding: 16px 18px 18px; margin-bottom: 12px; border-radius: var(--radius); background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow); }
