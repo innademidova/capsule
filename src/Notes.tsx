@@ -6,7 +6,7 @@ import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
 // "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
-// her notes and rules ("never buy satin pajamas") live in the Notes tab, one rule at a time is shown as a reminder.
+// her notes and rules ("never buy satin pajamas") live in the Notes tab and are shown only there.
 // Her favourite bloggers (notes of kind 'blogger') are shown in the Inspiration tab.
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
@@ -312,7 +312,7 @@ export async function closeEntries(item: Item, shopping: ShopItem[], setShopping
 
 const RULES_KEY = 'notes-rules-open'
 
-// #/notes/rules (the reminder) opens the rules block; otherwise it stays as she left it on this device
+// #/notes/rules opens the rules block; otherwise it stays as she left it on this device
 export function NotesScreen({ showRules }: { showRules?: boolean }) {
   const delNote = useDeleteNote()
   const { notes } = useStore()
