@@ -745,3 +745,18 @@ a.store-link { background: var(--soft); }
 }
 .linked-split { height: 1px; background: var(--line); margin: 6px 0 2px; }
 .mini.owned { opacity: .55; }
+/* Swipe-to-delete rows (SwipeRow): the red button sits behind the row */
+.swipe { position: relative; overflow: hidden; }
+.swipe + .swipe:not(.swipe-card) { border-top: 1px solid var(--line); }
+.swipe-body { position: relative; background: var(--card); transition: transform .2s ease; touch-action: pan-y; }
+.swipe-del { position: absolute; top: 0; right: 0; bottom: 0; width: 76px; display: grid; place-items: center; background: var(--danger); color: #fff; border: 0; }
+.swipe-card { border-radius: var(--radius, 20px); }
+.swipe-card .swipe-body { border-radius: inherit; }
+.swipe-card .swipe-body > .card { box-shadow: none; }
+.swipe-card { box-shadow: var(--shadow); background: var(--card); }
+@media (hover: hover) and (pointer: fine) {
+  .swipe-del { width: 52px; }
+  .swipe-body { transition: transform .2s ease, margin-right .15s ease; }
+  .swipe:hover:not(.open) .swipe-body { margin-right: 52px; }
+  .swipe-del { background: transparent; color: var(--danger); }
+}

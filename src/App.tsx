@@ -66,10 +66,32 @@ function parse(hash: string): Route {
 
 // How many steps we took inside the app, so that "back" never leaves it
 let depth = 0
-export const go = (path: string) => { depth++; location.hash = path }
+export const go = (path: string) => { depth++; forward = true; location.hash = path }
 export const back = (fallback: string) => {
-  if (depth > 0) { depth--; history.back() }
-  else location.replace('#' + fallback)
+  if (depth > 0) { depth--; returning = true; history.back() }
+  else { forward = true; location.replace('#' + fallback) }
+}
+
+// Scroll position per screen, so that going back lands where she left the list
+const scrolls = new Map<string, number>()
+let returning = false
+let forward = false // our own go(): setting the hash may fire popstate too
+let restoring = false
+window.addEventListener('popstate', () => { if (!forward) returning = true })
+window.addEventListener('scroll', () => { if (!restoring) scrolls.set(location.hash, window.scrollY) }, { passive: true })
+function settleScroll() {
+  const top = returning ? scrolls.get(location.hash) ?? 0 : 0
+  returning = false
+  forward = false
+  restoring = true
+  window.scrollTo(0, top)
+  // The list may need a few frames to render its full height
+  let tries = 30
+  const step = () => {
+    if (Math.abs(window.scrollY - top) > 2 && tries-- > 0) { window.scrollTo(0, top); requestAnimationFrame(step) }
+    else { restoring = false; scrolls.set(location.hash, window.scrollY) }
+  }
+  requestAnimationFrame(step)
 }
 
 export default function App() {
@@ -138,7 +160,7 @@ function Main({ email }: { email: string }) {
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    const on = () => { setRoute(parse(location.hash)); window.scrollTo(0, 0) }
+    const on = () => { setRoute(parse(location.hash)); settleScroll() }
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])

@@ -284,3 +284,44 @@ export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: strin
     </div>
   )
 }
+
+// A list row with a delete action behind it: swipe left on touch screens, hover with a mouse.
+// A tap on a row that is swiped open closes it instead of opening the row.
+export function SwipeRow({ onDelete, children, card }: { onDelete: () => void; children: ReactNode; card?: boolean }) {
+  const [dx, setDx] = useState(0)
+  const [drag, setDrag] = useState(false)
+  const start = useRef<{ x: number; y: number; dx: number; on: boolean } | null>(null)
+  const del = useRef<HTMLButtonElement>(null)
+  const width = () => del.current?.offsetWidth ?? 76
+  return (
+    <div className={'swipe' + (card ? ' swipe-card' : '') + (dx < 0 ? ' open' : '')}>
+      <button ref={del} className="swipe-del" onClick={() => { setDx(0); onDelete() }} aria-label={t('common.delete')} tabIndex={dx < 0 ? 0 : -1}>
+        <Icon name="trash" />
+      </button>
+      <div className="swipe-body" style={dx ? { transform: `translateX(${dx}px)`, transition: drag ? 'none' : undefined } : undefined}
+        onPointerDown={e => { if (e.pointerType !== 'mouse') start.current = { x: e.clientX, y: e.clientY, dx, on: false } }}
+        onPointerMove={e => {
+          const s = start.current
+          if (!s) return
+          const mx = e.clientX - s.x, my = e.clientY - s.y
+          if (!s.on) {
+            if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) { start.current = null; return }
+            if (Math.abs(mx) < 10) return
+            s.on = true; setDrag(true); e.currentTarget.setPointerCapture(e.pointerId)
+          }
+          setDx(Math.max(-width() * 1.3, Math.min(0, s.dx + mx)))
+        }}
+        onPointerUp={() => {
+          const s = start.current
+          start.current = null
+          if (!s?.on) return
+          setDx(d => (d < -width() / 2 ? -width() : 0))
+          setTimeout(() => setDrag(false))
+        }}
+        onPointerCancel={() => { start.current = null; setDrag(false); setDx(d => (d < -width() / 2 ? -width() : 0)) }}
+        onClickCapture={e => { if (drag || dx < 0) { e.preventDefault(); e.stopPropagation(); if (!drag) setDx(0) } }}>
+        {children}
+      </div>
+    </div>
+  )
+}

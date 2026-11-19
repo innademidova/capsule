@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { supabase, CATEGORIES, type Option, type Retailer } from './lib'
 import { useStore, upsert, without } from './store'
-import { Icon, Chips, Header, Section, Sheet } from './ui'
+import { Icon, Chips, Header, Section, Sheet, SwipeRow } from './ui'
 import { t } from './i18n'
 
 // What a store sells: the item categories plus a few store-only tags
@@ -76,8 +76,15 @@ export function Stores() {
 
 // Tap the text to edit; the globe opens the website, the Instagram icon the profile
 function StoreRow({ s, onEdit }: { s: Retailer; onEdit: () => void }) {
+  const { setStores } = useStore()
+  const del = async () => {
+    if (!confirm(t('stores.confirmDelete', { name: s.name }))) return
+    const { error } = await supabase.from('stores').delete().eq('id', s.id)
+    if (error) return alert(error.message)
+    setStores(without(s.id))
+  }
   return (
-    <div className="store-row">
+    <SwipeRow onDelete={del}><div className="store-row">
       <button className="store-body" onClick={onEdit}>
         <span className="find-name">
           {s.name}
@@ -95,7 +102,7 @@ function StoreRow({ s, onEdit }: { s: Retailer; onEdit: () => void }) {
           ? <a className="store-link" href={s.instagram} target="_blank" rel="noopener noreferrer" title={instaName(s.instagram)} aria-label="Instagram"><Icon name="instagram" /></a>
           : <span className="store-link" />}
       </span>
-    </div>
+    </div></SwipeRow>
   )
 }
 

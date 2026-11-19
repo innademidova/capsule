@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { supabase, CATEGORIES, OCCASIONS, categoryLabel, labelOf, itemTitle, type ShopItem, type Note, type Item } from './lib'
 import { useStore, upsert, without } from './store'
-import { Icon, Header, Photo, Chips, Section, Sheet } from './ui'
+import { Icon, Header, Photo, Chips, Section, Sheet, SwipeRow } from './ui'
 import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
@@ -116,10 +116,17 @@ export function FindList() {
 // byNeed: the list is grouped by urgency, so the row shows its type instead of the urgency pills
 function FindRow({ s, onToggle, byNeed }: { s: ShopItem; onToggle: (s: ShopItem) => void; byNeed?: boolean }) {
   const cands = useCandidates(s)
+  const { setShopping } = useStore()
+  const del = async () => {
+    if (!confirm(t('notes.confirmDelete', { name: s.name }))) return
+    const { error } = await supabase.from('shopping').delete().eq('id', s.id)
+    if (error) return alert(error.message)
+    setShopping(without(s.id))
+  }
   const showCat = byNeed && !!s.category
   const meta = (s.priority === 3 && !byNeed) || showCat || s.occasions.length > 0 || s.links.length > 0 || cands.length > 0
   return (
-    <div className={'find-row' + (s.done ? ' done' : '')}>
+    <SwipeRow onDelete={del}><div className={'find-row' + (s.done ? ' done' : '')}>
       <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)}
         aria-label={s.done ? t('shop.markNotBought') : t('shop.markBought')} title={s.done ? t('shop.markNotBought') : t('shop.markBought')}><Icon name="check" /></button>
       <button className="find-body" onClick={() => go(`/f/${s.id}`)}>
@@ -140,7 +147,7 @@ function FindRow({ s, onToggle, byNeed }: { s: ShopItem; onToggle: (s: ShopItem)
           </span>
         )}
       </button>
-    </div>
+    </div></SwipeRow>
   )
 }
 
@@ -307,6 +314,7 @@ const RULES_KEY = 'notes-rules-open'
 
 // #/notes/rules (the reminder) opens the rules block; otherwise it stays as she left it on this device
 export function NotesScreen({ showRules }: { showRules?: boolean }) {
+  const delNote = useDeleteNote()
   const { notes } = useStore()
   const [open, setOpen] = useState<Note | null>(null)
   const list = notes.filter(n => n.kind === 'insight')
@@ -319,12 +327,12 @@ export function NotesScreen({ showRules }: { showRules?: boolean }) {
         {list.length > 0 && (
           <div className="insights">
             {list.map((n, i) => (
-              <button key={n.id} className="card insight" onClick={() => setOpen(n)}>
+              <SwipeRow key={n.id} card onDelete={() => delNote(n)}><button className="card insight" onClick={() => setOpen(n)}>
                 <span className="insight-num">{String(i + 1).padStart(2, '0')}</span>
                 {n.title && <b className="insight-title">{n.title}</b>}
                 {n.body && <span className="insight-body">{n.body}</span>}
                 <span className="muted small">{formatDate(n.created_at)}</span>
-              </button>
+              </button></SwipeRow>
             ))}
           </div>
         )}
@@ -353,6 +361,7 @@ export function RuleReminder() {
 
 // Her shopping rules as one folding card: folded it shows the main rule, open it lists all of them and adds new ones
 function RulesBlock({ showRules }: { showRules?: boolean }) {
+  const delNote = useDeleteNote()
   const { notes } = useStore()
   const [edit, setEdit] = useState<Note | null>(null)
   const [open, setOpenS] = useState(() => {
@@ -382,10 +391,10 @@ function RulesBlock({ showRules }: { showRules?: boolean }) {
           {rest.length > 0 && (
             <div className="rule-list">
               {rest.map(n => (
-                <button key={n.id} className="rule-row" onClick={() => setEdit(n)}>
+                <SwipeRow key={n.id} onDelete={() => delNote(n)}><button className="rule-row" onClick={() => setEdit(n)}>
                   <span className="rule-mark"><Icon name="ban" /></span>
                   <span className="rule-text"><b>{n.title || n.body}</b>{n.title && n.body && <span className="muted">{n.body}</span>}</span>
-                </button>
+                </button></SwipeRow>
               ))}
             </div>
           )}
@@ -437,6 +446,7 @@ export function profileOf(raw: string): { title: string; url: string } | null {
 // Inspiration tab -> Bloggers (#/inspo/bloggers): her favourite fashion bloggers.
 // Tap opens the profile, the pencil edits the note; several links can be pasted at once
 export function Bloggers() {
+  const delNote = useDeleteNote()
   const { notes, inspirations, setNotes } = useStore()
   const [open, setOpen] = useState<Note | null>(null)
   const [text, setText] = useState('')
@@ -462,7 +472,7 @@ export function Bloggers() {
             // Her saved looks from this blogger: a few thumbnails, tap shows them all
             const looks = inspirations.filter(i => i.blogger_id === n.id)
             return (
-              <div key={n.id} className="blogger-row">
+              <SwipeRow key={n.id} onDelete={() => delNote(n)}><div className="blogger-row">
                 <a className="blogger-link" href={n.url ?? undefined} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')}>
                   <span className="blogger-ava">{n.title.replace(/^@/, '').charAt(0).toUpperCase()}</span>
                   <span className="blogger-text"><b>{n.title}</b>{n.body && <span className="muted small">{n.body}</span>}</span>
@@ -474,7 +484,7 @@ export function Bloggers() {
                   </button>
                 )}
                 <button className="icon-btn" onClick={() => setOpen(n)} aria-label={t('common.edit')}><Icon name="edit" /></button>
-              </div>
+              </div></SwipeRow>
             )
           })}
         </div>
@@ -558,4 +568,15 @@ function NoteSheet({ note, onClose }: { note: Note; onClose: () => void }) {
       </div>
     </Sheet>
   )
+}
+
+// Delete a note, rule or blogger straight from a list (swipe or hover)
+function useDeleteNote() {
+  const { setNotes } = useStore()
+  return async (n: Note) => {
+    if (!confirm(t('notes.confirmDeleteNote'))) return
+    const { error } = await supabase.from('notes').delete().eq('id', n.id)
+    if (error) return alert(error.message)
+    setNotes(without(n.id))
+  }
 }
