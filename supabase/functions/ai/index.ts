@@ -119,7 +119,7 @@ async function wardrobe(sb: SupabaseClient) {
   return { list, text: `HER WARDROBE (${list.length} items; id | category | kind | name | colors | seasons | styles | occasions | brand | composition | notes | set; items with the same set code are one suit or co-ord, made in the same fabric: they can be worn together or split up; category "sleep" is pajamas and loungewear, use it only when the request is about home or sleep):\n${text || "(empty)"}` };
 }
 
-// Her own shopping rules (Notes tab -> Rules): the wardrobe check and "Before you buy" must respect them
+// Her own shopping rules (Notes tab -> My rules): the wardrobe check and "Before you buy" must respect them
 async function rules(sb: SupabaseClient) {
   const { data } = await sb.from("notes").select("title,body").eq("kind", "rule").order("pinned", { ascending: false }).order("created_at");
   if (!data?.length) return "";

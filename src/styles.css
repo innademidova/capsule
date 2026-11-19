@@ -213,8 +213,12 @@ h1, h2, h3 { margin: 0; letter-spacing: -0.02em; }
   padding: 7px 5px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 52px;
 }
 .tab.on { background: var(--accent); color: var(--on-accent); }
-/* Six tabs must fit a 375px phone with the Ukrainian labels */
-@media (max-width: 400px) { .tab { padding: 7px 4px; font-size: 10.5px; } }
+/* Seven tabs on a phone: the bar spans the screen, each tab as wide as its label plus an even share of the rest */
+@media (max-width: 520px) {
+  .tabbar { left: 8px; right: 8px; transform: none; max-width: none; gap: 0; padding: 5px; }
+  .tab { flex: 1 1 auto; min-width: 0; padding: 7px 1px; font-size: 9.5px; letter-spacing: -0.01em; }
+  .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+}
 .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .side-brand { display: none; }
 
@@ -545,8 +549,8 @@ details.card .dict-list { margin-top: 12px; }
 .carousel-nav.next .icon { transform: scaleX(-1); }
 .carousel-dots button { cursor: pointer; }
 
-/* Looking for tab and Notes tab (rules, insights) */
-.notes-seg { margin-top: 0; }
+/* Looking for, Notes, Stores and the Inspiration switch */
+.screen-seg { margin-top: 0; }
 .seg-count { margin-left: 6px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--line); color: var(--muted); }
 .seg button.on .seg-count { background: var(--soft); color: var(--ink); }
 .notes-body { max-width: 720px; margin: 0 auto; }
@@ -607,6 +611,20 @@ details.card .dict-list { margin-top: 12px; }
 .rule-row + .rule-row { border-top: 1px solid var(--line); }
 .rule-text { display: grid; gap: 2px; padding-top: 4px; }
 .rule-text .muted { font-size: 13px; }
+
+/* Notes tab: the rules fold into one card above the notes */
+.rules-block { padding: 0; margin-bottom: 14px; }
+.rules-head { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 14px; }
+.rules-head-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.rules-head-text b { display: flex; align-items: center; font-size: 15px; }
+.rules-head-text .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rules-block.open .rules-head-text .muted { white-space: normal; }
+.rules-chevron { display: grid; color: var(--muted); transition: transform .2s; }
+.rules-block.open .rules-chevron { transform: rotate(180deg); }
+.rules-inner { padding: 0 14px 12px; }
+.rules-inner .rule-main { box-shadow: none; margin: 2px 0 4px; }
+.rules-inner .rule-list { padding: 0; }
+.rules-inner .composer { box-shadow: none; background: var(--soft); margin: 8px 0 0; }
 
 .insights { display: grid; gap: 12px; margin-bottom: 12px; }
 @media (min-width: 760px) { .insights { grid-template-columns: 1fr 1fr; align-items: start; } }

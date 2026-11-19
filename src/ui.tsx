@@ -37,6 +37,8 @@ const PATHS: Record<string, string> = {
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
   ban: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM5.6 5.6l12.8 12.8',
   send: 'M12 19V5M6 11l6-6 6 6',
+  chevron: 'M6 9l6 6 6-6',
+  store: 'M4 9l1.5-5h13L20 9M4 9h16M5 9v11h14V9M10 20v-5h4v5',
 }
 
 export function Icon({ name, filled }: { name: string; filled?: boolean }) {

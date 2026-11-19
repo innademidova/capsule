@@ -1,8 +1,8 @@
-// Notes tab "Stores": where she buys clothes or looks for them, with the website, Instagram, what they sell and a note
+// Stores tab (#/stores): where she buys clothes or looks for them, with the website, Instagram, what they sell and a note
 import { useState } from 'react'
 import { supabase, CATEGORIES, type Option, type Retailer } from './lib'
 import { useStore, upsert, without } from './store'
-import { Icon, Chips, Section, Sheet } from './ui'
+import { Icon, Chips, Header, Section, Sheet } from './ui'
 import { t } from './i18n'
 
 // What a store sells: the item categories plus a few store-only tags
@@ -56,17 +56,21 @@ export function Stores() {
   const match = (s: Retailer) => tag === ALL || (tag === 'regular' ? s.regular : tag === 'ua' ? s.ukrainian : s.tags.includes(tag))
   const list = stores.filter(match).sort((a, b) => Number(b.regular) - Number(a.regular) || a.name.localeCompare(b.name))
   return (
-    <>
-      <p className="notes-hint">{t('stores.hint')}</p>
-      {filters.length > 1 && (
-        <div className="find-filter">
-          <Chips options={[{ id: ALL, label: t('common.all') }, ...filters]} value={[tag]} onChange={v => setTag(v[0] ?? ALL)} multi={false} />
-        </div>
-      )}
-      {list.length > 0 && <div className="card store-list">{list.map(s => <StoreRow key={s.id} s={s} onEdit={() => setOpen(s)} />)}</div>}
-      <button className="btn wide store-add" onClick={() => setOpen('new')}><Icon name="plus" /> {t('stores.add')}</button>
+    <div className="screen">
+      <Header title={t('nav.stores')}
+        right={<button className="icon-btn" onClick={() => setOpen('new')} aria-label={t('stores.add')}><Icon name="plus" /></button>} />
+      <div className="notes-body">
+        <p className="notes-hint">{t('stores.hint')}</p>
+        {filters.length > 1 && (
+          <div className="find-filter">
+            <Chips options={[{ id: ALL, label: t('common.all') }, ...filters]} value={[tag]} onChange={v => setTag(v[0] ?? ALL)} multi={false} />
+          </div>
+        )}
+        {list.length > 0 && <div className="card store-list">{list.map(s => <StoreRow key={s.id} s={s} onEdit={() => setOpen(s)} />)}</div>}
+        <button className="btn wide store-add" onClick={() => setOpen('new')}><Icon name="plus" /> {t('stores.add')}</button>
+      </div>
       {open && <StoreSheet store={open === 'new' ? undefined : open} onClose={() => setOpen(null)} />}
-    </>
+    </div>
   )
 }
 

@@ -44,6 +44,7 @@
     "outfits": "Outfits",
     "inspo": "Inspo",
     "shop": "Looking for",
+    "stores": "Stores",
     "notes": "Notes",
     "me": "Profile"
   },
@@ -227,6 +228,10 @@
   },
   "inspo": {
     "title": "Inspiration",
+    "tab": {
+      "photos": "Photos",
+      "bloggers": "Bloggers"
+    },
     "add": "Add looks",
     "formulas": "My style formulas",
     "palette": "Palette: {{list}}",
@@ -509,12 +514,6 @@
     "storm": "storm"
   },
   "notes": {
-    "tab": {
-      "rules": "Rules",
-      "insights": "Insights",
-      "bloggers": "Bloggers",
-      "stores": "Stores"
-    },
     "other": "Other",
     "findEmpty": "Write down what you want to find, even without a photo or a shop: colour, fabric, doubts. Wishlist options can be attached later.",
     "newFind": "What are you looking for?",
@@ -534,16 +533,18 @@
     "forEntries": "Could tick off from “Looking for”",
     "alsoDone": "Mark “{{name}}” on your Looking for list as bought?",
     "remember": "Remember",
+    "rules": "My rules",
     "rulesHint": "What you already know about yourself. One rule at a time shows up in the wishlist and on the Looking for tab.",
     "insightsHint": "Thoughts and discoveries about style and shopping, so they don't get lost.",
     "main": "Main rule",
     "rulePlaceholder": "New rule… The first line becomes the title",
     "insightPlaceholder": "Write a thought… The first line becomes the title",
     "rule": "Rule",
-    "insight": "Insight",
+    "insight": "Note",
     "title": "Title",
     "text": "Text",
     "pin": "Main: show it first and large",
+    "isRule": "Rule: show it in the rules block and as a reminder",
     "showAll": "Read in full",
     "showLess": "Show less",
     "confirmDeleteNote": "Delete this note?",

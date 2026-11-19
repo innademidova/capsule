@@ -3,11 +3,11 @@ import { supabase, CATEGORIES, OCCASIONS, categoryLabel, labelOf, itemTitle, typ
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, Chips, Section, Sheet } from './ui'
 import { go, back } from './App'
-import { Stores } from './Stores'
 import { t, formatDate } from './i18n'
 
 // "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
-// rules ("never buy satin pajamas"), insights and her favourite bloggers live in the Notes tab. One rule at a time is shown as a reminder.
+// her notes and rules ("never buy satin pajamas") live in the Notes tab, one rule at a time is shown as a reminder.
+// Her favourite bloggers (notes of kind 'blogger') are shown in the Inspiration tab.
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 const pathOf = (url: string) => { try { return decodeURIComponent(new URL(url).pathname).replace(/\/$/, '') } catch { return '' } }
@@ -301,28 +301,35 @@ export async function closeEntries(item: Item, shopping: ShopItem[], setShopping
   }
 }
 
-// --- Rules and insights ---
+// --- Notes tab: her notes, with the shopping rules folded into one block on top ---
 
-export type NotesTab = 'rules' | 'insights' | 'bloggers' | 'stores'
-const NOTE_TABS: NotesTab[] = ['rules', 'insights', 'bloggers', 'stores']
-const KIND: Record<Exclude<NotesTab, 'stores'>, Note['kind']> = { rules: 'rule', insights: 'insight', bloggers: 'blogger' }
+const RULES_KEY = 'notes-rules-open'
 
-// Notes tab: her rules, insights, favourite bloggers and stores
-export function NotesScreen({ tab }: { tab: NotesTab }) {
-  const { notes, stores } = useStore()
-  const count = (x: NotesTab) => x === 'stores' ? stores.length : notes.filter(n => n.kind === KIND[x]).length
+// #/notes/rules (the reminder) opens the rules block; otherwise it stays as she left it on this device
+export function NotesScreen({ showRules }: { showRules?: boolean }) {
+  const { notes } = useStore()
+  const [open, setOpen] = useState<Note | null>(null)
+  const list = notes.filter(n => n.kind === 'insight')
   return (
     <div className="screen">
       <Header title={t('nav.notes')} />
-      <div className="seg notes-seg">
-        {NOTE_TABS.map(x => (
-          <button key={x} className={tab === x ? 'on' : ''} onClick={() => tab !== x && location.replace('#/notes' + (x === 'rules' ? '' : '/' + x))}>
-            {t(`notes.tab.${x}`)}{count(x) > 0 && <span className="seg-count">{count(x)}</span>}
-          </button>
-        ))}
-      </div>
       <div className="notes-body">
-        {tab === 'rules' ? <Rules /> : tab === 'insights' ? <Insights /> : tab === 'bloggers' ? <Bloggers /> : <Stores />}
+        <p className="notes-hint">{t('notes.insightsHint')}</p>
+        <RulesBlock showRules={showRules} />
+        {list.length > 0 && (
+          <div className="insights">
+            {list.map((n, i) => (
+              <button key={n.id} className="card insight" onClick={() => setOpen(n)}>
+                <span className="insight-num">{String(i + 1).padStart(2, '0')}</span>
+                {n.title && <b className="insight-title">{n.title}</b>}
+                {n.body && <span className="insight-body">{n.body}</span>}
+                <span className="muted small">{formatDate(n.created_at)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <Composer kind="insight" />
+        {open && <NoteSheet note={open} onClose={() => setOpen(null)} />}
       </div>
     </div>
   )
@@ -337,35 +344,56 @@ export function RuleReminder() {
   if (!rules.length) return null
   const r = rules[Math.floor(seed * rules.length)]
   return (
-    <button className="reminder" onClick={() => go('/notes')}>
+    <button className="reminder" onClick={() => go('/notes/rules')}>
       <span className="rule-mark"><Icon name="ban" /></span>
       <span className="reminder-text"><span className="eyebrow">{t('notes.remember')}</span><b>{r.title}</b></span>
     </button>
   )
 }
 
-export function Rules() {
+// Her shopping rules as one folding card: folded it shows the main rule, open it lists all of them and adds new ones
+function RulesBlock({ showRules }: { showRules?: boolean }) {
   const { notes } = useStore()
-  const [open, setOpen] = useState<Note | null>(null)
+  const [edit, setEdit] = useState<Note | null>(null)
+  const [open, setOpenS] = useState(() => {
+    if (showRules) return true
+    try { return localStorage.getItem(RULES_KEY) === '1' } catch { return false }
+  })
+  const toggle = () => {
+    setOpenS(!open)
+    try { localStorage.setItem(RULES_KEY, open ? '0' : '1') } catch { /* private mode */ }
+  }
   const rules = notes.filter(n => n.kind === 'rule')
+  const main = rules.filter(n => n.pinned)
   const rest = rules.filter(n => !n.pinned)
   return (
-    <>
-      <p className="notes-hint">{t('notes.rulesHint')}</p>
-      {rules.filter(n => n.pinned).map(n => <MainRule key={n.id} n={n} onEdit={() => setOpen(n)} />)}
-      {rest.length > 0 && (
-        <div className="card rule-list">
-          {rest.map(n => (
-            <button key={n.id} className="rule-row" onClick={() => setOpen(n)}>
-              <span className="rule-mark"><Icon name="ban" /></span>
-              <span className="rule-text"><b>{n.title || n.body}</b>{n.title && n.body && <span className="muted">{n.body}</span>}</span>
-            </button>
-          ))}
+    <div className={'card rules-block' + (open ? ' open' : '')}>
+      <button className="rules-head" onClick={toggle} aria-expanded={open}>
+        <span className="rule-mark"><Icon name="ban" /></span>
+        <span className="rules-head-text">
+          <b>{t('notes.rules')}{rules.length > 0 && <span className="seg-count">{rules.length}</span>}</b>
+          <span className="muted small">{open || !main[0]?.title ? t('notes.rulesHint') : main[0].title}</span>
+        </span>
+        <span className="rules-chevron"><Icon name="chevron" /></span>
+      </button>
+      {open && (
+        <div className="rules-inner">
+          {main.map(n => <MainRule key={n.id} n={n} onEdit={() => setEdit(n)} />)}
+          {rest.length > 0 && (
+            <div className="rule-list">
+              {rest.map(n => (
+                <button key={n.id} className="rule-row" onClick={() => setEdit(n)}>
+                  <span className="rule-mark"><Icon name="ban" /></span>
+                  <span className="rule-text"><b>{n.title || n.body}</b>{n.title && n.body && <span className="muted">{n.body}</span>}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <Composer kind="rule" />
         </div>
       )}
-      <Composer kind="rule" />
-      {open && <NoteSheet note={open} onClose={() => setOpen(null)} />}
-    </>
+      {edit && <NoteSheet note={edit} onClose={() => setEdit(null)} />}
+    </div>
   )
 }
 
@@ -382,31 +410,6 @@ function MainRule({ n, onEdit }: { n: Note; onEdit: () => void }) {
       {n.body && <p className={'rule-main-body' + (long && !full ? ' clamp' : '')}>{full ? n.body : first}</p>}
       {long && <button className="link-btn" onClick={() => setFull(f => !f)}>{full ? t('notes.showLess') : t('notes.showAll')}</button>}
     </div>
-  )
-}
-
-export function Insights() {
-  const { notes } = useStore()
-  const [open, setOpen] = useState<Note | null>(null)
-  const list = notes.filter(n => n.kind === 'insight')
-  return (
-    <>
-      <p className="notes-hint">{t('notes.insightsHint')}</p>
-      {list.length > 0 && (
-        <div className="insights">
-          {list.map((n, i) => (
-            <button key={n.id} className="card insight" onClick={() => setOpen(n)}>
-              <span className="insight-num">{String(i + 1).padStart(2, '0')}</span>
-              {n.title && <b className="insight-title">{n.title}</b>}
-              {n.body && <span className="insight-body">{n.body}</span>}
-              <span className="muted small">{formatDate(n.created_at)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <Composer kind="insight" />
-      {open && <NoteSheet note={open} onClose={() => setOpen(null)} />}
-    </>
   )
 }
 
@@ -431,7 +434,8 @@ function profileOf(raw: string): { title: string; url: string } | null {
   } catch { return null }
 }
 
-// Her favourite fashion bloggers: tap opens the profile, the pencil edits the note; several links can be pasted at once
+// Inspiration tab -> Bloggers (#/inspo/bloggers): her favourite fashion bloggers.
+// Tap opens the profile, the pencil edits the note; several links can be pasted at once
 export function Bloggers() {
   const { notes, setNotes } = useStore()
   const [open, setOpen] = useState<Note | null>(null)
@@ -507,11 +511,13 @@ function NoteSheet({ note, onClose }: { note: Note; onClose: () => void }) {
   const [body, setBody] = useState(note.body)
   const [pinned, setPinned] = useState(note.pinned)
   const [url, setUrl] = useState(note.url ?? '')
+  const [kind, setKind] = useState(note.kind)
   const [busy, setBusy] = useState(false)
   const blogger = note.kind === 'blogger'
   const save = async () => {
     setBusy(true)
-    const patch = { title: title.trim(), body: body.trim(), pinned, ...(blogger ? { url: url.trim() || null } : {}) }
+    // A note can become a rule and back; only a rule can be the main one
+    const patch = { title: title.trim(), body: body.trim(), kind, pinned: kind === 'rule' && pinned, ...(blogger ? { url: url.trim() || null } : {}) }
     const { data, error } = await supabase.from('notes').update(patch).eq('id', note.id).select().single()
     setBusy(false)
     if (error) return alert(error.message)
@@ -524,14 +530,17 @@ function NoteSheet({ note, onClose }: { note: Note; onClose: () => void }) {
     setNotes(without(note.id)); onClose()
   }
   return (
-    <Sheet title={t(`notes.${note.kind}`)} onClose={onClose}>
+    <Sheet title={t(`notes.${kind}`)} onClose={onClose}>
       <div className="form note-form">
         <Section title={t(blogger ? 'notes.handle' : 'notes.title')}><input value={title} onChange={e => setTitle(e.target.value)} /></Section>
         {blogger && <Section title={t('notes.profileLink')}><input type="url" value={url} onChange={e => setUrl(e.target.value)} /></Section>}
         <Section title={t(blogger ? 'notes.likeWhat' : 'notes.text')}>
           <textarea rows={blogger ? 4 : 8} value={body} placeholder={blogger ? t('notes.likeWhatPlaceholder') : undefined} onChange={e => setBody(e.target.value)} />
         </Section>
-        {note.kind === 'rule' && (
+        {!blogger && (
+          <label className="check-row"><input type="checkbox" checked={kind === 'rule'} onChange={e => setKind(e.target.checked ? 'rule' : 'insight')} /><span><b>{t('notes.isRule')}</b></span></label>
+        )}
+        {kind === 'rule' && (
           <label className="check-row"><input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)} /><span><b>{t('notes.pin')}</b></span></label>
         )}
         <button className="btn primary wide" disabled={busy || !(title.trim() || body.trim())} onClick={save}>{busy ? t('common.saving') : t('common.save')}</button>

@@ -6,9 +6,41 @@ import {
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
 import { go, back } from './App'
+import { Bloggers } from './Notes'
 import { t } from './i18n'
 
-export function InspoList() {
+export type InspoTab = 'photos' | 'bloggers'
+
+// Two parts: her inspiration photos (#/inspo) and her favourite bloggers (#/inspo/bloggers)
+function InspoTabs({ tab }: { tab: InspoTab }) {
+  const { inspirations, notes } = useStore()
+  const tabs: { id: InspoTab; path: string; count: number }[] = [
+    { id: 'photos', path: '/inspo', count: inspirations.length },
+    { id: 'bloggers', path: '/inspo/bloggers', count: notes.filter(n => n.kind === 'blogger').length },
+  ]
+  return (
+    <div className="seg screen-seg" role="tablist">
+      {tabs.map(x => (
+        <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => tab !== x.id && location.replace('#' + x.path)}>
+          {t(`inspo.tab.${x.id}`)}{x.count > 0 && <span className="seg-count">{x.count}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function InspoList({ tab }: { tab: InspoTab }) {
+  if (tab === 'bloggers') return (
+    <div className="screen">
+      <Header title={t('inspo.title')} />
+      <InspoTabs tab={tab} />
+      <div className="notes-body"><Bloggers /></div>
+    </div>
+  )
+  return <InspoPhotos />
+}
+
+function InspoPhotos() {
   const { inspirations, profile, requests, setInspirations, setRequests, reload } = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -43,6 +75,7 @@ export function InspoList() {
       <Header title={t('inspo.title')} right={
         <button className="icon-btn" onClick={() => fileRef.current?.click()} aria-label={t('inspo.add')}><Icon name="plus" /></button>
       } />
+      <InspoTabs tab="photos" />
       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { add(e.target.files); e.target.value = '' }} />
 
       <div className="card formulas">

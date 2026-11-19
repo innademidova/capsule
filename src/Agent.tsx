@@ -55,7 +55,7 @@ function AgentChat({ context, onClose }: { context: AgentContext; onClose: () =>
     : context.outfit_id ? outfits.find(o => o.id === context.outfit_id)?.name || t('outfits.outfit')
     : context.inspiration_id ? t('agent.aLook')
     : context.entry_id ? shopping.find(s => s.id === context.entry_id)?.name
-    : ({ wardrobe: t('nav.wardrobe'), wishlist: t('wardrobe.wishlist'), outfits: t('nav.outfits'), inspo: t('nav.inspo'), shop: t('nav.shop'), notes: t('nav.notes') } as Record<string, string>)[context.screen]
+    : ({ wardrobe: t('nav.wardrobe'), wishlist: t('wardrobe.wishlist'), outfits: t('nav.outfits'), inspo: t('nav.inspo'), shop: t('nav.shop'), stores: t('nav.stores'), bloggers: t('inspo.tab.bloggers'), notes: t('nav.notes') } as Record<string, string>)[context.screen]
 
   const send = async (m = text.trim()) => {
     if (!m || !thread || busy) return

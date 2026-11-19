@@ -12,21 +12,23 @@ import { WardrobeList, ItemDetail, ItemForm, emptyFilters, type Filters } from '
 import { OutfitList, OutfitDetail, OutfitEditor, WornForm } from './Outfits'
 import { StyleItem, Assistant } from './Looks'
 import { Profile, type ProfileTab } from './Profile'
-import { InspoList, InspoDetail } from './Inspo'
+import { InspoList, InspoDetail, type InspoTab } from './Inspo'
 import { Shop, BeforeBuy } from './Shop'
-import { FindDetail, NotesScreen, type NotesTab } from './Notes'
+import { FindDetail, NotesScreen } from './Notes'
+import { Stores } from './Stores'
 import { AgentButton, type AgentContext } from './Agent'
 
 // Routes live after # so they work on GitHub Pages
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'outfit-photo' } | { view: 'stylist' }
-  | { view: 'style'; id: string } | { view: 'inspo' } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'notes'; tab: NotesTab } | { view: 'find'; id?: string }
+  | { view: 'style'; id: string } | { view: 'inspo'; tab: InspoTab } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'stores' }
+  | { view: 'notes'; rules?: boolean } | { view: 'find'; id?: string }
   | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
 
 // What the assistant should know about the open screen
 function agentContext(r: Route): AgentContext {
-  const c: AgentContext = { screen: r.view }
+  const c: AgentContext = { screen: r.view === 'inspo' && r.tab === 'bloggers' ? 'bloggers' : r.view }
   if ((r.view === 'item' || r.view === 'style' || r.view === 'item-edit') && r.id) c.item_id = r.id
   if ((r.view === 'outfit' || r.view === 'outfit-edit') && r.id) c.outfit_id = r.id
   if (r.view === 'insp') c.inspiration_id = r.id
@@ -47,11 +49,14 @@ function parse(hash: string): Route {
   if (a === 'o' && b) return { view: 'outfit', id: b }
   if (a === 'stylist') return { view: 'stylist' }
   if (a === 'style' && b) return { view: 'style', id: b }
-  if (a === 'inspo') return { view: 'inspo' }
+  if (a === 'inspo') return { view: 'inspo', tab: b === 'bloggers' ? 'bloggers' : 'photos' }
   if (a === 'n' && b) return { view: 'insp', id: b }
-  if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', tab: b } // old link
+  if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', rules: b === 'rules' } // old link
   if (a === 'shop') return { view: 'shop' }
-  if (a === 'notes') return { view: 'notes', tab: b === 'insights' || b === 'bloggers' || b === 'stores' ? b : 'rules' }
+  if (a === 'stores') return { view: 'stores' }
+  if (a === 'notes' && b === 'bloggers') return { view: 'inspo', tab: 'bloggers' } // old link
+  if (a === 'notes' && b === 'stores') return { view: 'stores' } // old link
+  if (a === 'notes') return { view: 'notes', rules: b === 'rules' }
   if (a === 'f' && b) return { view: 'find', id: b === 'new' ? undefined : b }
   if (a === 'buy') return { view: 'buy' }
   if (a === 'me') return { view: 'me', tab: (b || 'overview') as ProfileTab }
@@ -209,10 +214,11 @@ function Main({ email }: { email: string }) {
       break
     case 'stylist': screen = <Assistant />; break
     case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
-    case 'inspo': screen = <InspoList />; break
+    case 'inspo': screen = <InspoList tab={route.tab} />; break
     case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
     case 'shop': screen = <Shop />; break
-    case 'notes': screen = <NotesScreen tab={route.tab} />; break
+    case 'stores': screen = <Stores />; break
+    case 'notes': screen = <NotesScreen key={String(route.rules)} showRules={route.rules} />; break
     case 'find': {
       const s = shopping.find(x => x.id === route.id)
       screen = route.id && !s ? notFound : <FindDetail key={route.id ?? 'new'} entry={s} />
@@ -229,6 +235,7 @@ function Main({ email }: { email: string }) {
     { id: 'outfits', icon: 'layers', path: '/outfits' },
     { id: 'inspo', icon: 'image', path: '/inspo' },
     { id: 'shop', icon: 'bag', path: '/shop' },
+    { id: 'stores', icon: 'store', path: '/stores' },
     { id: 'notes', icon: 'note', path: '/notes' },
     { id: 'me', icon: 'user', path: '/me' },
   ]
