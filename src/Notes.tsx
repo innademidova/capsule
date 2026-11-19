@@ -414,7 +414,7 @@ function MainRule({ n, onEdit }: { n: Note; onEdit: () => void }) {
 }
 
 // A profile link or @name: what to show and where it leads (a bare name is an Instagram account)
-function profileOf(raw: string): { title: string; url: string } | null {
+export function profileOf(raw: string): { title: string; url: string } | null {
   const s = raw.trim().replace(/[,;]+$/, '')
   if (!s) return null
   if (!/[/:]/.test(s)) {
@@ -437,7 +437,7 @@ function profileOf(raw: string): { title: string; url: string } | null {
 // Inspiration tab -> Bloggers (#/inspo/bloggers): her favourite fashion bloggers.
 // Tap opens the profile, the pencil edits the note; several links can be pasted at once
 export function Bloggers() {
-  const { notes, setNotes } = useStore()
+  const { notes, inspirations, setNotes } = useStore()
   const [open, setOpen] = useState<Note | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -458,15 +458,25 @@ export function Bloggers() {
       <p className="notes-hint">{t('notes.bloggersHint')}</p>
       {list.length > 0 && (
         <div className="card blogger-list">
-          {list.map(n => (
-            <div key={n.id} className="blogger-row">
-              <a className="blogger-link" href={n.url ?? undefined} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')}>
-                <span className="blogger-ava">{n.title.replace(/^@/, '').charAt(0).toUpperCase()}</span>
-                <span className="blogger-text"><b>{n.title}</b>{n.body && <span className="muted small">{n.body}</span>}</span>
-              </a>
-              <button className="icon-btn" onClick={() => setOpen(n)} aria-label={t('common.edit')}><Icon name="edit" /></button>
-            </div>
-          ))}
+          {list.map(n => {
+            // Her saved looks from this blogger: a few thumbnails, tap shows them all
+            const looks = inspirations.filter(i => i.blogger_id === n.id)
+            return (
+              <div key={n.id} className="blogger-row">
+                <a className="blogger-link" href={n.url ?? undefined} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')}>
+                  <span className="blogger-ava">{n.title.replace(/^@/, '').charAt(0).toUpperCase()}</span>
+                  <span className="blogger-text"><b>{n.title}</b>{n.body && <span className="muted small">{n.body}</span>}</span>
+                </a>
+                {looks.length > 0 && (
+                  <button className="blogger-looks" onClick={() => go(`/inspo/by/${n.id}`)} aria-label={t('inspo.byBlogger', { name: n.title })}>
+                    {looks.slice(0, 3).map(i => <Photo key={i.id} path={i.thumb_path ?? i.image_path} alt="" className="cover" />)}
+                    {looks.length > 3 && <span className="find-more">+{looks.length - 3}</span>}
+                  </button>
+                )}
+                <button className="icon-btn" onClick={() => setOpen(n)} aria-label={t('common.edit')}><Icon name="edit" /></button>
+              </div>
+            )
+          })}
         </div>
       )}
       <div className="composer">

@@ -638,3 +638,8 @@ alter table public.stores enable row level security;
 drop policy if exists "own rows" on public.stores;
 create policy "own rows" on public.stores for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 20261119_inspo_blogger.sql
+-- An inspiration can come from one of her favourite bloggers (notes of kind 'blogger'); optional
+alter table inspirations add column if not exists blogger_id uuid references notes(id) on delete set null;
+create index if not exists inspirations_blogger_idx on inspirations(blogger_id);

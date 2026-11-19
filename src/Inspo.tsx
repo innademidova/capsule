@@ -1,17 +1,18 @@
 import { useRef, useState } from 'react'
 import {
   supabase, processPhoto, uploadPhoto, removePhotos, askAI, categoryLabel, itemTitle, linkInspo, looksFor,
-  type Inspiration, type AIRequest, type ShopItem, type Item,
+  type Inspiration, type AIRequest, type ShopItem, type Item, type Note,
 } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
 import { go, back } from './App'
-import { Bloggers } from './Notes'
+import { Bloggers, profileOf } from './Notes'
 import { t } from './i18n'
 
 export type InspoTab = 'photos' | 'bloggers'
 
-// Two parts: her inspiration photos (#/inspo) and her favourite bloggers (#/inspo/bloggers)
+// Two parts: her inspiration photos (#/inspo, or one blogger's looks at #/inspo/by/<blogger note id>)
+// and her favourite bloggers (#/inspo/bloggers)
 function InspoTabs({ tab }: { tab: InspoTab }) {
   const { inspirations, notes } = useStore()
   const tabs: { id: InspoTab; path: string; count: number }[] = [
@@ -21,7 +22,7 @@ function InspoTabs({ tab }: { tab: InspoTab }) {
   return (
     <div className="seg screen-seg" role="tablist">
       {tabs.map(x => (
-        <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => tab !== x.id && location.replace('#' + x.path)}>
+        <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => location.hash !== '#' + x.path && location.replace('#' + x.path)}>
           {t(`inspo.tab.${x.id}`)}{x.count > 0 && <span className="seg-count">{x.count}</span>}
         </button>
       ))}
@@ -29,7 +30,7 @@ function InspoTabs({ tab }: { tab: InspoTab }) {
   )
 }
 
-export function InspoList({ tab }: { tab: InspoTab }) {
+export function InspoList({ tab, blogger }: { tab: InspoTab; blogger?: string }) {
   if (tab === 'bloggers') return (
     <div className="screen">
       <Header title={t('inspo.title')} />
@@ -37,11 +38,14 @@ export function InspoList({ tab }: { tab: InspoTab }) {
       <div className="notes-body"><Bloggers /></div>
     </div>
   )
-  return <InspoPhotos />
+  return <InspoPhotos blogger={blogger} />
 }
 
-function InspoPhotos() {
-  const { inspirations, profile, requests, setInspirations, setRequests, reload } = useStore()
+function InspoPhotos({ blogger }: { blogger?: string }) {
+  const { inspirations, notes, profile, requests, setInspirations, setRequests, reload } = useStore()
+  // One blogger's looks: photos added here are marked as theirs
+  const by = blogger ? notes.find(n => n.id === blogger) : undefined
+  const shown = blogger ? inspirations.filter(i => i.blogger_id === blogger) : inspirations
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [fBusy, setFBusy] = useState(false)
@@ -55,7 +59,7 @@ function InspoPhotos() {
     try {
       for (const f of [...files]) {
         const paths = await uploadPhoto(await processPhoto(f))
-        const { data, error } = await supabase.from('inspirations').insert({ image_path: paths.photo_path, thumb_path: paths.thumb_path }).select().single()
+        const { data, error } = await supabase.from('inspirations').insert({ image_path: paths.photo_path, thumb_path: paths.thumb_path, blogger_id: by?.id ?? null }).select().single()
         if (error) throw error
         last = data as Inspiration; setInspirations(upsert(last))
       }
@@ -78,7 +82,14 @@ function InspoPhotos() {
       <InspoTabs tab="photos" />
       <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { add(e.target.files); e.target.value = '' }} />
 
-      <div className="card formulas">
+      {blogger ? (
+        <div className="by-blogger">
+          <span className="blogger-ava">{(by?.title ?? '?').replace(/^@/, '').charAt(0).toUpperCase()}</span>
+          <span className="grow"><b>{t('inspo.byBlogger', { name: by?.title ?? '' })}</b>
+            {by?.url && <a className="muted small" href={by.url} target="_blank" rel="noopener noreferrer">{t('notes.openProfile')}</a>}</span>
+          <button className="icon-btn" onClick={() => location.replace('#/inspo')} aria-label={t('common.close')}><Icon name="x" /></button>
+        </div>
+      ) : <div className="card formulas">
         <h3 className="card-title"><Icon name="wand" /> {t('inspo.formulas')}</h3>
         {profile?.summary ? (
           <>
@@ -95,9 +106,9 @@ function InspoPhotos() {
         <AIActions label={profile?.summary ? t('inspo.updateFormulas') : t('inspo.findFormulas')} onRun={findFormulas} busy={fBusy}
           disabled={analyzed < 2} />
         {analyzed < 2 && <p className="hint">{t('inspo.needTwo', { count: analyzed })}</p>}
-      </div>
+      </div>}
 
-      {inspirations.length === 0 ? (
+      {blogger && !shown.length ? <p className="muted center pad">{t('inspo.byBloggerEmpty')}</p> : shown.length === 0 ? (
         <div className="empty">
           <Icon name="image" />
           <h2>{t('inspo.empty')}</h2>
@@ -106,7 +117,7 @@ function InspoPhotos() {
         </div>
       ) : (
         <div className="grid inspo-grid">
-          {inspirations.map(i => (
+          {shown.map(i => (
             <button key={i.id} className="inspo-tile" onClick={() => go(`/n/${i.id}`)}>
               <Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" />
               {i.analysis ? <span className="badge"><Icon name="check" /></span>
@@ -157,6 +168,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
       <div className="detail">
         <Photo path={insp.image_path} alt="" className="big cover-big" zoom />
         <div className="detail-info">
+          <BloggerPick insp={insp} />
           <LinkedItems insp={insp} />
           {!a && (
             <>
@@ -203,6 +215,49 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+const NEW = '+new'
+
+// Optional: which of her bloggers this look comes from (a random look has none). A new blogger can be added right here.
+function BloggerPick({ insp }: { insp: Inspiration }) {
+  const { notes, inspirations, setNotes, setInspirations } = useStore()
+  const bloggers = notes.filter(n => n.kind === 'blogger').sort((a, b) => a.title.localeCompare(b.title))
+  const cur = bloggers.find(b => b.id === insp.blogger_id)
+  const more = cur ? inspirations.filter(i => i.blogger_id === cur.id).length : 0
+  const set = async (blogger_id: string | null) => {
+    const { data, error } = await supabase.from('inspirations').update({ blogger_id }).eq('id', insp.id).select().single()
+    if (error) return alert(error.message)
+    setInspirations(upsert(data as Inspiration))
+  }
+  const pick = async (v: string) => {
+    if (v !== NEW) return set(v || null)
+    const p = profileOf(prompt(t('notes.bloggerPlaceholder')) ?? '')
+    if (!p) return
+    const have = bloggers.find(b => b.url === p.url)
+    if (have) return set(have.id)
+    const { data, error } = await supabase.from('notes').insert({ kind: 'blogger', ...p }).select().single()
+    if (error) return alert(error.message)
+    setNotes(x => [...x, data as Note])
+    await set((data as Note).id)
+  }
+  return (
+    <div className="card insp-blogger">
+      <div className="row">
+        <span className="blogger-ava">{cur ? cur.title.replace(/^@/, '').charAt(0).toUpperCase() : <Icon name="user" />}</span>
+        <label className="grow"><span className="eyebrow">{t('inspo.blogger')}</span>
+          <select value={cur?.id ?? ''} onChange={e => pick(e.target.value)}>
+            <option value="">{t('inspo.noBlogger')}</option>
+            {bloggers.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+            <option value={NEW}>{t('inspo.newBlogger')}</option>
+          </select>
+        </label>
+        {cur?.url && <a className="store-link" href={cur.url} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')} aria-label={t('notes.openProfile')}>
+          <Icon name={cur.url.includes('instagram.com') ? 'instagram' : 'link'} /></a>}
+      </div>
+      {more > 1 && <button className="link-btn" onClick={() => go(`/inspo/by/${cur!.id}`)}>{t('inspo.allFrom', { name: cur!.title, count: more })}</button>}
     </div>
   )
 }

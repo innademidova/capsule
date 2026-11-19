@@ -22,7 +22,7 @@ import { AgentButton, type AgentContext } from './Agent'
 type Route =
   | { view: 'wardrobe' } | { view: 'item'; id: string } | { view: 'item-edit'; id?: string; wish?: boolean } | { view: 'wishlist' }
   | { view: 'outfits' } | { view: 'outfit'; id: string } | { view: 'outfit-edit'; id?: string; with?: string } | { view: 'outfit-photo' } | { view: 'stylist' }
-  | { view: 'style'; id: string } | { view: 'inspo'; tab: InspoTab } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'stores' }
+  | { view: 'style'; id: string } | { view: 'inspo'; tab: InspoTab; blogger?: string } | { view: 'insp'; id: string } | { view: 'shop' } | { view: 'stores' }
   | { view: 'notes'; rules?: boolean } | { view: 'find'; id?: string }
   | { view: 'buy' } | { view: 'me'; tab: ProfileTab }
 
@@ -49,7 +49,7 @@ function parse(hash: string): Route {
   if (a === 'o' && b) return { view: 'outfit', id: b }
   if (a === 'stylist') return { view: 'stylist' }
   if (a === 'style' && b) return { view: 'style', id: b }
-  if (a === 'inspo') return { view: 'inspo', tab: b === 'bloggers' ? 'bloggers' : 'photos' }
+  if (a === 'inspo') return { view: 'inspo', tab: b === 'bloggers' ? 'bloggers' : 'photos', blogger: b === 'by' && c ? c : undefined }
   if (a === 'n' && b) return { view: 'insp', id: b }
   if (a === 'shop' && (b === 'rules' || b === 'insights')) return { view: 'notes', rules: b === 'rules' } // old link
   if (a === 'shop') return { view: 'shop' }
@@ -214,7 +214,7 @@ function Main({ email }: { email: string }) {
       break
     case 'stylist': screen = <Assistant />; break
     case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
-    case 'inspo': screen = <InspoList tab={route.tab} />; break
+    case 'inspo': screen = <InspoList tab={route.tab} blogger={route.blogger} />; break
     case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
     case 'shop': screen = <Shop />; break
     case 'stores': screen = <Stores />; break

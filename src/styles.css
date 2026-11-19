@@ -641,6 +641,18 @@ details.card .dict-list { margin-top: 12px; }
 .blogger-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .blogger-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (hover: hover) { .blogger-link:hover b { text-decoration: underline; } }
+/* A blogger's saved looks: overlapping thumbnails in the row, tap shows them all */
+.blogger-looks { display: inline-flex; align-items: center; padding: 4px 4px 4px 14px; flex: none; }
+.blogger-looks .photo { width: 30px; height: 40px; border-radius: 8px; margin-left: -10px; border: 2px solid var(--card); overflow: hidden; }
+/* Look page: which blogger it comes from */
+.insp-blogger { display: grid; gap: 8px; }
+.insp-blogger .row { gap: 12px; align-items: center; }
+.insp-blogger label { display: grid; gap: 2px; min-width: 0; }
+.insp-blogger select { width: 100%; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font: inherit; font-weight: 700; color: inherit; }
+.insp-blogger .blogger-ava .icon { width: 18px; height: 18px; color: var(--muted); }
+/* Inspiration filtered to one blogger */
+.by-blogger { display: flex; align-items: center; gap: 12px; padding: 4px 4px 12px; }
+.by-blogger .grow { display: grid; gap: 1px; min-width: 0; }
 .store-list { padding: 2px 6px 2px 14px; }
 .store-row { display: flex; gap: 6px; align-items: flex-start; }
 .store-row + .store-row { border-top: 1px solid var(--line); }

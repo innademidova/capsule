@@ -232,6 +232,12 @@
       "photos": "Photos",
       "bloggers": "Bloggers"
     },
+    "blogger": "Blogger",
+    "noBlogger": "No blogger",
+    "newBlogger": "+ Add a blogger…",
+    "byBlogger": "Looks from {{name}}",
+    "byBloggerEmpty": "No saved looks from this blogger yet. Add one with the + above.",
+    "allFrom": "All looks from {{name}} ({{count}})",
     "add": "Add looks",
     "formulas": "My style formulas",
     "palette": "Palette: {{list}}",
