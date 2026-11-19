@@ -268,7 +268,10 @@
     "wishEmpty": "Link the wishlist pieces this look needs.",
     "linkWish": "Link from the wishlist",
     "noWish": "Your wishlist is empty.",
-    "alreadyMine": "Already mine"
+    "ownTitle": "Matching pieces from my wardrobe",
+    "ownEmpty": "Link the pieces you already have that go with this look.",
+    "linkOwn": "Link from my wardrobe",
+    "noOwn": "Your wardrobe is empty."
   },
   "shop": {
     "toList": "List",

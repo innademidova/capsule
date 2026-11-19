@@ -262,32 +262,42 @@ function BloggerPick({ insp }: { insp: Inspiration }) {
   )
 }
 
-// Wishlist pieces this look needs: linked by hand, shown on the look and counted on each piece
+// Pieces linked to a look by hand: wishlist pieces to buy, and similar pieces she already owns
 function LinkedItems({ insp }: { insp: Inspiration }) {
-  const { items, wishlist, setInspirations } = useStore()
+  const { items, wishlist } = useStore()
+  return (
+    <div className="card">
+      <LinkedPart insp={insp} pool={wishlist} icon="bag" title={t('inspo.wishTitle')} empty={t('inspo.wishEmpty')} link={t('inspo.linkWish')} none={t('inspo.noWish')} />
+      <div className="linked-split" />
+      <LinkedPart insp={insp} pool={items} icon="hanger" title={t('inspo.ownTitle')} empty={t('inspo.ownEmpty')} link={t('inspo.linkOwn')} none={t('inspo.noOwn')} />
+    </div>
+  )
+}
+
+function LinkedPart({ insp, pool, icon, title, empty, link, none }: { insp: Inspiration; pool: Item[]; icon: string; title: string; empty: string; link: string; none: string }) {
+  const { setInspirations } = useStore()
   const [open, setOpen] = useState(false)
-  const all = [...wishlist, ...items]
-  const linked = (insp.item_ids ?? []).map(id => all.find(i => i.id === id)).filter((i): i is Item => !!i)
+  const linked = (insp.item_ids ?? []).map(id => pool.find(i => i.id === id)).filter((i): i is Item => !!i)
   const toggle = async (id: string, on: boolean) => {
     try { setInspirations(upsert(await linkInspo(insp, id, on))) } catch (e) { alert((e as Error).message) }
   }
   return (
-    <div className="card">
-      <h3 className="card-title"><Icon name="bag" /> {t('inspo.wishTitle')}</h3>
+    <>
+      <h3 className="card-title"><Icon name={icon} /> {title}</h3>
       {linked.length > 0 ? (
         <div className="mini-list">
           {linked.map(i => (
-            <button key={i.id} className={'mini' + (i.wishlist ? '' : ' owned')} onClick={() => go(`/i/${i.id}`)}>
+            <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}>
               <Photo path={i.thumb_path ?? i.photo_path} alt="" />
-              <span>{i.wishlist ? itemTitle(i) : t('inspo.alreadyMine')}</span>
+              <span>{itemTitle(i)}</span>
             </button>
           ))}
         </div>
-      ) : <p className="muted small">{t('inspo.wishEmpty')}</p>}
-      <button className="btn sm" onClick={() => setOpen(o => !o)}><Icon name={open ? 'check' : 'link'} /> {open ? t('common.done') : t('inspo.linkWish')}</button>
-      {open && (wishlist.length ? (
+      ) : <p className="muted small">{empty}</p>}
+      <button className="btn sm" onClick={() => setOpen(o => !o)}><Icon name={open ? 'check' : 'link'} /> {open ? t('common.done') : link}</button>
+      {open && (pool.length ? (
         <div className="pick-grid">
-          {wishlist.map(i => {
+          {pool.map(i => {
             const on = (insp.item_ids ?? []).includes(i.id)
             return (
               <button key={i.id} className={'pick' + (on ? ' on' : '')} onClick={() => toggle(i.id, !on)} aria-pressed={on}>
@@ -297,8 +307,8 @@ function LinkedItems({ insp }: { insp: Inspiration }) {
             )
           })}
         </div>
-      ) : <p className="muted small">{t('inspo.noWish')}</p>)}
-    </div>
+      ) : <p className="muted small">{none}</p>)}
+    </>
   )
 }
 

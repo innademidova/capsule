@@ -529,7 +529,6 @@ details.card .dict-list { margin-top: 12px; }
 .pick.look { aspect-ratio: 3 / 4; }
 .pick .photo { width: 100%; height: 100%; }
 .pick.on { border-color: var(--accent); }
-.mini.owned { opacity: .55; }
 .tile-need { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px 2px 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; }
 .tile-need .icon { width: 13px; height: 13px; }
 
@@ -744,3 +743,5 @@ a.store-link { background: var(--soft); }
   .can-drag { cursor: grab; }
   .dragging, .dragging * { cursor: grabbing !important; user-select: none; }
 }
+.linked-split { height: 1px; background: var(--line); margin: 6px 0 2px; }
+.mini.owned { opacity: .55; }

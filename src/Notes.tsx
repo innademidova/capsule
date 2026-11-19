@@ -196,7 +196,7 @@ function FindView({ entry, onEdit }: { entry: ShopItem; onEdit: () => void }) {
               {cands.map(i => (
                 <button key={i.id} className={'mini' + (i.wishlist ? '' : ' owned')} onClick={() => go(`/i/${i.id}`)}>
                   <Photo path={i.thumb_path ?? i.photo_path} alt="" />
-                  <span>{i.wishlist ? itemTitle(i) : t('inspo.alreadyMine')}</span>
+                  <span>{itemTitle(i)}</span>
                 </button>
               ))}
             </div>
