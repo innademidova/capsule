@@ -5,7 +5,7 @@ import {
 } from './lib'
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState, Section } from './ui'
-import { FindList, RuleReminder } from './Notes'
+import { FindList } from './Notes'
 import { go, back } from './App'
 import { t, formatDate } from './i18n'
 
@@ -42,7 +42,6 @@ export function Shop() {
           <span className="cta-icon"><Icon name="bag" /></span>
           <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
         </button>
-        <RuleReminder />
         <FindList />
         <div className="card find-check">
           <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>

@@ -345,20 +345,6 @@ export function NotesScreen({ showRules }: { showRules?: boolean }) {
 
 const replace = (n: Note) => (list: Note[]) => list.map(x => x.id === n.id ? n : x)
 
-export function RuleReminder() {
-  const { notes } = useStore()
-  const [seed] = useState(Math.random)
-  const rules = notes.filter(n => n.kind === 'rule' && n.title)
-  if (!rules.length) return null
-  const r = rules[Math.floor(seed * rules.length)]
-  return (
-    <button className="reminder" onClick={() => go('/notes/rules')}>
-      <span className="rule-mark"><Icon name="ban" /></span>
-      <span className="reminder-text"><span className="eyebrow">{t('notes.remember')}</span><b>{r.title}</b></span>
-    </button>
-  )
-}
-
 // Her shopping rules as one folding card: folded it shows the main rule, open it lists all of them and adds new ones
 function RulesBlock({ showRules }: { showRules?: boolean }) {
   const delNote = useDeleteNote()

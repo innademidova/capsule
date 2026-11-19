@@ -8,7 +8,7 @@ import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
 import { InspiredBy } from './Inspo'
-import { RuleReminder, ForEntries, closeEntries } from './Notes'
+import { ForEntries, closeEntries } from './Notes'
 
 // --- List ---
 
@@ -58,7 +58,6 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
         <button className={wish ? '' : 'on'} onClick={() => wish && location.replace('#/')}>{t('wardrobe.title')}</button>
         <button className={wish ? 'on' : ''} onClick={() => !wish && location.replace('#/wish')}>{t('wardrobe.wishlist')}</button>
       </div>
-      {wish && <RuleReminder />}
       {wish && items.length > 0 && <WishRating items={items} prio={prio} setPrio={setPrio} />}
 
       <div className="search">
