@@ -246,7 +246,7 @@ export function Sheet({ title, onClose, children, sticky, top, foot, className }
 }
 
 // Several photos of one item: swipe sideways, dots show where you are; each photo opens full screen
-export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: string; onRemove?: (path: string) => void }) {
+export function Carousel({ paths, alt, onRemove, photoClass = 'big' }: { paths: string[]; alt: string; onRemove?: (path: string) => void; photoClass?: string }) {
   const [at, setAt] = useState(0)
   const track = useRef<HTMLDivElement>(null)
   const onScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -275,7 +275,7 @@ export function Carousel({ paths, alt, onRemove }: { paths: string[]; alt: strin
       <div className="carousel-track" ref={track} onScroll={onScroll}>
         {paths.map((p, n) => (
           <div key={p} className="carousel-slide">
-            <Photo path={p} alt={alt} className="big" zoom />
+            <Photo path={p} alt={alt} className={photoClass} zoom />
             {onRemove && n > 0 && <button className="icon-btn sm carousel-del" onClick={() => onRemove(p)} aria-label={t('common.delete')}><Icon name="trash" /></button>}
           </div>
         ))}

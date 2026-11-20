@@ -379,7 +379,7 @@ export type Outfit = {
 }
 export type InspoPiece = { piece: string; category: string; status: 'have' | 'similar' | 'missing'; item_ids: string[]; note: string }
 export type InspoAnalysis = { summary: string; formula: string; pieces: InspoPiece[]; to_buy: string[]; tags: string[] }
-export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; item_ids: string[] /* linked items, mostly wishlist */; blogger_id: string | null /* notes kind 'blogger' */; created_at: string }
+export type Inspiration = { id: string; image_path: string; thumb_path: string | null; note: string | null; analysis: InspoAnalysis | null; item_ids: string[] /* linked items, mostly wishlist */; more_photos: string[] /* rest of an Instagram carousel */; blogger_id: string | null /* notes kind 'blogger' */; created_at: string }
 export type StyleProfile = { appearance: string | null; summary: string | null; formulas: { title: string; recipe: string }[]; palette: string[]; key_pieces: string[]; based_on: number; updated_at: string }
 // "Looking for" entry: why = free-text details; links to check; item_ids = wishlist candidates
 export type ShopItem = {

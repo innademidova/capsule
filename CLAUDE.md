@@ -84,7 +84,7 @@ Deploy the function: `npx supabase functions deploy ai --project-ref ajbdkvpyhoy
 3. Write `{"results":[{"id":…,"result":{…}}]}` and run `node scripts/ai-queue.mjs apply res.json`.
 4. Tell her briefly what was done; the app refreshes when she reopens it.
 
-**List gestures** (2026-11-19, her feedback): rows in Notes (notes, rules), Bloggers, Stores and Looking for can be deleted from the list (`SwipeRow` in `src/ui.tsx`: swipe left on touch; with a mouse a trash icon fades in on hover in a space kept free, top right on cards, so nothing moves; asks to confirm). Going back restores the scroll position of the screen she came from (`settleScroll` in App.tsx, positions per hash). A look's linked pieces are two parts: "To buy from the wishlist" and "Matching pieces from my wardrobe", each with its own picker.
+**List gestures** (2026-11-19, her feedback): rows in Notes (notes, rules), Bloggers, Stores and Looking for can be deleted from the list (`SwipeRow` in `src/ui.tsx`: swipe left on touch; with a mouse a trash icon fades in on hover in a space kept free, top right on cards, so nothing moves; asks to confirm). Going back restores the scroll position of the screen she came from (`settleScroll` in App.tsx, positions per hash). A saved look can have several photos (an Instagram carousel, 2026-11-20, `inspirations.more_photos`, migration `20261120_inspo_more_photos.sql`): carousel and "Add photos" on the look page, a layers badge on the grid tile. A look's linked pieces are two parts: "To buy from the wishlist" and "Matching pieces from my wardrobe", each with its own picker.
 
 ## Stack and layout
 

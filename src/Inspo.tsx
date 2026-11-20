@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import {
-  supabase, processPhoto, uploadPhoto, removePhotos, askAI, categoryLabel, itemTitle, linkInspo, looksFor,
+  supabase, processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, askAI, categoryLabel, itemTitle, linkInspo, looksFor,
   type Inspiration, type AIRequest, type ShopItem, type Item, type Note,
 } from './lib'
 import { useStore, upsert, without } from './store'
-import { Icon, Header, Photo, AIActions, RequestState } from './ui'
+import { Icon, Header, Photo, AIActions, RequestState, Carousel } from './ui'
 import { go, back } from './App'
 import { Bloggers, profileOf } from './Notes'
 import { t } from './i18n'
@@ -120,6 +120,7 @@ function InspoPhotos({ blogger }: { blogger?: string }) {
           {shown.map(i => (
             <button key={i.id} className="inspo-tile" onClick={() => go(`/n/${i.id}`)}>
               <Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" />
+              {i.more_photos?.length > 0 && <span className="tile-multi" title={t('inspo.photos', { count: i.more_photos.length + 1 })}><Icon name="layers" /></span>}
               {i.analysis ? <span className="badge"><Icon name="check" /></span>
                 : requests.some(r => r.kind === 'inspo' && r.input.inspiration_id === i.id && r.status === 'queued') && <span className="badge"><Icon name="clock" /></span>}
             </button>
@@ -138,6 +139,26 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
   const [note, setNote] = useState(insp.note ?? '')
   const req = requests.find(r => r.kind === 'inspo' && r.input.inspiration_id === insp.id)
   const a = insp.analysis
+  // More photos of the same look (an Instagram carousel), added and removed right here
+  const more = insp.more_photos ?? []
+  const moreRef = useRef<HTMLInputElement>(null)
+  const [adding, setAdding] = useState(false)
+  const setMore = async (next: string[]) => {
+    const { data, error } = await supabase.from('inspirations').update({ more_photos: next }).eq('id', insp.id).select().single()
+    if (error) throw error
+    setInspirations(upsert(data as Inspiration))
+  }
+  const addMore = async (files: FileList | null) => {
+    if (!files?.length) return
+    setAdding(true)
+    try { const added: string[] = []; for (const f of [...files]) added.push(await uploadExtraPhoto(f)); await setMore([...more, ...added]) }
+    catch (e) { alert((e as Error).message) }
+    setAdding(false)
+  }
+  const removeMore = async (path: string) => {
+    if (!confirm(t('item.confirmDeletePhoto'))) return
+    try { await setMore(more.filter(p => p !== path)); await removePhotos(path) } catch (e) { alert((e as Error).message) }
+  }
 
   const run = async (mode: 'now') => {
     setBusy(true)
@@ -152,7 +173,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
   const del = async () => {
     if (!confirm(t('inspo.confirmDelete'))) return
     await supabase.from('inspirations').delete().eq('id', insp.id)
-    await removePhotos(insp.image_path, insp.thumb_path)
+    await removePhotos(insp.image_path, insp.thumb_path, ...more)
     setInspirations(without(insp.id)); back('/inspo')
   }
   const toList = async (name: string) => {
@@ -166,7 +187,13 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
       <Header title="" left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label={t('common.back')}><Icon name="back" /></button>}
         right={<button className="icon-btn" onClick={del} aria-label={t('common.delete')}><Icon name="trash" /></button>} />
       <div className="detail">
-        <Photo path={insp.image_path} alt="" className="big cover-big" zoom />
+        <div className="carousel">
+          {more.length > 0
+            ? <Carousel paths={[insp.image_path, ...more]} alt="" onRemove={removeMore} photoClass="big cover-big" />
+            : <Photo path={insp.image_path} alt="" className="big cover-big" zoom />}
+          <input ref={moreRef} type="file" accept="image/*" multiple hidden onChange={e => { addMore(e.target.files); e.target.value = '' }} />
+          <button className="btn ghost sm" onClick={() => moreRef.current?.click()} disabled={adding}><Icon name="plus" /> {adding ? t('common.uploading') : t('item.addPhotos')}</button>
+        </div>
         <div className="detail-info">
           <BloggerPick insp={insp} />
           <LinkedItems insp={insp} />

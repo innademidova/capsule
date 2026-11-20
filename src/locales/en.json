@@ -271,7 +271,9 @@
     "ownTitle": "Matching pieces from my wardrobe",
     "ownEmpty": "Link the pieces you already have that go with this look.",
     "linkOwn": "Link from my wardrobe",
-    "noOwn": "Your wardrobe is empty."
+    "noOwn": "Your wardrobe is empty.",
+    "photos_one": "{{count}} photo",
+    "photos_other": "{{count}} photos"
   },
   "shop": {
     "toList": "List",
