@@ -325,3 +325,41 @@ export function SwipeRow({ onDelete, children, card }: { onDelete: () => void; c
     </div>
   )
 }
+
+// Text input with a suggestion dropdown. Replaces <datalist>, which iOS Safari
+// shows only as keyboard suggestions instead of a list.
+export function Combo({ value, options, onChange, placeholder }: {
+  value: string; options: string[]; onChange: (v: string) => void; placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+  const q = value.trim().toLowerCase()
+  const exact = options.some(o => o.toLowerCase() === q)
+  const shown = (q && !exact ? options.filter(o => o.toLowerCase().includes(q)) : options).slice(0, 50)
+  return (
+    <div className="combo" ref={box}>
+      <input value={value} placeholder={placeholder} autoComplete="off"
+        onChange={e => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Tab') setOpen(false) }} />
+      {options.length > 0 && (
+        <button type="button" className="combo-toggle" tabIndex={-1} aria-label="Show options"
+          onMouseDown={e => { e.preventDefault(); setOpen(o => !o) }}><Icon name="chevron" /></button>
+      )}
+      {open && shown.length > 0 && (
+        <ul className="combo-list" role="listbox">
+          {shown.map(o => (
+            <li key={o} role="option" aria-selected={o === value} className={o === value ? 'on' : ''}
+              onMouseDown={e => { e.preventDefault(); onChange(o); setOpen(false) }}>{o}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}

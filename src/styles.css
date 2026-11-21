@@ -393,7 +393,7 @@ h4 { margin: 14px 0 6px; font-size: 13px; text-transform: uppercase; letter-spac
 /* Composition editor */
 .materials { display: flex; flex-direction: column; gap: 8px; }
 .material-row { display: flex; gap: 8px; align-items: center; }
-.material-row > input { flex: 1; min-width: 0; }
+.material-row > input, .material-row > .combo { flex: 1; min-width: 0; }
 .material-row .pct { position: relative; width: 84px; flex: none; }
 .material-row .pct input { width: 100%; padding-right: 26px; }
 .material-row .pct span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
@@ -759,3 +759,15 @@ a.store-link { background: var(--soft); }
 }
 .tile-multi { position: absolute; top: 8px; left: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(0, 0, 0, .45); color: #fff; }
 .tile-multi .icon { width: 15px; height: 15px; }
+
+/* Combo: input with a suggestion dropdown (works on iOS, unlike datalist) */
+.combo { position: relative; }
+.combo > input { padding-right: 40px; }
+.combo-toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; color: var(--muted); }
+.combo-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: 4px; list-style: none;
+  max-height: 240px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.combo-list li { padding: 11px 12px; border-radius: 8px; cursor: pointer; }
+.combo-list li:hover, .combo-list li.on { background: var(--bg); }

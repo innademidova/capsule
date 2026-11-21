@@ -3,7 +3,7 @@ import {
   supabase, CATEGORIES, COLORS, SEASONS, STYLES, OCCASIONS, KINDS, categoryLabel, labelOf, itemTitle, kindLabel, kindId, materialLabel, materialName,
   processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
-import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel, AIActions } from './ui'
+import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel, AIActions, Combo } from './ui'
 import { go, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
@@ -324,7 +324,7 @@ function MaterialsInput({ value, names, onChange }: { value: Material[]; names: 
     <div className="materials">
       {rows.map((r, i) => (
         <div key={i} className="material-row">
-          <input list="materials" placeholder={t('form.materialPlaceholder')} value={r.name} onChange={e => put(i, { name: e.target.value })} />
+          <Combo placeholder={t('form.materialPlaceholder')} value={r.name} options={names} onChange={v => put(i, { name: v })} />
           <label className="pct">
             <input type="number" inputMode="numeric" min={0} max={100} placeholder="%" value={r.pct ?? ''}
               onChange={e => put(i, { pct: e.target.value === '' ? null : Math.max(0, Math.min(100, Math.round(+e.target.value))) })} />
@@ -333,7 +333,6 @@ function MaterialsInput({ value, names, onChange }: { value: Material[]; names: 
           <button type="button" className="icon-btn" aria-label={t('form.removeMaterial')} onClick={() => onChange(rows.filter((_, j) => j !== i))}><Icon name="x" /></button>
         </div>
       ))}
-      <datalist id="materials">{names.map(n => <option key={n} value={n} />)}</datalist>
       <div className="material-foot">
         <button type="button" className="btn ghost" onClick={() => onChange([...rows, { name: '', pct: rows.length && total < 100 && withPct ? 100 - total : null }])}><Icon name="plus" /> {t('form.addMaterial')}</button>
         {withPct > 0 && <span className={'hint' + (total === 100 ? '' : ' warn')}>{t('form.total', { total })}{total !== 100 ? ` ${t('form.totalHint')}` : ''}</span>}
@@ -726,8 +725,8 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         </Section>
 
         <Section title={t('field.type')}>
-          <input list="kinds" placeholder={t('form.typePlaceholder')} value={d.kind ?? ''} onChange={e => set({ kind: e.target.value })} />
-          <datalist id="kinds">{(KINDS[d.category] ?? Object.values(KINDS).flat()).map(k => <option key={k} value={kindLabel(k)} />)}</datalist>
+          <Combo placeholder={t('form.typePlaceholder')} value={d.kind ?? ''} onChange={v => set({ kind: v })}
+            options={(KINDS[d.category] ?? Object.values(KINDS).flat()).map(kindLabel)} />
         </Section>
 
         <Section title={t('field.name')}>
@@ -741,8 +740,7 @@ export function ItemForm({ item, wish, onSaved }: { item?: Item; wish?: boolean;
         </Section>
 
         <Section title={t('field.brand')}>
-          <input list="brands" placeholder={t('form.brandPlaceholder')} value={d.brand ?? ''} onChange={e => set({ brand: e.target.value })} />
-          <datalist id="brands">{brands.map(b => <option key={b} value={b} />)}</datalist>
+          <Combo placeholder={t('form.brandPlaceholder')} value={d.brand ?? ''} options={brands} onChange={v => set({ brand: v })} />
         </Section>
 
         {(wish || item?.wishlist) && (
