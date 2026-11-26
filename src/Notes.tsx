@@ -2,7 +2,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { supabase, CATEGORIES, OCCASIONS, categoryLabel, labelOf, itemTitle, type ShopItem, type Note, type Item } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, Chips, Section, Sheet, SwipeRow } from './ui'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { t, formatDate } from './i18n'
 
 // "Looking for" (things to find, with or without a picture or a shop) lives in the Looking for tab;
@@ -74,7 +74,7 @@ export function FindList() {
   if (!shopping.length) return (
     <div className="card find-empty">
       <p className="muted">{t('notes.findEmpty')}</p>
-      <button className="btn primary sm" onClick={() => go('/f/new')}><Icon name="plus" /> {t('common.add')}</button>
+      <Link className="btn primary sm" to={'/f/new'}><Icon name="plus" /> {t('common.add')}</Link>
     </div>
   )
   return (
@@ -129,7 +129,7 @@ function FindRow({ s, onToggle, byNeed }: { s: ShopItem; onToggle: (s: ShopItem)
     <SwipeRow onDelete={del}><div className={'find-row' + (s.done ? ' done' : '')}>
       <button className={'check' + (s.done ? ' on' : '')} onClick={() => onToggle(s)}
         aria-label={s.done ? t('shop.markNotBought') : t('shop.markBought')} title={s.done ? t('shop.markNotBought') : t('shop.markBought')}><Icon name="check" /></button>
-      <button className="find-body" onClick={() => go(`/f/${s.id}`)}>
+      <Link className="find-body" to={`/f/${s.id}`}>
         <span className="find-name">{s.name}{s.priority === 1 && !s.done && !byNeed && <span className="pill p1">{priorityLabel(1)}</span>}</span>
         {s.why && <span className="find-why">{s.why}</span>}
         {meta && (
@@ -146,7 +146,7 @@ function FindRow({ s, onToggle, byNeed }: { s: ShopItem; onToggle: (s: ShopItem)
             )}
           </span>
         )}
-      </button>
+      </Link>
     </div></SwipeRow>
   )
 }
@@ -201,10 +201,10 @@ function FindView({ entry, onEdit }: { entry: ShopItem; onEdit: () => void }) {
           {cands.length > 0 ? (
             <div className="mini-list">
               {cands.map(i => (
-                <button key={i.id} className={'mini' + (i.wishlist ? '' : ' owned')} onClick={() => go(`/i/${i.id}`)}>
+                <Link key={i.id} className={'mini' + (i.wishlist ? '' : ' owned')} to={`/i/${i.id}`}>
                   <Photo path={i.thumb_path ?? i.photo_path} alt="" />
                   <span>{itemTitle(i)}</span>
-                </button>
+                </Link>
               ))}
             </div>
           ) : <p className="muted small">{t('notes.candidatesEmpty')}</p>}
@@ -295,7 +295,7 @@ export function ForEntries({ item }: { item: Item }) {
   return (
     <div className="card">
       <h3 className="card-title"><Icon name="search" /> {t('notes.forEntries')}</h3>
-      <div className="chips">{list.map(s => <button key={s.id} className="chip" onClick={() => go(`/f/${s.id}`)}>{s.name}</button>)}</div>
+      <div className="chips">{list.map(s => <Link key={s.id} className="chip" to={`/f/${s.id}`}>{s.name}</Link>)}</div>
     </div>
   )
 }
@@ -464,10 +464,10 @@ export function Bloggers() {
                   <span className="blogger-text"><b>{n.title}</b>{n.body && <span className="muted small">{n.body}</span>}</span>
                 </a>
                 {looks.length > 0 && (
-                  <button className="blogger-looks" onClick={() => go(`/inspo/by/${n.id}`)} aria-label={t('inspo.byBlogger', { name: n.title })}>
+                  <Link className="blogger-looks" to={`/inspo/by/${n.id}`} aria-label={t('inspo.byBlogger', { name: n.title })}>
                     {looks.slice(0, 3).map(i => <Photo key={i.id} path={i.thumb_path ?? i.image_path} alt="" className="cover" />)}
                     {looks.length > 3 && <span className="find-more">+{looks.length - 3}</span>}
-                  </button>
+                  </Link>
                 )}
                 <button className="icon-btn" onClick={() => setOpen(n)} aria-label={t('common.edit')}><Icon name="edit" /></button>
               </div></SwipeRow>

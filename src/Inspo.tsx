@@ -5,7 +5,7 @@ import {
 } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Photo, AIActions, RequestState, Carousel } from './ui'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { Bloggers, profileOf } from './Notes'
 import { t } from './i18n'
 
@@ -118,12 +118,12 @@ function InspoPhotos({ blogger }: { blogger?: string }) {
       ) : (
         <div className="grid inspo-grid">
           {shown.map(i => (
-            <button key={i.id} className="inspo-tile" onClick={() => go(`/n/${i.id}`)}>
+            <Link key={i.id} className="inspo-tile" to={`/n/${i.id}`}>
               <Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" />
               {i.more_photos?.length > 0 && <span className="tile-multi" title={t('inspo.photos', { count: i.more_photos.length + 1 })}><Icon name="layers" /></span>}
               {i.analysis ? <span className="badge"><Icon name="check" /></span>
                 : requests.some(r => r.kind === 'inspo' && r.input.inspiration_id === i.id && r.status === 'queued') && <span className="badge"><Icon name="clock" /></span>}
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -220,7 +220,7 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
                         <span className="muted small">{categoryLabel(p.category)}{p.note ? ` · ${p.note}` : ''}</span>
                         {own.length > 0 && (
                           <div className="mini-list">
-                            {own.map(i => <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}><Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span></button>)}
+                            {own.map(i => <Link key={i.id} className="mini" to={`/i/${i.id}`}><Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span></Link>)}
                           </div>
                         )}
                       </div>
@@ -284,7 +284,7 @@ function BloggerPick({ insp }: { insp: Inspiration }) {
         {cur?.url && <a className="store-link" href={cur.url} target="_blank" rel="noopener noreferrer" title={t('notes.openProfile')} aria-label={t('notes.openProfile')}>
           <Icon name={cur.url.includes('instagram.com') ? 'instagram' : 'link'} /></a>}
       </div>
-      {more > 1 && <button className="link-btn" onClick={() => go(`/inspo/by/${cur!.id}`)}>{t('inspo.allFrom', { name: cur!.title, count: more })}</button>}
+      {more > 1 && <Link className="link-btn" to={`/inspo/by/${cur!.id}`}>{t('inspo.allFrom', { name: cur!.title, count: more })}</Link>}
     </div>
   )
 }
@@ -314,10 +314,10 @@ function LinkedPart({ insp, pool, icon, title, empty, link, none }: { insp: Insp
       {linked.length > 0 ? (
         <div className="mini-list">
           {linked.map(i => (
-            <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}>
+            <Link key={i.id} className="mini" to={`/i/${i.id}`}>
               <Photo path={i.thumb_path ?? i.photo_path} alt="" />
               <span>{itemTitle(i)}</span>
-            </button>
+            </Link>
           ))}
         </div>
       ) : <p className="muted small">{empty}</p>}
@@ -353,7 +353,7 @@ export function InspiredBy({ item }: { item: Item }) {
       <h3 className="card-title"><Icon name="image" /> {linked.length ? t('item.inspiredBy', { count: linked.length }) : t('item.inspiredByNone')}</h3>
       {linked.length > 0 && (
         <div className="pick-grid">
-          {linked.map(i => <button key={i.id} className="pick look" onClick={() => go(`/n/${i.id}`)}><Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" /></button>)}
+          {linked.map(i => <Link key={i.id} className="pick look" to={`/n/${i.id}`}><Photo path={i.thumb_path ?? i.image_path} alt="" className="cover" /></Link>)}
         </div>
       )}
       {inspirations.length > 0 && <button className="btn sm" onClick={() => setOpen(o => !o)}><Icon name={open ? 'check' : 'link'} /> {open ? t('common.done') : t('item.linkLooks')}</button>}

@@ -5,7 +5,7 @@ import {
 } from './lib'
 import { useStore, upsert, without } from './store'
 import { Icon, Header, Collage, Chips, Section, Photo, AIActions, RequestState, Sheet } from './ui'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { t } from './i18n'
 
 const outfitItems = (o: { layout: Placement[] }, items: Item[]) =>
@@ -31,10 +31,10 @@ export function OutfitList() {
       <Header title={t('outfits.title')} right={
         <button className={'icon-btn' + (fav ? ' fav' : '')} onClick={() => setFav(f => !f)} aria-label={t('wardrobe.favorites')}><Icon name="heart" filled={fav} /></button>
       } />
-      <button className="card stylist-cta" onClick={() => go('/stylist')}>
+      <Link className="card stylist-cta" to={'/stylist'}>
         <span className="cta-icon"><Icon name="sparkle" /></span>
         <span><b>{t('outfits.askStylist')}</b><span className="muted small">{t('outfits.askStylistHint')}</span></span>
-      </button>
+      </Link>
       <div className="seg outfit-filter" role="tablist">
         {(['all', 'ai', 'mine', 'worn'] as const).map(id => (
           <button key={id} role="tab" aria-selected={kind === id} className={kind === id ? 'on' : ''} onClick={() => pick(id)}>
@@ -61,17 +61,17 @@ export function OutfitList() {
           <h2>{t('outfits.empty')}</h2>
           <p className="muted">{t('outfits.emptyHint')}</p>
           <button className="btn primary" onClick={() => go('/o/new')} disabled={!items.length}><Icon name="plus" /> {t('outfits.new')}</button>
-          <button className="btn" onClick={() => go('/o/photo')}><Icon name="camera" /> {t('outfits.addPhoto')}</button>
+          <Link className="btn" to={'/o/photo'}><Icon name="camera" /> {t('outfits.addPhoto')}</Link>
         </div>
       ) : !shown.length ? <p className="muted center pad">{t('common.nothingYet')}</p> : (
         <div className="grid outfits">
           {shown.map(o => (
-            <button key={o.id} className="tile" onClick={() => go(`/o/${o.id}`)}>
+            <Link key={o.id} className="tile" to={`/o/${o.id}`}>
               {o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={all} />}
               {o.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
               {o.miss && <span className="tile-miss"><Icon name="ban" /></span>}
               <span className="tile-name">{o.name || (isWorn(o) ? t('outfits.myOutfit') : t('outfits.outfit'))}</span>
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -125,7 +125,7 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
       <Header title="" left={<button className="icon-btn" onClick={() => back('/outfits')} aria-label={t('common.back')}><Icon name="back" /></button>}
         right={<>
           <button className={'icon-btn' + (outfit.favorite ? ' fav' : '')} onClick={() => patch({ favorite: !outfit.favorite })} aria-label={t('common.favorite')}><Icon name="heart" filled={outfit.favorite} /></button>
-          <button className="icon-btn" onClick={() => go(`/o/${outfit.id}/edit`)} aria-label={t('common.edit')}><Icon name="edit" /></button>
+          <Link className="icon-btn" to={`/o/${outfit.id}/edit`} aria-label={t('common.edit')}><Icon name="edit" /></Link>
         </>} />
       <div className="detail">
         {outfit.image_path ? <Photo path={outfit.image_path} alt={title} className="look-post" zoom /> : <Collage layout={outfit.layout} items={all} className="big" />}
@@ -152,10 +152,10 @@ export function OutfitDetail({ outfit }: { outfit: Outfit }) {
             <h3 className="card-title">{t('outfits.pieces')}</h3>
             <div className="mini-list">
               {list.map(i => (
-                <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}>
+                <Link key={i.id} className="mini" to={`/i/${i.id}`}>
                   <Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span>
                   {i.wishlist && <span className="mini-wish">{t('wardrobe.wishlist')}</span>}
-                </button>
+                </Link>
               ))}
             </div>
           </div>}

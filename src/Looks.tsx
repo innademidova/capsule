@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { supabase, autoLayout, askAI, renderLook, currentWeather, itemTitle, kindLabel, type Item, type Outfit, type AIRequest, type LookIdea, type LooksResult } from './lib'
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState } from './ui'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { t } from './i18n'
 
 const pick = (ids: string[], items: Item[]) => ids.map(id => items.find(i => i.id === id)).filter((i): i is Item => !!i)
@@ -13,7 +13,7 @@ const pick = (ids: string[], items: Item[]) => ids.map(id => items.find(i => i.i
 export function FlatLay({ items }: { items: Item[] }) {
   return (
     <div className="look-flat">
-      {items.map(i => <button key={i.id} onClick={() => go(`/i/${i.id}`)}><Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} /></button>)}
+      {items.map(i => <Link key={i.id} to={`/i/${i.id}`}><Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} /></Link>)}
     </div>
   )
 }

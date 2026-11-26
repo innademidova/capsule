@@ -4,7 +4,7 @@ import {
   processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, canPaste, pasteImage, askAI, whiteToAlpha, generateGarment, splitSet, cents, compositionText, looksFor, BRANDS, MATERIALS, type Material, type Item, type Processed, type AIRequest,
 } from './lib'
 import { Chips, Icon, Photo, Header, Section, Swatch, Collage, Carousel, AIActions, Combo } from './ui'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { useStore, upsert } from './store'
 import { t } from './i18n'
 import { InspiredBy } from './Inspo'
@@ -96,26 +96,26 @@ export function WardrobeList({ items, filters, setFilters, wish }: {
           <Icon name="hanger" />
           <h2>{wish ? t('wardrobe.emptyWish') : t('wardrobe.empty')}</h2>
           <p className="muted">{wish ? t('wardrobe.emptyWishHint') : t('wardrobe.emptyHint')}</p>
-          <button className="btn primary" onClick={() => go(newPath)}><Icon name="plus" /> {t('wardrobe.addItem')}</button>
+          <Link className="btn primary" to={newPath}><Icon name="plus" /> {t('wardrobe.addItem')}</Link>
         </div>
       ) : shown.length === 0 ? (
         <p className="muted center pad">{t('wardrobe.noMatch')}</p>
       ) : (
         <div className="grid">
           {shown.map(i => (
-            <button key={i.id} className="tile" onClick={() => go(`/i/${i.id}`)}>
+            <Link key={i.id} className="tile" to={`/i/${i.id}`}>
               <Photo path={i.thumb_path ?? i.photo_path} alt={itemTitle(i)} />
               {wish && i.need ? <span className="tile-tags"><span className={`need-pill p${i.need}`}>{t(`wish.need${i.need}`)}</span>{i.favorite && <Icon name="heart" filled />}</span>
                 : i.favorite && <span className="tile-fav"><Icon name="heart" filled /></span>}
               {need(i.id) > 0 && <span className="tile-need" title={t('item.inspiredBy', { count: need(i.id) })}><Icon name="image" />{need(i.id)}</span>}
               <span className="tile-name">{itemTitle(i)}</span>
               <span className="tile-colors">{i.colors.slice(0, 4).map(c => <Swatch key={c} id={c} size={10} />)}</span>
-            </button>
+            </Link>
           ))}
         </div>
       )}
 
-      <button className="fab" onClick={() => go(newPath)} aria-label={t('wardrobe.addItem')}><Icon name="plus" /></button>
+      <Link className="fab" to={newPath} aria-label={t('wardrobe.addItem')}><Icon name="plus" /></Link>
     </div>
   )
 }
@@ -231,7 +231,7 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
       <Header title="" left={<button className="icon-btn" onClick={() => back(home)} aria-label={t('common.back')}><Icon name="back" /></button>}
         right={<>
           <button className={'icon-btn' + (item.favorite ? ' fav' : '')} onClick={toggleFav} aria-label={t('common.favorite')}><Icon name="heart" filled={item.favorite} /></button>
-          <button className="icon-btn" onClick={() => go(`/i/${item.id}/edit`)} aria-label={t('common.edit')}><Icon name="edit" /></button>
+          <Link className="icon-btn" to={`/i/${item.id}/edit`} aria-label={t('common.edit')}><Icon name="edit" /></Link>
         </>} />
       <div className="detail">
         <div className="carousel">
@@ -261,12 +261,12 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
           {item.link && (
             <a className="btn" href={item.link} target="_blank" rel="noopener noreferrer"><Icon name="link" /> {t('item.openShop')}<span className="cost">{hostOf(item.link)}</span></a>
           )}
-          <button className="btn wide ai-fill" onClick={() => go(`/style/${item.id}`)}><Icon name="sparkle" /> {t('item.styleIt')}</button>
+          <Link className="btn wide ai-fill" to={`/style/${item.id}`}><Icon name="sparkle" /> {t('item.styleIt')}</Link>
           {item.wishlist ? (
             <button className="btn primary" onClick={bought} disabled={busy}><Icon name="check" /> {t('item.bought')}</button>
           ) : <>
             <div className="row wrap">
-              <button className="btn primary" onClick={() => go(`/o/new/${item.id}`)}><Icon name="layers" /> {t('item.buildOutfit')}</button>
+              <Link className="btn primary" to={`/o/new/${item.id}`}><Icon name="layers" /> {t('item.buildOutfit')}</Link>
             </div>
           </>}
           {item.wishlist && <NeedPicker item={item} onChange={onChange} />}
@@ -276,16 +276,16 @@ export function ItemDetail({ item, onChange, onDelete }: { item: Item; onChange:
             <div className="card">
               <h3 className="card-title">{t('item.partOfSet')}</h3>
               <div className="set-mates">
-                {mates.map(m => <button key={m.id} onClick={() => go(`/i/${m.id}`)}><Photo path={m.thumb_path ?? m.photo_path} alt={itemTitle(m)} /><span>{itemTitle(m)}</span></button>)}
+                {mates.map(m => <Link key={m.id} to={`/i/${m.id}`}><Photo path={m.thumb_path ?? m.photo_path} alt={itemTitle(m)} /><span>{itemTitle(m)}</span></Link>)}
               </div>
-              {!item.wishlist && <button className="btn" onClick={() => go(`/o/new/${[item.id, ...mates.map(m => m.id)].join(',')}`)}><Icon name="layers" /> {t('item.outfitWithSet')}</button>}
+              {!item.wishlist && <Link className="btn" to={`/o/new/${[item.id, ...mates.map(m => m.id)].join(',')}`}><Icon name="layers" /> {t('item.outfitWithSet')}</Link>}
             </div>
           )}
           {inOutfits.length > 0 && (
             <div className="card">
               <h3 className="card-title">{t('item.inOutfits', { count: inOutfits.length })}</h3>
               <div className="mini-outfits">
-                {inOutfits.map(o => <button key={o.id} onClick={() => go(`/o/${o.id}`)}>{o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={[...items, ...wishlist]} />}</button>)}
+                {inOutfits.map(o => <Link key={o.id} to={`/o/${o.id}`}>{o.image_path ? <Photo path={o.image_path} alt="" className="look-thumb" /> : <Collage layout={o.layout} items={[...items, ...wishlist]} />}</Link>)}
               </div>
             </div>
           )}

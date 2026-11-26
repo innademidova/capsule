@@ -92,7 +92,8 @@ function backdropOf(img: HTMLImageElement): string | null {
   } catch { return null } // no CORS: keep the default look
 }
 
-export function Photo({ path, alt, className, zoom }: { path: string | null; alt: string; className?: string; zoom?: boolean }) {
+// onZoom: the caller opens its own full-screen view (a carousel opens all its photos)
+export function Photo({ path, alt, className, zoom, onZoom }: { path: string | null; alt: string; className?: string; zoom?: boolean; onZoom?: () => void }) {
   const [url, setUrl] = useState<string>()
   const [open, setOpen] = useState(false)
   const [bg, setBg] = useState<string | null | undefined>(path ? backdrops.get(path) : undefined)
@@ -109,21 +110,35 @@ export function Photo({ path, alt, className, zoom }: { path: string | null; alt
   }, [path])
   return (
     <div className={'photo ' + (className ?? '') + (zoom && url ? ' zoomable' : '') + (bg ? ' full' : '')} style={bg ? { background: bg } : undefined}
-      onClick={zoom && url ? () => setOpen(true) : undefined}>
+      onClick={zoom && url ? () => (onZoom ? onZoom() : setOpen(true)) : undefined}>
       {url ? <img src={url} alt={alt} loading="lazy" crossOrigin="anonymous" onLoad={onLoad} /> : <span className="photo-empty"><Icon name="hanger" /></span>}
-      {open && url && <Lightbox url={url} alt={alt} onClose={() => setOpen(false)} />}
+      {open && url && <Lightbox urls={[url]} alt={alt} onClose={() => setOpen(false)} />}
     </div>
   )
 }
 
-function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: () => void }) {
+// Full-screen view of one or several photos: arrow keys, side buttons and swipes flip them
+function Lightbox({ urls, alt, start = 0, onClose }: { urls: string[]; alt: string; start?: number; onClose: (at: number) => void }) {
   const [saving, setSaving] = useState(false)
+  const [at, setAt] = useState(start)
+  const url = urls[at]
+  const step = (d: number) => setAt(i => Math.max(0, Math.min(urls.length - 1, i + d)))
+  const close = () => onClose(at)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1) }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
+    }
     addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  })
+  useEffect(() => {
     document.body.style.overflow = 'hidden'
-    return () => { removeEventListener('keydown', onKey); document.body.style.overflow = '' }
-  }, [onClose])
+    return () => { document.body.style.overflow = '' }
+  }, [])
+  // Horizontal swipe on touch screens
+  const swipe = useRef<{ x: number; y: number } | null>(null)
   // On phones the share sheet has "Save image"; elsewhere a normal file download
   const download = async () => {
     setSaving(true)
@@ -142,12 +157,22 @@ function Lightbox({ url, alt, onClose }: { url: string; alt: string; onClose: ()
     } finally { setSaving(false) }
   }
   return createPortal(
-    <div className="lightbox" onClick={e => { e.stopPropagation(); onClose() }}>
+    <div className="lightbox" onClick={e => { e.stopPropagation(); close() }}
+      onPointerDown={e => { if (e.pointerType !== 'mouse') swipe.current = { x: e.clientX, y: e.clientY } }}
+      onPointerUp={e => {
+        const s = swipe.current; swipe.current = null
+        if (!s) return
+        const dx = e.clientX - s.x, dy = e.clientY - s.y
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1)
+      }}>
       <div className="lightbox-bar" onClick={e => e.stopPropagation()}>
+        {urls.length > 1 && <span className="lightbox-count">{at + 1} / {urls.length}</span>}
         <button className="icon-btn" onClick={download} disabled={saving} aria-label={t('common.download')}><Icon name="download" /></button>
-        <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><Icon name="x" /></button>
+        <button className="icon-btn" onClick={close} aria-label={t('common.close')}><Icon name="x" /></button>
       </div>
-      <img src={url} alt={alt} onClick={e => e.stopPropagation()} />
+      {at > 0 && <button className="icon-btn lightbox-nav prev" onClick={e => { e.stopPropagation(); step(-1) }} aria-label={t('common.previous')}><Icon name="back" /></button>}
+      {at < urls.length - 1 && <button className="icon-btn lightbox-nav next" onClick={e => { e.stopPropagation(); step(1) }} aria-label={t('common.next')}><Icon name="back" /></button>}
+      <img key={url} src={url} alt={alt} onClick={e => e.stopPropagation()} />
     </div>, document.body)
 }
 
@@ -248,7 +273,9 @@ export function Sheet({ title, onClose, children, sticky, top, foot, className }
 // Several photos of one item: swipe sideways, dots show where you are; each photo opens full screen
 export function Carousel({ paths, alt, onRemove, photoClass = 'big' }: { paths: string[]; alt: string; onRemove?: (path: string) => void; photoClass?: string }) {
   const [at, setAt] = useState(0)
+  const [full, setFull] = useState<{ urls: string[]; start: number } | null>(null)
   const track = useRef<HTMLDivElement>(null)
+  const zoom = (n: number) => signedUrls(paths).then(m => setFull({ urls: paths.map(p => m[p]).filter(Boolean), start: n }))
   const onScroll = (e: UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     setAt(Math.round(el.scrollLeft / el.clientWidth))
@@ -275,11 +302,12 @@ export function Carousel({ paths, alt, onRemove, photoClass = 'big' }: { paths: 
       <div className="carousel-track" ref={track} onScroll={onScroll}>
         {paths.map((p, n) => (
           <div key={p} className="carousel-slide">
-            <Photo path={p} alt={alt} className={photoClass} zoom />
+            <Photo path={p} alt={alt} className={photoClass} zoom onZoom={() => zoom(n)} />
             {onRemove && n > 0 && <button className="icon-btn sm carousel-del" onClick={() => onRemove(p)} aria-label={t('common.delete')}><Icon name="trash" /></button>}
           </div>
         ))}
       </div>
+      {full && <Lightbox urls={full.urls} alt={alt} start={full.start} onClose={i => { setFull(null); goTo(i) }} />}
       {paths.length > 1 && <div className="carousel-dots">{paths.map((p, n) => <button key={p} className={n === at ? 'on' : ''} onClick={() => goTo(n)} aria-label={String(n + 1)} />)}</div>}
     </div>
   )

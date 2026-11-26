@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type AnchorHTMLAttributes } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   supabase, applyDict, type DictRow,
@@ -67,6 +67,18 @@ function parse(hash: string): Route {
 // How many steps we took inside the app, so that "back" never leaves it
 let depth = 0
 export const go = (path: string) => { depth++; forward = true; location.hash = path }
+
+// A real link to an app screen: a normal click stays in the app (like go()), while a middle click,
+// Cmd/Ctrl+click or the context menu open the screen in a new tab
+const modified = (e: React.MouseEvent) => e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey
+export function Link({ to, className, replace, onClick, ...rest }: { to: string; replace?: boolean } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
+  return <a {...rest} href={'#' + to} className={'nav-link' + (className ? ' ' + className : '')} onClick={e => {
+    onClick?.(e)
+    if (e.defaultPrevented || modified(e)) return
+    e.preventDefault()
+    if (replace) { if (location.hash !== '#' + to) location.replace('#' + to) } else go(to)
+  }} />
+}
 export const back = (fallback: string) => {
   if (depth > 0) { depth--; returning = true; history.back() }
   else { forward = true; location.replace('#' + fallback) }
@@ -271,9 +283,10 @@ function Main({ email }: { email: string }) {
         <nav className="tabbar" aria-label={t('nav.main')}>
           <div className="side-brand">Capsule</div>
           {tabs.map(x => (
-            <button key={x.id} className={'tab' + (tab === x.id ? ' on' : '')} aria-current={tab === x.id ? 'page' : undefined} onClick={() => tab !== x.id && location.replace('#' + x.path)}>
+            <Link key={x.id} to={x.path} replace className={'tab' + (tab === x.id ? ' on' : '')} aria-current={tab === x.id ? 'page' : undefined}
+              onClick={e => { if (tab === x.id && !modified(e)) e.preventDefault() }}>
               <Icon name={x.icon} /><span>{t(`nav.${x.id}`)}</span>
-            </button>
+            </Link>
           ))}
         </nav>
       </div>

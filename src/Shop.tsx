@@ -6,7 +6,7 @@ import {
 import { useStore, upsert } from './store'
 import { Icon, Header, Photo, AIActions, RequestState, Section } from './ui'
 import { FindList } from './Notes'
-import { go, back } from './App'
+import { go, Link, back } from './App'
 import { t, formatDate } from './i18n'
 
 const priority = (p: number) => [1, 2, 3].includes(p) ? t(`shop.priority.${p}`) : ''
@@ -36,12 +36,12 @@ export function Shop() {
   return (
     <div className="screen">
       <Header title={t('nav.shop')}
-        right={<button className="icon-btn" onClick={() => go('/f/new')} aria-label={t('notes.newFind')}><Icon name="plus" /></button>} />
+        right={<Link className="icon-btn" to={'/f/new'} aria-label={t('notes.newFind')}><Icon name="plus" /></Link>} />
       <div className="notes-body">
-        <button className="card stylist-cta" onClick={() => go('/buy')}>
+        <Link className="card stylist-cta" to={'/buy'}>
           <span className="cta-icon"><Icon name="bag" /></span>
           <span><b>{t('shop.beforeBuy')}</b><span className="muted small">{t('shop.beforeBuyHint')}</span></span>
-        </button>
+        </Link>
         <FindList />
         <div className="card find-check">
           <h3 className="card-title"><Icon name="sparkle" /> {t('shop.check')}</h3>
@@ -146,7 +146,7 @@ export function BeforeBuy() {
 export function MiniItems({ items }: { items: Item[] }) {
   return (
     <div className="mini-list">
-      {items.map(i => <button key={i.id} className="mini" onClick={() => go(`/i/${i.id}`)}><Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span></button>)}
+      {items.map(i => <Link key={i.id} className="mini" to={`/i/${i.id}`}><Photo path={i.thumb_path ?? i.photo_path} alt="" /><span>{itemTitle(i)}</span></Link>)}
     </div>
   )
 }

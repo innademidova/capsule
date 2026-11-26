@@ -57,6 +57,8 @@ Without `ANTHROPIC_API_KEY` every "now" AI task runs on OpenAI (`useOpenAI()` in
 Test data: the 15 illustrated basics from `scripts/seed-basics.mjs` were deleted on 2026-11-04 at her request; her real
 items start with the beige cropped trench (2026-11-04). Do not seed test items again.
 
+**Navigation links and photo viewer** (2026-11-26): screen-to-screen navigation uses `Link` (App.tsx), a real `<a href="#/...">` that calls `go()` on a plain click, so a middle click / Cmd+click opens the screen in a new tab (her request); use it instead of `<button onClick={() => go(...)}>` for new navigation. Tab bar links use `replace`. The full-screen photo viewer (`Lightbox` in ui.tsx) flips through all photos of a carousel with arrow keys, side buttons and swipes and shows "n / total"; closing it leaves the carousel on that photo.
+
 ## AI: two modes, her choice per action (same pattern as perfume-diary)
 
 Photo tagging (`tag`, "Fill in with AI") runs on OpenAI (`gpt-6.1-terra`, secret `OPENAI_API_KEY`); every other "now" action uses Claude. Every AI action creates a row in `ai_requests` (kind `tag|outfits|inspo|formulas|gaps|buy`).
