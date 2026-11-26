@@ -778,3 +778,14 @@ a.store-link { background: var(--soft); }
 }
 .combo-list li { padding: 11px 12px; border-radius: 8px; cursor: pointer; }
 .combo-list li:hover, .combo-list li.on { background: var(--bg); }
+
+/* Inspiration look page: step to the previous / next look (Instagram-like feed) */
+.look-count { font-size: 13px; font-weight: 600; color: var(--muted); }
+.look-step .icon { transform: rotate(90deg); }
+.look-step.down .icon { transform: rotate(-90deg); }
+.look-step:disabled { opacity: .3; cursor: default; }
+@media (pointer: coarse) { .look-swipe .photo, .look-swipe .carousel-track { touch-action: pan-x pinch-zoom; } }
+.detail.enter-up { animation: look-up .22s ease; }
+.detail.enter-down { animation: look-down .22s ease; }
+@keyframes look-up { from { opacity: 0; transform: translateY(40px); } }
+@keyframes look-down { from { opacity: 0; transform: translateY(-40px); } }

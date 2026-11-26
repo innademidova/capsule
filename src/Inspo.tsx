@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import {
   supabase, processPhoto, uploadPhoto, uploadExtraPhoto, removePhotos, askAI, categoryLabel, itemTitle, linkInspo, looksFor,
   type Inspiration, type AIRequest, type ShopItem, type Item, type Note,
@@ -10,6 +10,12 @@ import { Bloggers, profileOf } from './Notes'
 import { t } from './i18n'
 
 export type InspoTab = 'photos' | 'bloggers'
+
+// The order of the grid she opened a look from (all looks or one blogger's), so the look page
+// can step to the previous / next one like an Instagram feed
+let feed: string[] = []
+// Which way the last step went, so the next look slides in from that side
+let slide: 'up' | 'down' | '' = ''
 
 // Two parts: her inspiration photos (#/inspo, or one blogger's looks at #/inspo/by/<blogger note id>)
 // and her favourite bloggers (#/inspo/bloggers)
@@ -46,6 +52,7 @@ function InspoPhotos({ blogger }: { blogger?: string }) {
   // One blogger's looks: photos added here are marked as theirs
   const by = blogger ? notes.find(n => n.id === blogger) : undefined
   const shown = blogger ? inspirations.filter(i => i.blogger_id === blogger) : inspirations
+  feed = shown.map(i => i.id)
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [fBusy, setFBusy] = useState(false)
@@ -134,7 +141,37 @@ function InspoPhotos({ blogger }: { blogger?: string }) {
 
 
 export function InspoDetail({ insp }: { insp: Inspiration }) {
-  const { items, requests, setInspirations, setRequests, setShopping } = useStore()
+  const { items, inspirations, requests, setInspirations, setRequests, setShopping } = useStore()
+  // Previous / next look: up/down arrow keys and the header buttons; on phones a vertical swipe on the photo
+  // (a sideways swipe flips the photos of this look). Steps replace the history entry, so Back returns to the grid.
+  const order = feed.includes(insp.id) ? feed : inspirations.map(i => i.id)
+  const pos = order.indexOf(insp.id)
+  const prevId = pos > 0 ? order[pos - 1] : undefined
+  const nextId = pos >= 0 && pos < order.length - 1 ? order[pos + 1] : undefined
+  const [enter] = useState(() => { const d = slide; slide = ''; return d })
+  const step = (d: 1 | -1) => {
+    const id = d > 0 ? nextId : prevId
+    if (!id) return
+    slide = d > 0 ? 'up' : 'down'
+    location.replace('#/n/' + id)
+  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector('.lightbox, .sheet-bg') || (e.target as HTMLElement).closest?.('input, textarea, select')) return
+      if (e.key === 'ArrowDown') { e.preventDefault(); step(1) }
+      if (e.key === 'ArrowUp') { e.preventDefault(); step(-1) }
+    }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  })
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const onTouchStart = (e: TouchEvent) => { const p = e.touches[0]; touch.current = e.touches.length === 1 ? { x: p.clientX, y: p.clientY } : null }
+  const onTouchEnd = (e: TouchEvent) => {
+    const s = touch.current; touch.current = null
+    if (!s || document.querySelector('.lightbox')) return
+    const p = e.changedTouches[0], dx = p.clientX - s.x, dy = p.clientY - s.y
+    if (Math.abs(dy) > 60 && Math.abs(dy) > Math.abs(dx) * 1.5) step(dy < 0 ? 1 : -1)
+  }
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(insp.note ?? '')
   const req = requests.find(r => r.kind === 'inspo' && r.input.inspiration_id === insp.id)
@@ -184,10 +221,15 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
 
   return (
     <div className="screen">
-      <Header title="" left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label={t('common.back')}><Icon name="back" /></button>}
-        right={<button className="icon-btn" onClick={del} aria-label={t('common.delete')}><Icon name="trash" /></button>} />
-      <div className="detail">
-        <div className="carousel">
+      <Header title={pos >= 0 && order.length > 1 ? <span className="look-count">{pos + 1} / {order.length}</span> : ''}
+        left={<button className="icon-btn" onClick={() => back('/inspo')} aria-label={t('common.back')}><Icon name="back" /></button>}
+        right={<>
+          <button className="icon-btn look-step up" onClick={() => step(-1)} disabled={!prevId} aria-label={t('inspo.prevLook')} title={t('inspo.prevLook') + ' (↑)'}><Icon name="back" /></button>
+          <button className="icon-btn look-step down" onClick={() => step(1)} disabled={!nextId} aria-label={t('inspo.nextLook')} title={t('inspo.nextLook') + ' (↓)'}><Icon name="back" /></button>
+          <button className="icon-btn" onClick={del} aria-label={t('common.delete')}><Icon name="trash" /></button>
+        </>} />
+      <div className={'detail' + (enter ? ' enter-' + enter : '')}>
+        <div className="carousel look-swipe" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {more.length > 0
             ? <Carousel paths={[insp.image_path, ...more]} alt="" onRemove={removeMore} photoClass="big cover-big" />
             : <Photo path={insp.image_path} alt="" className="big cover-big" zoom />}

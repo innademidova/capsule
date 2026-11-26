@@ -249,7 +249,7 @@ function Main({ email }: { email: string }) {
     case 'stylist': screen = <Assistant />; break
     case 'style': { const it = find(route.id); screen = it ? <StyleItem item={it} /> : notFound; break }
     case 'inspo': screen = <InspoList tab={route.tab} blogger={route.blogger} />; break
-    case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail insp={x} /> : notFound; break }
+    case 'insp': { const x = inspirations.find(i => i.id === route.id); screen = x ? <InspoDetail key={x.id} insp={x} /> : notFound; break }
     case 'shop': screen = <Shop />; break
     case 'stores': screen = <Stores />; break
     case 'notes': screen = <NotesScreen key={String(route.rules)} showRules={route.rules} />; break

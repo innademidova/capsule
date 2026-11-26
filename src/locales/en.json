@@ -227,6 +227,8 @@
     "anotherLook": "One more look"
   },
   "inspo": {
+    "prevLook": "Previous look",
+    "nextLook": "Next look",
     "title": "Inspiration",
     "tab": {
       "photos": "Photos",
