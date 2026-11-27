@@ -233,6 +233,10 @@ export function InspoDetail({ insp }: { insp: Inspiration }) {
           {more.length > 0
             ? <Carousel paths={[insp.image_path, ...more]} alt="" onRemove={removeMore} photoClass="big cover-big" />
             : <Photo path={insp.image_path} alt="" className="big cover-big" zoom />}
+          {(prevId || nextId) && <div className="look-pager">
+            {prevId ? <Link to={'/n/' + prevId} replace className="btn ghost sm" onClick={() => { slide = 'down' }}><Icon name="back" /> {t('inspo.prevLook')}</Link> : <span />}
+            {nextId ? <Link to={'/n/' + nextId} replace className="btn ghost sm next" onClick={() => { slide = 'up' }}>{t('inspo.nextLook')} <Icon name="back" /></Link> : <span />}
+          </div>}
           <input ref={moreRef} type="file" accept="image/*" multiple hidden onChange={e => { addMore(e.target.files); e.target.value = '' }} />
           <button className="btn ghost sm" onClick={() => moreRef.current?.click()} disabled={adding}><Icon name="plus" /> {adding ? t('common.uploading') : t('item.addPhotos')}</button>
         </div>
